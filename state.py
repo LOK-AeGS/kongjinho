@@ -110,10 +110,13 @@ class MarketFindings(Findings):
 
 class StakeholderPosition(TypedDict):
     technology_id: TechnologyID
-    group: Literal["competitor", "adopter", "developer", "investor", "industry"]
+    target_name: str
+    target_scope: Literal["selected_technology", "technology_family", "other"]
+    group: Literal["competitor", "operator", "supplier", "investor"]
     speaker: str
     affiliation: str | None
     stance: Literal["positive", "negative", "conditional", "neutral", "unknown"]
+    evidence_stance: Literal["support", "counter", "neutral"]
     claim_ids: list[str]
     bias_notes: list[str]
 

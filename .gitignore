@@ -8,3 +8,5 @@ outputs/**/domain_findings*.json
 data/search_cache/
 data/fetch_cache/
 outputs/index_artifacts/
+outputs/stakeholder/
+outputs/stakeholder-cache/
