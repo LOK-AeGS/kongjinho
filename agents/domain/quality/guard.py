@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from urllib.parse import urlparse
 
-from rag.evidence import normalize_text
-from rag.fetch import has_numeric_with_unit
+from agents.domain.rag.evidence import normalize_text
+from agents.domain.rag.fetch import has_numeric_with_unit
 
 # 단위가 붙은 수치(측정값)만 대조한다.
 # 모든 숫자를 뽑았더니 "DeepSeek-V2" 의 2 를 측정값으로 보고 멀쩡한 주장을 강등시켰다.

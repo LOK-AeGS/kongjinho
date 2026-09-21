@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, TypedDict
 
-from rag.evidence import merge_evidence
+from agents.domain.rag.evidence import merge_evidence
 
 Perspective = Literal["technical", "market", "stakeholder", "domain"]
 

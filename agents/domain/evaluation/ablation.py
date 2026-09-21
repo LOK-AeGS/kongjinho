@@ -3,7 +3,7 @@
 같은 청크 집합과 같은 Golden Set에 대해 세 방식을 돌려 Hit@k, MRR, 지연, 메모리를 잰다.
 측정을 같은 프로세스·같은 입력에서 하지 않으면 수치를 비교할 수 없다.
 
-실행: python -m evaluation.ablation --corpus data/corpus --embedding BAAI/bge-m3
+실행: python -m agents.domain.evaluation.ablation --corpus data/corpus --embedding BAAI/bge-m3
 """
 
 from __future__ import annotations
@@ -16,10 +16,10 @@ import tracemalloc
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from evaluation.golden_set import GOLDEN_SET, GoldenItem, marker_hit
-from rag.evidence import normalize_text
-from rag.fetch import fetch_document
-from rag.index import BM25Index, Chunk, DenseIndex, HybridIndex, chunk_parts
+from agents.domain.evaluation.golden_set import GOLDEN_SET, GoldenItem, marker_hit
+from agents.domain.rag.evidence import normalize_text
+from agents.domain.rag.fetch import fetch_document
+from agents.domain.rag.index import BM25Index, Chunk, DenseIndex, HybridIndex, chunk_parts
 
 DEFAULT_SOURCES = {
     "sw-deepseek-v2": "https://arxiv.org/pdf/2405.04434",
@@ -114,7 +114,7 @@ def run_ablation(
     # 인덱스를 메모리에만 두면 같은 수치를 다시 만들 수 없다. 체크섬과 함께 남긴다.
     artifacts = []
     if artifact_dir is not None:
-        from runtime.artifacts import describe_cache, save_bm25, save_chunks, save_faiss
+        from agents.domain.runtime.artifacts import describe_cache, save_bm25, save_chunks, save_faiss
 
         artifacts.append(save_chunks(chunks, artifact_dir).to_dict())
         artifacts.append(save_bm25(bm25, artifact_dir).to_dict())

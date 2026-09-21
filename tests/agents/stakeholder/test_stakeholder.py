@@ -5,11 +5,12 @@ from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 from langgraph.graph import StateGraph, START, END
-from stakeholder.agent import GROUPS, default_request, run_stakeholder, stakeholder_agent, team_update, validate_observations
-from stakeholder.backend import OpenAIBackend, unpack_search
-from stakeholder.models import Extraction, Observation
-from stakeholder.web import PageFetcher, digest, parse_html
-from team_state import EvaluationState, merge_evidence
+from agents.stakeholder.node import stakeholder_agent, team_update
+from agents.stakeholder.subgraph import GROUPS, default_request, run_stakeholder, validate_observations
+from agents.stakeholder.backend import OpenAIBackend, unpack_search
+from agents.stakeholder.models import Extraction, Observation
+from agents.stakeholder.web import PageFetcher, digest, parse_html
+from graph.team_state import EvaluationState, merge_evidence
 
 URL='https://example.com/source'
 TEXT='The deployment has operational benefits but migration requires careful planning.'

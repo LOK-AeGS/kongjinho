@@ -2,24 +2,23 @@
 
 여기서 검사하는 규칙이 깨지면 근거 없는 주장이 보고서에 실려도 아무도 모른다.
 
-실행: python tests/test_domain_agent.py   (pytest 로도 동작)
+실행: python tests/agents/domain/test_domain_agent.py   (pytest 로도 동작)
 """
 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from agents.domain_agent import (  # noqa: E402
-    DomainAnalysis, DraftClaim, DraftFit, _shape, project_input, summarize_technical,
-)
-from agents.domain_state import merge_by_perspective, to_team_findings  # noqa: E402
-from quality.guard import run_guard  # noqa: E402
-from quality.linter import lint_claims  # noqa: E402
-from rag.evidence import (  # noqa: E402
+from agents.domain.node import project_input, summarize_technical  # noqa: E402
+from agents.domain.subgraph import DomainAnalysis, DraftClaim, DraftFit, _shape  # noqa: E402
+from agents.domain.state import merge_by_perspective, to_team_findings  # noqa: E402
+from agents.domain.quality.guard import run_guard  # noqa: E402
+from agents.domain.quality.linter import lint_claims  # noqa: E402
+from agents.domain.rag.evidence import (  # noqa: E402
     Evidence, make_evidence_id, merge_evidence, normalize_url,
 )
-from rag.websearch import classify_source  # noqa: E402
+from agents.domain.rag.websearch import classify_source  # noqa: E402
 
 AS_OF = "2026-09-22"
 

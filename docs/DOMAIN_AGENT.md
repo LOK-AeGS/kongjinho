@@ -61,7 +61,7 @@ BM25는 영어 질의에서는 완벽하지만 한국어 질의에서는 무너�
 | dense (bge-m3) | 0.875 | 0.875 | 0.875 | 0.875 | 47.6ms | 84.0ms | 0.1MB |
 | hybrid (RRF) | 0.812 | 0.875 | 0.875 | 0.833 | 33.6ms | 36.2ms | 0.1MB |
 
-재현: `python -m evaluation.ablation --embedding BAAI/bge-m3`
+재현: `python -m agents.domain.evaluation.ablation --embedding BAAI/bge-m3`
 
 예상과 달랐던 부분이 있습니다. hybrid가 dense 단독보다 MRR이 낮습니다(0.833 대 0.875).
 RRF 융합이 BM25의 약한 상위 결과를 끌어올리면서 1순위 정확도를 깎은 것으로 보입니다.
@@ -88,7 +88,7 @@ BM25가 1.00으로 dense(0.89)보다 높아, 한쪽을 버리면 그 구간이 �
 
 검색 제공자의 도메인 필터는 신뢰하지 않습니다. Tavily의 `include_domains`에 13개 도메인을
 지정했더니 medium·substack·youtube가 그대로 반환되는 것을 확인했습니다(2개일 때는 정상 동작).
-그래서 결과를 받은 뒤 `rag/websearch.py`의 등급표로 다시 거르고, 거른 이유를 검색 로그에
+그래서 결과를 받은 뒤 `agents/domain/rag/websearch.py`의 등급표로 다시 거르고, 거른 이유를 검색 로그에
 남깁니다.
 
 등급은 paper, patent, standard, vendor, news 다섯이며 등급표에 없는 도메인은 채택하지
@@ -126,7 +126,7 @@ URL 정규화 단계에서 `utm_` 같은 추적 파라미터를 떼는데, 이�
 서브그래프에 넘기는 입력도 `project_input()`으로 추려, 시장·이해관계자 관점의 중간 결론이
 도메인 판단에 새어 들어가지 않게 했습니다.
 
-이 구조는 팀 `state.py`와 다르므로 `agents/domain_state.py`에 따로 두었습니다.
+이 구조는 팀 `state.py`와 다르므로 `agents/domain/state.py`에 따로 두었습니다.
 다른 다섯 에이전트가 작업 중인 상태에서 공유 스키마를 바꾸면 그쪽이 깨지기 때문입니다.
 `to_team_findings()`가 팀 스키마로 되돌리는 변환을 제공하며, 에이전트를 합칠 때 씁니다.
 
@@ -135,7 +135,7 @@ URL 정규화 단계에서 `utm_` 같은 추적 파라미터를 떼는데, 이�
 코드로 답할 수 있는 것을 확률적 판정자에게 맡기면 같은 입력에 다른 결과가 나옵니다.
 그래서 결정적 guard가 먼저 검사하고, LLM judge는 대조로 답할 수 없는 것만 봅니다.
 
-`quality/guard.py`가 보는 것은 citation, locator, quote, numeric unit, date,
+`agents/domain/quality/guard.py`가 보는 것은 citation, locator, quote, numeric unit, date,
 reference integrity입니다.
 
 quote 검사는 근거의 인용문이 수집한 원문 스냅샷에 실제로 있는지를 문자열로 대조합니다.
@@ -147,10 +147,10 @@ quote 검사는 근거의 인용문이 수집한 원문 스냅샷에 실제로 �
 실제로 모델 출력을 거르는 것은 numeric unit 검사입니다. 주장에 쓴 수치가 인용한 근거에
 없으면 위반으로 잡습니다. 모델이 근거에 없는 숫자를 끌어오는 경우가 여기서 걸립니다.
 
-`quality/judge.py`는 coverage와 neutrality만 봅니다. 요구사항 축이 실제로 다뤄졌는지,
+`agents/domain/quality/judge.py`는 coverage와 neutrality만 봅니다. 요구사항 축이 실제로 다뤄졌는지,
 서술이 한쪽으로 기울었는지는 문자열 대조로 답할 수 없습니다.
 
-`quality/linter.py`는 표현을 봅니다. 비교 사실 자체는 막지 않습니다. "SW는 93.3% 감소,
+`agents/domain/quality/linter.py`는 표현을 봅니다. 비교 사실 자체는 막지 않습니다. "SW는 93.3% 감소,
 HW는 1.80배 향상"은 통과합니다. 막는 것은 근거 없는 승자 판정이고, 추천과 압도 표현은
 근거가 있어도 차단합니다. 이 보고서의 목적이 우열 판정이 아니기 때문입니다.
 
@@ -200,7 +200,7 @@ HW는 1.80배 향상"은 통과합니다. 막는 것은 근거 없는 승자 판
 
 ## 재현성
 
-`runtime/manifest.py`가 실행마다 다음을 기록합니다. LLM provider·모델 ID·temperature·
+`agents/domain/runtime/manifest.py`가 실행마다 다음을 기록합니다. LLM provider·모델 ID·temperature·
 max tokens·seed·프롬프트 버전, 임베딩 모델·device·precision·batch size·차원,
 OS·CPU·RAM·torch 백엔드, 패키지 버전, 산출물 경로와 SHA-256, git commit입니다.
 
@@ -213,26 +213,27 @@ OS·CPU·RAM·torch 백엔드, 패키지 버전, 산출물 경로와 SHA-256, gi
 
 | 경로 | 역할 |
 |---|---|
-| `agents/domain_agent.py` | 서브그래프, 근거 생성, 품질 적용, 부모 그래프 진입 함수 |
-| `agents/domain_state.py` | 부모 State 확장(evidence_store 리듀서, 관점별 키), 팀 스키마 변환 |
-| `prompts/domain.py` | 프롬프트 템플릿, 도메인 프로파일, 프롬프트 버전 |
-| `rag/evidence.py` | 결정적 evidence_id, 멱등 병합, 검색 로그 |
-| `rag/websearch.py` | 출처 등급표, 캐시, 재시도·레이트리밋, 오프라인 목 |
-| `rag/fetch.py` | 본문 수집·파싱, 짧은 문서/긴 문서 분기 |
-| `rag/index.py` | 청킹, BM25·dense·hybrid, 임베딩 실행 정보 |
-| `quality/guard.py` | 결정적 검증 6종 |
-| `quality/judge.py` | coverage·neutrality 질적 평가 |
-| `quality/linter.py` | 승자·추천·압도 표현 차단 |
-| `evaluation/golden_set.py` | 표지 기반 정답 16문항 |
-| `evaluation/ablation.py` | BM25·dense·hybrid 비교 |
-| `runtime/manifest.py` | 실행 환경·모델·산출물 체크섬 기록 |
-| `tests/test_domain_agent.py` | 계약 테스트 23건 (LLM·네트워크 없음) |
+| `agents/domain/subgraph.py` | 서브그래프, 근거 생성, 품질 적용 |
+| `agents/domain/node.py` | 부모 그래프 진입 함수(make_node), 입력 투영·출력 변환 |
+| `agents/domain/state.py` | 부모 State 확장(evidence_store 리듀서, 관점별 키), 팀 스키마 변환 |
+| `agents/domain/prompts.py` | 프롬프트 템플릿, 도메인 프로파일, 프롬프트 버전 |
+| `agents/domain/rag/evidence.py` | 결정적 evidence_id, 멱등 병합, 검색 로그 |
+| `agents/domain/rag/websearch.py` | 출처 등급표, 캐시, 재시도·레이트리밋, 오프라인 목 |
+| `agents/domain/rag/fetch.py` | 본문 수집·파싱, 짧은 문서/긴 문서 분기 |
+| `agents/domain/rag/index.py` | 청킹, BM25·dense·hybrid, 임베딩 실행 정보 |
+| `agents/domain/quality/guard.py` | 결정적 검증 6종 |
+| `agents/domain/quality/judge.py` | coverage·neutrality 질적 평가 |
+| `agents/domain/quality/linter.py` | 승자·추천·압도 표현 차단 |
+| `agents/domain/evaluation/golden_set.py` | 표지 기반 정답 16문항 |
+| `agents/domain/evaluation/ablation.py` | BM25·dense·hybrid 비교 |
+| `agents/domain/runtime/manifest.py` | 실행 환경·모델·산출물 체크섬 기록 |
+| `tests/agents/domain/test_domain_agent.py` | 계약 테스트 23건 (LLM·네트워크 없음) |
 
 ## 부모 그래프 연결
 
 ```python
-from agents.domain_agent import DomainAgentDeps, build_domain_agent
-from rag.websearch import build_search_provider
+from agents.domain import DomainAgentDeps, make_node
+from agents.domain.rag.websearch import build_search_provider
 
 deps = DomainAgentDeps(
     llm=init_chat_model("gpt-4o-mini", model_provider="openai", temperature=0),
@@ -240,7 +241,7 @@ deps = DomainAgentDeps(
     embedding_model="BAAI/bge-m3",
     fetch_cache_dir=Path("data/fetch_cache"),
 )
-app = build_graph(..., domain=build_domain_agent(deps), ...)
+app = build_graph(..., domain=make_node(deps), ...)
 ```
 
 ## 실행 결과 (2026-09-22 기준)

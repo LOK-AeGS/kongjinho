@@ -6,7 +6,7 @@ from datetime import date
 
 from langgraph.graph import END, START, StateGraph
 
-from team_state import merge_evidence
+from graph.team_state import merge_evidence
 from .models import Extraction, StakeholderState
 from .web import digest, normalize
 
@@ -213,32 +213,3 @@ def run_stakeholder(request=None, technical_findings=None, backend=None):
                'extraction': {'observations': [], 'gaps': []}, 'rounds': 0, 'revision_rounds': 0,
                'rejected': [], 'gaps': [], 'errors': [], 'result': {}}
     return build_stakeholder_graph(backend).invoke(initial, {'recursion_limit': 80})
-
-
-def team_update(final, existing_evidence=None):
-    result = final['result']
-    claims = {c['claim_id']: c for c in result['claims']}
-    findings = [{**p, 'id': cid, 'claim_id': cid, 'statement': claims[cid]['statement'],
-                 'evidence_ids': claims[cid]['evidence_ids'], 'conditions': claims[cid]['conditions'],
-                 'uncertainty': claims[cid]['uncertainty']}
-                for p in result['positions'] for cid in p['claim_ids']]
-    direct = {(p['technology_id'], p['group']) for p in result['positions'] if p['target_scope'] == 'selected_technology'}
-    return {'stakeholder_eval': {'perspective': 'stakeholder', 'findings': findings,
-                'evidence_ids': list(result['evidence_store']), 'limitations': result['completion']['gaps'] + result['completion']['errors'],
-                'confidence': len(direct) / 8, 'completion': result['completion'], 'search_outcomes': result['search_outcomes']},
-            'evidence_store': result['evidence_store'], 'errors': result['completion']['errors']}
-
-
-def stakeholder_agent(state, *, backend=None):
-    request = default_request(state.get('as_of_date'))
-    request['domain'] = state['domain']
-    for side in ('sw', 'hw'):
-        request[side] = deepcopy(state['selected_tech'][side])
-    # 다른 관점 결과나 공유 evidence를 전달하지 않고 공통 기술 프로필만 투영한다.
-    return team_update(run_stakeholder(request, state.get('tech_profiles'), backend))
-
-
-def legacy_stakeholder_agent(state, *, backend=None):
-    request = deepcopy(state['request'])
-    request['domain'] = 'datacenter'
-    return {'stakeholder_findings': run_stakeholder(request, state.get('technical_findings'), backend)['result']}

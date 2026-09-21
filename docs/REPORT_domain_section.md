@@ -212,12 +212,12 @@ flowchart TD
 
 | 단계 | 구현 | 비고 |
 |---|---|---|
-| 문서 수집 | `rag/websearch.py`, `rag/fetch.py` | 출처 등급 필터, 타임아웃·재시도·레이트리밋 |
+| 문서 수집 | `agents/domain/rag/websearch.py`, `agents/domain/rag/fetch.py` | 출처 등급 필터, 타임아웃·재시도·레이트리밋 |
 | 파싱 | pdfplumber (PDF), BeautifulSoup (HTML) | 페이지·문자 범위를 위치 정보로 보존 |
-| 청킹 | `rag/index.py` | 1,200자 / 200자 겹침, 위치 정보 유지 |
+| 청킹 | `agents/domain/rag/index.py` | 1,200자 / 200자 겹침, 위치 정보 유지 |
 | 임베딩 | BAAI/bge-m3 (오픈소스) | 긴 문서에만 적용 |
 | 검색 | FAISS + BM25, RRF 융합 | 질의 유형이 둘이라 함께 사용 |
-| 컨텍스트 활용 | `agents/domain_agent.py` | ID·짧은 인용만 전달해 프롬프트 희석 방지 |
+| 컨텍스트 활용 | `agents/domain/subgraph.py` | ID·짧은 인용만 전달해 프롬프트 희석 방지 |
 
 ### PDF 파싱에서 걸렸던 문제
 
@@ -280,8 +280,8 @@ LLM 판정자는 요구사항 축이 실제로 다뤄졌는지(coverage)와 서�
 
 ```bash
 pip install -r requirements.lock
-python -m evaluation.ablation --embedding BAAI/bge-m3   # 검색 방식 비교
-python tests/test_domain_agent.py                       # 계약 테스트 25건
+python -m agents.domain.evaluation.ablation --embedding BAAI/bge-m3   # 검색 방식 비교
+python tests/agents/domain/test_domain_agent.py                       # 계약 테스트 25건
 jupyter nbconvert --execute notebooks/06-domain-agent.ipynb  # 전체 파이프라인
 ```
 

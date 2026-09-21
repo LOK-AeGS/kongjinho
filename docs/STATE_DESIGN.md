@@ -1,7 +1,7 @@
 # KV cache Multi-Agent State 설계
 
 > 이 문서는 최초 PipelineState 설계 기록입니다. 팀 설계서 v0.3 기준의 현재 연결 계약은
-> `team_state.py`와 `README.md`의 “팀 그래프 연결”을 따릅니다.
+> `graph/team_state.py`와 `docs/STAKEHOLDER_AGENT.md`의 “팀 연결 계약”을 따릅니다.
 > 이해관계자 노드는 selected_tech/domain을 입력받아 stakeholder_eval/evidence_store/errors를 반환합니다.
 > evidence_store는 dict + idempotent merge이며, not_found와 검색 로그는 stakeholder_eval.search_outcomes에 보존합니다.
 > 아래 stakeholder_findings 방식은 legacy_stakeholder_agent에만 해당합니다.
@@ -86,5 +86,5 @@ initial_state()는 기술명/선정 사유, 날짜, 도메인, 반복 한도, �
 선정 페이지 범위와 총 200페이지 제한을 검사한다. 파일 존재, 모델의 공개 라이선스,
 출처의 진위나 모든 중첩 필드의 자료형을 검증하는 함수는 아니다.
 
-state.py는 Python 표준 라이브러리만 사용한다. graph_wiring.py는 LangGraph가 필요하며,
+graph/state.py는 Python 표준 라이브러리만 사용한다. graph/build.py는 LangGraph가 필요하며,
 실제 6개 에이전트 함수를 주입해야 한다. 검색·LLM·보고서 생성 구현은 포함하지 않는다.

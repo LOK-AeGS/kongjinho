@@ -1,4 +1,4 @@
-"""단독 실행: python run_stakeholder.py --ask-key"""
+"""단독 실행: python -m scripts.run_stakeholder --ask-key"""
 import argparse
 import getpass
 import json
@@ -7,8 +7,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from stakeholder.agent import GROUP_LABELS, default_request, run_stakeholder, team_update
-from stakeholder.backend import OpenAIBackend
+from agents.stakeholder.node import team_update
+from agents.stakeholder.subgraph import GROUP_LABELS, default_request, run_stakeholder
+from agents.stakeholder.backend import OpenAIBackend
 
 
 def render_markdown(result: dict, request: dict) -> str:
@@ -78,7 +79,7 @@ def main():
     folder = args.output_dir / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     folder.mkdir(parents=True, exist_ok=False)
     if args.offline_fixture:
-        from stakeholder.offline import FixtureBackend
+        from agents.stakeholder.offline import FixtureBackend
         backend = FixtureBackend(args.offline_fixture)
         print("오프라인 fixture 재생: 실검색 결과로 간주하지 마세요.", flush=True)
     else:

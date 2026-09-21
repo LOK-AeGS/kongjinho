@@ -14,8 +14,8 @@ from __future__ import annotations
 import platform
 from dataclasses import dataclass, field
 
-from rag.evidence import normalize_text
-from rag.fetch import DocumentPart
+from agents.domain.rag.evidence import normalize_text
+from agents.domain.rag.fetch import DocumentPart
 
 CHUNK_CHARS = 1200
 CHUNK_OVERLAP = 200
