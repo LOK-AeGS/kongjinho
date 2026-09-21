@@ -1,0 +1,63 @@
+{
+  "run_id": "domain-nb-001",
+  "started_at": "2026-09-21T17:37:17+00:00",
+  "finished_at": "2026-09-21T17:39:56+00:00",
+  "llm": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "temperature": 0.0,
+    "max_tokens": null,
+    "seed": null,
+    "prompt_version": "domain/v2-websearch"
+  },
+  "embedding": {
+    "model_name": "BAAI/bge-m3",
+    "device": "mps:0",
+    "normalize_embeddings": true,
+    "batch_size": 16,
+    "dimension": 1024,
+    "torch_version": "2.14.0",
+    "platform": "Darwin arm64"
+  },
+  "search": {},
+  "policy": {},
+  "artifacts": [
+    {
+      "name": "domain_findings_demo.json",
+      "path": "/Users/sanlee/Desktop/SKALA/코딩파일/Ai-service/Capstone_Ai_RAG/outputs/domain_findings_demo.json",
+      "sha256": "bee4e12dfb597458c0e167c6a084461efd4e5661c44c770a7414cbaca9520960",
+      "bytes": 59870
+    },
+    {
+      "name": "ablation.json",
+      "path": "/Users/sanlee/Desktop/SKALA/코딩파일/Ai-service/Capstone_Ai_RAG/outputs/ablation.json",
+      "sha256": "93a11510c2db6e75ca8b7313e5e7221539f30057f7c417c9ef2f4abff1261848",
+      "bytes": 2036
+    }
+  ],
+  "packages": {
+    "langgraph": "1.2.11",
+    "langchain": "1.4.2",
+    "langchain-core": "1.6.3",
+    "langchain-openai": "1.6.2",
+    "langchain-tavily": "0.2.18",
+    "langchain-community": "0.4.2",
+    "langchain-huggingface": "1.2.2",
+    "sentence-transformers": "6.1.0",
+    "torch": "2.14.0",
+    "faiss-cpu": "1.15.1",
+    "rank-bm25": "0.2.2",
+    "pdfplumber": "0.11.10",
+    "httpx": "0.28.1",
+    "pydantic": "2.13.5"
+  },
+  "hardware": {
+    "os": "Darwin 25.5.0",
+    "machine": "arm64",
+    "python": "3.11.15",
+    "cpu_count": 10,
+    "ram_gb": 16.0,
+    "torch_backend": "mps"
+  },
+  "git_commit": "260dcf06979c5bacd9c85634be2746c2d7711a5e"
+}
