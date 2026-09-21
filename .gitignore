@@ -5,3 +5,6 @@ __pycache__/
 .env
 data/*.pdf
 outputs/**/domain_findings*.json
+data/search_cache/
+data/fetch_cache/
+outputs/index_artifacts/

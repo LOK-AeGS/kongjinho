@@ -1,19 +1,27 @@
-# 설치: python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+# 최상위 의존성. 고정 버전은 requirements.lock 을 쓴다.
+# 설치: python -m venv .venv && source .venv/bin/activate
+#       pip install -r requirements.lock      (재현 실행)
+#       pip install -r requirements.txt       (개발)
 
-# 도메인 평가 에이전트 실행에 필요한 최소 의존성
+# 그래프와 LLM
 langgraph>=1.0.1
 langchain>=1.0.2
 langchain-openai>=1.0.1
 pydantic>=2.9
 python-dotenv>=1.0.1
 
-# 노트북 데모용. 팀 공유 검색 도구가 준비되면 에이전트 자체에는 필요하지 않다
-# (에이전트는 Retriever 프로토콜만 요구하고 인덱스 구축은 담당하지 않음).
-notebook>=7.4.5
+# 웹 검색·본문 수집
+langchain-tavily>=0.2.12
+httpx>=0.27
+beautifulsoup4>=4.12
+pdfplumber>=0.11.7
+
+# 검색 색인 (긴 문서에만 사용)
+rank-bm25>=0.2.2
+faiss-cpu>=1.12.0
 langchain-community>=0.4.1
-langchain-text-splitters>=0.3.0
 langchain-huggingface>=0.3.0
 sentence-transformers>=5.1.1
-faiss-cpu>=1.12.0
-pdfplumber>=0.11.7
-rank-bm25>=0.2.2
+
+# 노트북
+notebook>=7.4.5
