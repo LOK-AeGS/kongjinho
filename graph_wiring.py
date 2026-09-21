@@ -1,4 +1,8 @@
-"""에이전트 구현 함수를 주입하는 그래프 연결 예시. langgraph 설치 필요."""
+"""이전 PipelineState용 6개 노드 예시. stakeholder에는 legacy_stakeholder_agent 주입.
+
+팀 설계서 v0.3의 EvaluationState는 team_state.py를 사용한다.
+별도 TRL·Judge 그래프 구현은 팀 그래프 담당 범위다.
+"""
 from langgraph.graph import END, START, StateGraph
 
 from state import PipelineState
