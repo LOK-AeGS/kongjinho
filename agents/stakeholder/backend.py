@@ -85,7 +85,7 @@ class OpenAIBackend:
                 response = self.client.responses.create(model=self.model, instructions=SEARCH_INSTRUCTIONS,
                     input=json.dumps({'query': query, 'as_of_date': request['as_of_date'], 'tech_profiles': technical_findings}, ensure_ascii=False),
                     tools=[tool], tool_choice='required', include=['web_search_call.action.sources'],
-                    max_tool_calls=2, max_output_tokens=3000, store=False)
+                    max_tool_calls=2, max_output_tokens=8000, store=False)
                 found = unpack_search(response)
                 urls = found['cited_urls'][:5]
                 log.update(status='ok' if urls else 'no_results', actions=found['actions'], urls=urls, response_id=found['response_id'])

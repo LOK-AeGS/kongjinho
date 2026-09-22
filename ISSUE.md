@@ -67,14 +67,14 @@
 
 ## 3. 의존성
 
-### ⬜ 3-1. openai 3.x에서 실제 API 호출 미검증
+### ✅ 3-1. openai 3.x에서 실제 API 호출 (이해관계자 확인 완료)
 - 도메인 lock은 `openai 3.x`, 이해관계자는 원래 `openai<3`로 고정되어 있었습니다.
 - 통합 `requirements.txt`에서는 상한을 풀었습니다 (`openai>=2.0`).
 - openai 3.16.2에서 오프라인 테스트 40개는 통과했습니다.
-- 이해관계자의 실제 API 호출(`responses.create`, `responses.parse`)은 아직 3.x에서 확인하지 않았습니다.
-- **할 일:** API 키를 넣고 `python -m scripts.run_stakeholder --max-queries 1 --rounds 1 --revisions 0`으로 작게 실행해 봅니다.
+- 2026-09-22 openai 3.16.2에서 이해관계자의 실제 API 호출(`responses.create`, `responses.parse`)이 정상 동작함을 확인했습니다.
+  (처음 실패는 SDK 버전이 아니라 3-1a의 토큰 한도 문제였습니다.)
 
-### ⬜ 3-1a. 이해관계자 실제 실행에서 검색이 실패함: 출력 토큰 한도 부족 (원인 확정)
+### ✅ 3-1a. 이해관계자 실제 실행에서 검색이 실패함: 출력 토큰 한도 부족 (해결)
 - 2026-09-22 실제 실행 2회 모두 실패했습니다: `python -m scripts.run_stakeholder --ask-key --max-queries 1 --rounds 1 --revisions 0`
   결과는 `상태: failed`, `오류: sw:competitor:r1: ValueError`였습니다.
 - API 키와 연결은 정상입니다. 에러는 `agents/stakeholder/backend.py`의 `unpack_search()`가 내는 `search_incomplete`입니다.
@@ -87,12 +87,14 @@
   | 8000 | `completed` | 1681 (1030) | 성공, URL 75개 |
 
   짧은 영어 질의는 3000 안에서 성공했지만(2869 사용), 실제 질의는 한글 그룹명 등이 붙어 더 길어서 한도를 넘습니다.
-- **할 일 (이해관계자 담당):**
-  1. `backend.py`의 `search()`에서 `max_output_tokens=3000`을 8000 정도로 올립니다.
-  2. `extract()`의 `max_output_tokens=10000`도 같은 이유로 부족할 수 있습니다. 원문 입력이 크면 추론이 길어지므로 확인합니다.
-  3. 실패 시 에러 종류뿐 아니라 메시지와 `response.incomplete_details`도 검색 로그에 남깁니다.
+- **해결:** `backend.py`의 `search()`에서 `max_output_tokens`를 3000 → 8000으로 올렸습니다.
+  수정 후 실제 실행(`--max-queries 1 --rounds 1 --revisions 0`)에서 검색 1회, 원문 5개 수집, 입장 6개 확인까지 완료했습니다.
+  (`상태: partial`은 질의 1회로 8개 기술·그룹 조합 중 7개를 조사하지 않았기 때문이며 정상입니다.)
+- **남은 할 일 (이해관계자 담당):**
+  1. `extract()`의 `max_output_tokens=10000`도 같은 이유로 부족할 수 있습니다. 원문 입력이 크면 추론이 길어지므로 확인합니다.
+  2. 실패 시 에러 종류뿐 아니라 메시지와 `response.incomplete_details`도 검색 로그에 남깁니다.
      지금은 `ValueError`만 남아서 원인을 찾으려면 별도 진단 호출이 필요했습니다.
-  4. 검색 결과 URL 끝에 `?utm_source=openai`가 붙어 옵니다. 근거 ID(URL 기반 해시)와 중복 판정에 영향이 없는지 확인합니다.
+  3. 검색 결과 URL 끝에 `?utm_source=openai`가 붙어 옵니다. 근거 ID(URL 기반 해시)와 중복 판정에 영향이 없는지 확인합니다.
 
 ### ⬜ 3-2. lock 파일이 두 개
 - `requirements.lock` (도메인), `requirements.lock.txt` (이해관계자)
@@ -104,9 +106,9 @@
 
 ### ⬜ 4-1. 재구성 후 실제 API로 실행해 보지 않음
 - 로직은 바꾸지 않았고, 오프라인 테스트 40개와 이해관계자 fixture 실행은 통과했습니다.
-- 두 에이전트 모두 재구성 후 실제 API로는 실행하지 않았습니다.
-- 이해관계자는 재구성 전에도 API 키 인증 오류 때문에 실제 검색 end-to-end가 확인되지 않은 상태였습니다.
-- **할 일:** 키를 넣고 각 에이전트를 단독으로 한 번씩 실행합니다.
+- 이해관계자: ✅ 2026-09-22 실제 API로 end-to-end 실행 확인 (3-1a 수정 후).
+- 도메인: ⬜ 재구성 후 실제 API로 실행하지 않았습니다.
+- **할 일:** 키를 넣고 도메인 노트북을 한 번 실행합니다.
 
 ### ⬜ 4-2. 전체 그래프를 한 번도 돌려보지 않음
 - `graph/build.py`는 있지만 실행 진입점(`main.py`)이 없습니다.
