@@ -168,7 +168,16 @@ deps = ReportAgentDeps(generation_mode="deterministic")
 3. 누락된 인용 표시는 최종화 단계에서 연결한다.
 4. 본문에서 실제 사용된 evidence만 REFERENCE 후보가 된다.
 5. `doc_id → URL → metadata` 순서로 동일 source를 판별해 중복 제거한다.
-6. 공통 `Reference` 필드에 존재하는 메타데이터만 기록하며 값을 추정하지 않는다.
+6. 중복 제거한 출처를 `특허 → 논문 → 기타` 순서로 묶고 각 항목에 자료 유형을 표시한다.
+7. 특허는 `저자(연도). 제목. 특허번호. URL`, 논문은 `저자(연도). 제목. 학술 저장소·식별자`,
+   기타는 `저자(날짜). 제목. 발행 사이트. URL` 형식을 사용한다.
+8. 공통 Evidence에 존재하는 메타데이터만 기록하며 없는 값은 추정하지 않는다.
+
+```text
+- 특허 : NVIDIA(2025). *KV Cache Transform Coding*. US-XXXXXXX-A1. https://...
+- 논문 : Zandieh, A. et al.(2025). TurboQuant: Online Vector Quantization. *arXiv*, 2504.xxxxx.
+- 기타 : Google Research(2026-03-30). *TurboQuant for KV Cache Compression*. Google Research Blog. https://...
+```
 
 ## 결정적 품질 검사
 
