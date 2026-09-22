@@ -77,16 +77,19 @@ JUDGE_SYSTEM = """너는 기술 시장 조사의 근거 검토자다.
 1. relevant=true는 본문이 (a) 대상 기술 자체(이름 또는 명확한 동의어), 또는 조사 대상 설명에 적힌 상위 기술군을 직접 다루고
    (b) '조사 관점 정의'에 해당하는 내용을 본문에 명시하고 있을 때만이다. 기술·기술군 이름이 없는 일반 산업·시장 글은 false다.
    기술 개요, 성능 수치, 논문 소개 문장, 서론의 로드맵 문장은 시장 관점 근거가 아니므로 false다.
-2. 범위: 데이터센터의 LLM 추론(서빙) 인프라 근거만 인정한다. 온디바이스·엣지·모바일 중심이거나 학습(training) 중심 근거는 false다.
-3. scope: 본문이 대상 기술의 정확한 이름·버전을 직접 다루면 direct. 후속 버전, 같은 계열의 다른 모델, 상위 기술군 수준이면 class.
-4. stance: 대상 기술의 채택·시장성에 우호적 사실이면 support, 한계·비용·장벽·비판이면 counter, 중립적 사실이면 neutral.
-5. statement와 supporting_quote는 본문에 적힌 내용만 쓴다. supporting_quote는 본문에서 글자 그대로 복사한다.
+2. 이름이 비슷하거나 같은 개념(예: 계층형 메모리 확장, KV cache 압축)을 다뤄도 **발행 주체(회사·논문 저자)가
+   다른 별개 기술**이면 relevant=false다. 약어 철자 순서만 다른 경우(예: ITME ↔ IMTE)도 같은 기술이라고
+   넘겨짚지 않는다 — 본문에 대상 기술의 정확한 명칭이나 원 논문/원 발표자가 명시돼 있는지 직접 확인한다.
+3. 범위: 데이터센터의 LLM 추론(서빙) 인프라 근거만 인정한다. 온디바이스·엣지·모바일 중심이거나 학습(training) 중심 근거는 false다.
+4. scope: 본문이 대상 기술의 정확한 이름·버전을 직접 다루면 direct. 후속 버전, 같은 계열의 다른 모델, 상위 기술군 수준이면 class.
+5. stance: 대상 기술의 채택·시장성에 우호적 사실이면 support, 한계·비용·장벽·비판이면 counter, 중립적 사실이면 neutral.
+6. statement와 supporting_quote는 본문에 적힌 내용만 쓴다. supporting_quote는 본문에서 글자 그대로 복사한다.
    statement의 주어는 인용문의 주어와 같아야 하며, 다른 기술·기존 방식의 한계를 대상 기술의 한계로 옮겨 쓰지 않는다.
-6. evidence_level: forecast=전망 / announcement=출시·공식 발표 / pilot=시범·PoC·프로토타입·벤치마크 / production=실서비스 운영·양산·납품 명시 / unknown.
+7. evidence_level: forecast=전망 / announcement=출시·공식 발표 / pilot=시범·PoC·프로토타입·벤치마크 / production=실서비스 운영·양산·납품 명시 / unknown.
    논문·시뮬레이션·FPGA 실측은 production이 아니다.
-7. source_type: official_web, news, community(개인 블로그·포럼), paper, patent, other.
-8. published_date는 본문에 명시된 경우만 적고 없으면 null이다.
-9. 우열 표현(우수, 더 낫다, 승자, 추천, 압도 등)을 statement에 쓰지 않는다."""
+8. source_type: official_web, news, community(개인 블로그·포럼), paper, patent, other.
+9. published_date는 본문에 명시된 경우만 적고 없으면 null이다.
+10. 우열 표현(우수, 더 낫다, 승자, 추천, 압도 등)을 statement에 쓰지 않는다."""
 
 COUNTER_CHECK_SYSTEM = """너는 '반대·한계 근거' 검증자다. 인용문만 보고 판단한다. 요약문은 주어지지 않으며, 주어져도 믿지 않는다.
 1. 인용문에서 한계·문제점을 가진다고 말하는 대상(주어)을 먼저 찾아 limited_subject에 적는다.

@@ -9,16 +9,27 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-Tier = str  # "paper" | "patent" | "standard" | "vendor" | "news" | "other"
+Tier = str  # "paper" | "patent" | "standard" | "vendor" | "research" | "news" | "other"
 
-_PAPER_DOMAINS = ("arxiv.org", "aclanthology.org", "openreview.net", "dl.acm.org", "ieee.org", "usenix.org")
+# 2026-09-22 실 API 실행 3회(search_log)에서 실제로 걸러진 도메인 중 §1.4상 정당한 출처를
+# 재검토해 추가했다: 대상 기술(DeepSeek) 원저작사, 서빙 프레임워크 관련 주요 벤더,
+# 정식 시장조사기관, arxiv 미러. 그 외 개인 블로그·SNS·포럼은 그대로 "기타"로 남긴다.
+_PAPER_DOMAINS = (
+    "arxiv.org", "aclanthology.org", "openreview.net", "dl.acm.org", "ieee.org", "usenix.org",
+    "alphaxiv.org", "ar5iv.org", "papers.cool", "semanticscholar.org",
+)
 _PATENT_DOMAINS = ("patents.google.com", "patft.uspto.gov", "worldwide.espacenet.com", "wipo.int")
 _STANDARD_DOMAINS = ("jedec.org", "opencompute.org", "computeexpresslink.org", "opencapi.org", "snia.org")
 _VENDOR_DOMAINS = (
     "nvidia.com", "amd.com", "intel.com", "samsung.com", "skhynix.com", "sk.com",
     "microsoft.com", "azure.com", "aws.amazon.com", "cloud.google.com", "huggingface.co",
     "github.com", "openai.com", "anthropic.com", "meta.com", "micron.com",
+    "deepseek.com",  # 대상 SW 기술(DeepSeek-V2)의 원저작사 공식 도메인
+    "databricks.com", "redhat.com", "vllm.ai",  # 서빙 프레임워크·추론 인프라 주요 벤더
 )
+# 정식 시장조사기관(§1.4 "2차 출처: 학술산업 분석"). 뉴스와 분리해 관리한다 — 근거 강도를
+# 구분해야 할 때(예: 1차 발표 vs 3자 분석) 뒤에 쓸 수 있게.
+_RESEARCH_DOMAINS = ("mordorintelligence.com", "idc.com", "gartner.com", "counterpointresearch.com", "trendforce.com")
 _NEWS_DOMAINS = (
     "reuters.com", "theregister.com", "semianalysis.com", "techcrunch.com", "bloomberg.com",
     "wsj.com", "zdnet.com", "theverge.com", "arstechnica.com", "yonhapnews.co.kr", "etnews.com",
@@ -29,6 +40,7 @@ _TIER_TABLE: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("patent", _PATENT_DOMAINS),
     ("standard", _STANDARD_DOMAINS),
     ("vendor", _VENDOR_DOMAINS),
+    ("research", _RESEARCH_DOMAINS),
     ("news", _NEWS_DOMAINS),
 )
 

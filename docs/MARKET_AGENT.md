@@ -149,17 +149,30 @@ python -m scripts.run_market --offline         # API 키·네트워크 없이 �
 python tests/agents/market/test_market_agent.py   # 또는 pytest tests/agents/market/
 ```
 
-API 키·네트워크 없이 25개 테스트가 돈다: 근거 ID 결정성 3종, Rubric 판정 6종, 표현 린터,
-출처 등급 필터, Pool B 본문 수집·청킹·페이지 예산 4종, AppState 변환(`to_perspective_findings`)
-5종, 가짜 LLM으로 만든 전체 흐름(정상/환각 기각/반대 근거 오귀속 차단/RAG 라우팅/입력 격리) 5종.
+API 키·네트워크 없이 27개 테스트가 돈다: 근거 ID 결정성 3종, Rubric 판정 6종, 표현 린터,
+출처 등급 필터 2종, Pool B 본문 수집·청킹·페이지 예산 4종, AppState 변환(`to_perspective_findings`)
+5종, 가짜 LLM으로 만든 전체 흐름(정상/환각 기각/반대 근거 오귀속 차단/RAG 라우팅/입력 격리) 5종,
+판단 프롬프트 회귀 검사 1종.
 
 ## 구현 상태와 한계
 
-- **실제 API로 end-to-end 실행 확인함**(2026-09-22, `--rounds 1`): OpenAI(gpt-4.1-mini/gpt-4.1)
-  + Tavily로 상태 `partial`, 주장 5건, 근거 4건을 확보했다. 출처 등급 필터가 실제로
-  `etnews.com`(news)·`semiconductor.samsung.com`(vendor)을 통과시키고, 등급표에 없는
-  블로그·SNS·동영상·증권사 PDF 등 13건을 걸러 로그에 남기는 것을 확인했다 — 증권사
-  리서치처럼 정당해 보이는 출처가 걸러진 사례가 있어 등급표를 점진적으로 넓힐 필요가 있다.
+- **실제 API로 end-to-end 실행 4회 확인함**(2026-09-22). 매번 같은 패턴이 재현됐다: "시장
+  규모"는 출처 등급 필터를 거치지 않아 잘 채워지지만, "상용화·채택/생태계 지지/반대근거"는
+  필터를 거쳐서 등급표가 좁을수록 대부분 비었다. `report (2).pdf`(등급표 확장 전 실행)는
+  8칸(기술 2 × 기준 4) 전부 `not_found`로 나온 사례였다.
+- **등급표 확장(`rag/tier.py`)**: 위 문제의 원인을 `search_log.json`으로 직접 확인했다 — 실제로
+  `api-docs.deepseek.com`(대상 SW 원저작사!), `semanticscholar.org`(대상 HW 논문 원문 링크),
+  `alphaxiv.org`, `databricks.com`, `redhat.com`, `mordorintelligence.com` 같은 정당한 출처가
+  등급표에 없어 걸러지고 있었다. 이들을 추가하고(`vendor`/`paper`/신설 `research` 등급) 재실행해
+  개선을 확인했다 — 등급표 확장 전 8칸 중 0~1칸이던 것이 확장 후 2~4칸으로 늘었다. 다만
+  상용화·채택/생태계는 여전히 자주 비어서 등급표를 더 넓히거나 관점별 검색 질의를 다양화할
+  필요가 남아 있다.
+- **근거 오귀속 방지(`prompts.py` JUDGE_SYSTEM 규칙 2)**: 실행 중 SK hynix의 별개 제품
+  "IMTE"(Inference **M**emory **T**iering **E**xpansion)를 대상 HW 기술 "ITME"(Inference
+  **T**iered **M**emory Expansion)로 오귀속할 뻔한 사례를 발견했다 — 약어 철자 순서만 다르고
+  개념도 비슷해 LLM이 혼동하기 쉽다. "발행 주체가 다른 별개 기술은 relevant=false" 규칙을
+  추가했다. LLM이 실제로 이 규칙을 지키는지는 실 API로만 확인 가능하므로, 오프라인 테스트는
+  규칙 문구가 프롬프트에서 빠지지 않는지만 회귀 검사한다.
 - 질의 계획을 매 실행 LLM이 새로 만들어서, 검색되는 자료와 결과가 실행마다 달라진다.
   안정화하려면 질의를 캐시하거나 `seed_urls`로 신뢰 출처를 지정하는 방법이 있다.
 - 모델 구조(MLA)처럼 자체 시장이 없는 기술은 "시장 규모" 칸이 계속 부족으로 남을 수 있다.
