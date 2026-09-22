@@ -99,7 +99,7 @@ def build_nodes(live: set[str], fixture: dict, pdf_path: Path | None = None) -> 
         deps = MarketAgentDeps(
             llm=ChatOpenAI(model="gpt-4.1-mini", temperature=0, timeout=60, max_retries=2),
             strong_llm=ChatOpenAI(model="gpt-4.1", temperature=0, timeout=60, max_retries=2),
-            web_search=lambda q: tavily_web_search(q, max_results=3),
+            web_search=tavily_web_search,
             fetch_body=lambda url: fetch_document(url, cache_dir=Path("data/fetch_cache/market")),
         )
         nodes["market"], modes["market"] = market_node(deps), "실제 (gpt-4.1-mini/gpt-4.1 + Tavily)"
