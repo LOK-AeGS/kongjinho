@@ -10,6 +10,5 @@ data/fetch_cache/
 outputs/index_artifacts/
 outputs/stakeholder/
 outputs/stakeholder-cache/
-outputs/synthesis/
-outputs/domain/
-notebooks/data/
+data/technical/web_cache/
+outputs/technical/

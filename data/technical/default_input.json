@@ -1,0 +1,26 @@
+{
+  "request": {
+    "as_of": "2026-09-22",
+    "language": "ko",
+    "scope": "datacenter_inference",
+    "max_search_rounds": 2
+  },
+  "selected_tech": {
+    "sw": {
+      "name": "DeepSeek-V2 Multi-head Latent Attention",
+      "short_name": "MLA",
+      "technology": "sw",
+      "approach": "model_architecture_kv_compression",
+      "source_ids": ["arxiv:2405.04434v5"],
+      "selection_reason": "어텐션 구조에서 KV를 저차원 잠재 표현으로 압축"
+    },
+    "hw": {
+      "name": "ITME: Inference Tiered Memory Expansion",
+      "short_name": "ITME",
+      "technology": "hw",
+      "approach": "cxl_hybrid_tiered_memory",
+      "source_ids": ["arxiv:2606.12556v2"],
+      "selection_reason": "CXL-hybrid 계층으로 데이터센터 KV 상태 저장 공간 확장"
+    }
+  }
+}

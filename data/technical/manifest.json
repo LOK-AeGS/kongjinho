@@ -1,0 +1,89 @@
+{
+  "manifest_version": "technical-corpus-v1",
+  "documents": [
+    {
+      "doc_id": "arxiv:2402.02750v2",
+      "filename": "2402.02750v2.pdf",
+      "title": "KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache",
+      "revision": "v2",
+      "published_at": "2024-07-25",
+      "author_or_org": "Zirui Liu et al.",
+      "url": "https://arxiv.org/abs/2402.02750v2",
+      "page_count": 15,
+      "sha256": "df31ef32d71bfb280c533c5db8220cadf5ef42076bf45d82ba4c8da8e50ea5f4",
+      "role": "supporting",
+      "technology": "sw",
+      "approach": "kv_quantization"
+    },
+    {
+      "doc_id": "arxiv:2405.04434v5",
+      "filename": "2405.04434v5.pdf",
+      "title": "DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model",
+      "revision": "v5",
+      "published_at": "2024-06-19",
+      "author_or_org": "DeepSeek-AI",
+      "url": "https://arxiv.org/abs/2405.04434v5",
+      "page_count": 52,
+      "sha256": "f149f9c09aa8b46ce6a740a255a99b7cc2317ac5b065989339919b7e6c329c9b",
+      "role": "primary",
+      "technology": "sw",
+      "approach": "mla"
+    },
+    {
+      "doc_id": "arxiv:2406.19707v1",
+      "filename": "2406.19707v1.pdf",
+      "title": "InfiniGen: Efficient Generative Inference of Large Language Models with Dynamic KV Cache Management",
+      "revision": "v1",
+      "published_at": "2024-06-28",
+      "author_or_org": "Wonbeom Lee et al.",
+      "url": "https://arxiv.org/abs/2406.19707v1",
+      "page_count": 18,
+      "sha256": "267d689a1ded953f076eb93976c0ebeac1ad02029f1f7c9dd1c947aa05d7cb5f",
+      "role": "supporting",
+      "technology": "hw",
+      "approach": "kv_offloading"
+    },
+    {
+      "doc_id": "arxiv:2504.19874v1",
+      "filename": "2504.19874v1.pdf",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "revision": "v1",
+      "published_at": "2025-04-28",
+      "author_or_org": "Amir Zandieh et al.",
+      "url": "https://arxiv.org/abs/2504.19874v1",
+      "page_count": 25,
+      "sha256": "431eb13926e10491f5fbd0bebd0813c51bd6c1e884426a1500c5db640b2997ab",
+      "role": "supporting",
+      "technology": "sw",
+      "approach": "vector_quantization"
+    },
+    {
+      "doc_id": "arxiv:2511.00321v1",
+      "filename": "2511.00321v1.pdf",
+      "title": "Scalable Processing-Near-Memory for 1M-Token LLM Inference: CXL-Enabled KV-Cache Management Beyond GPU Limits",
+      "revision": "v1",
+      "published_at": "2025-10-31",
+      "author_or_org": "Dowon Kim et al.",
+      "url": "https://arxiv.org/abs/2511.00321v1",
+      "page_count": 13,
+      "sha256": "794adce50555cc340e9067e927d1822e4c6d3eff0ae39e2c87baa94f787d1061",
+      "role": "supporting",
+      "technology": "hw",
+      "approach": "cxl_pnm"
+    },
+    {
+      "doc_id": "arxiv:2606.12556v2",
+      "filename": "2606.12556v2.pdf",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "revision": "v2",
+      "published_at": "2026-06-16",
+      "author_or_org": "Memory Systems Research, SK hynix",
+      "url": "https://arxiv.org/abs/2606.12556v2",
+      "page_count": 13,
+      "sha256": "c8f29ee52bfaef00bd2b26bf2e71e49eda394d6e85b7fc9975fa5fd9a24a94d7",
+      "role": "primary",
+      "technology": "hw",
+      "approach": "itme"
+    }
+  ]
+}
