@@ -1,0 +1,7 @@
+# Report LLM writer / .env loading
+langchain>=1.0.2,<2
+langchain-openai>=1.0.1,<2
+python-dotenv>=1.0.1,<2
+
+# 선택적 PDF 출력
+reportlab>=4.4.9,<5

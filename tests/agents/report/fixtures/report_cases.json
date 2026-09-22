@@ -1,0 +1,77 @@
+{
+  "base": {
+    "request": {"as_of": "2026-09-22", "language": "ko", "scope": "datacenter_inference", "max_search_rounds": 2},
+    "selected_tech": {
+      "sw": {"name": "DeepSeek-V2 MLA", "short_name": "MLA", "technology": "sw", "approach": "모델 구조", "source_ids": ["D1"], "selection_reason": "모델 구조 단계의 KV 압축 사례"},
+      "hw": {"name": "ITME CXL-Hybrid Memory", "short_name": "ITME", "technology": "hw", "approach": "메모리 계층", "source_ids": ["D3"], "selection_reason": "메모리 계층 확장 사례"}
+    },
+    "domain": "datacenter_inference",
+    "corpus_manifest": [],
+    "technical_findings": {
+      "perspective": "technical", "status": "complete",
+      "records": [
+        {"technology": "sw", "perspective": "technical", "criterion": "TRL", "basis": "direct", "evidence_level": "production", "scope": "direct", "stance_counts": {"support": 1}, "evidence_ids": ["ev-mla-adoption"], "assessment": "공개 배포 신호", "assessment_vocab": "trl", "value": "7", "findings": "배포 신호가 있으나 공개 운용 자료는 제한적이다.", "limitations": ["공개 정보 기반 추정"]},
+        {"technology": "hw", "perspective": "technical", "criterion": "TRL", "basis": "direct", "evidence_level": "pilot", "scope": "direct", "stance_counts": {"support": 1}, "evidence_ids": ["ev-itme"], "assessment": "FPGA 기능 검증", "assessment_vocab": "trl", "value": "4", "findings": "FPGA 기능 검증이 공개됐다.", "limitations": ["공개 정보 기반 추정"]},
+        {"technology": "sw", "perspective": "technical", "criterion": "개입 계층", "basis": "direct", "evidence_level": "production", "scope": "direct", "stance_counts": {"support": 1}, "evidence_ids": ["ev-mla"], "assessment": "모델 구조", "assessment_vocab": "layer", "value": null, "findings": "모델 구조에 개입한다.", "limitations": []},
+        {"technology": "hw", "perspective": "technical", "criterion": "개입 계층", "basis": "direct", "evidence_level": "pilot", "scope": "direct", "stance_counts": {"support": 1}, "evidence_ids": ["ev-itme"], "assessment": "메모리 계층", "assessment_vocab": "layer", "value": null, "findings": "메모리 계층에 개입한다.", "limitations": []}
+      ],
+      "claims": [
+        {"claim_id": "technical:claim:001", "technology": "both", "perspective": "technical", "text": "두 접근은 KV cache 병목의 서로 다른 계층에 개입한다.", "evidence_ids": ["ev-mla", "ev-itme"], "conditions": [], "limitations": ["서로 다른 실험 조건을 직접 성능 비교로 읽지 않는다."]},
+        {"claim_id": "technical:claim:002", "technology": "sw", "perspective": "technical", "text": "DeepSeek-V2 전체 배치는 DeepSeek 67B 대비 KV cache를 93.3% 줄였다고 보고했다.", "evidence_ids": ["ev-mla"], "conditions": ["DeepSeek 67B 대비 DeepSeek-V2 전체 배치"], "limitations": ["MLA 단독 효과로 분리된 수치가 아니다."]},
+        {"claim_id": "technical:claim:003", "technology": "hw", "perspective": "technical", "text": "ITME는 확장 멀티턴 조건에서 최대 35.7% 처리량 향상을 보고했다.", "evidence_ids": ["ev-itme"], "conditions": ["128GB CPU offload 수용량 소진 조건", "최대값"], "limitations": ["평균값이 아니다."]}
+      ],
+      "gaps": [], "limitations": [], "input_evidence_ids": ["ev-mla", "ev-itme", "ev-mla-adoption"]
+    },
+    "market_findings": {
+      "perspective": "market", "status": "complete", "records": [],
+      "claims": [{"claim_id": "market:claim:001", "technology": "sw", "perspective": "market", "text": "오픈 웨이트와 API 제공은 공개된 채택 신호다.", "evidence_ids": ["ev-mla-adoption"], "conditions": ["제품 발표 단계"], "limitations": ["운영 규모는 공개되지 않았다."]}],
+      "gaps": [], "limitations": [], "input_evidence_ids": ["ev-mla-adoption"]
+    },
+    "stakeholder_findings": {
+      "perspective": "stakeholder", "status": "complete", "records": [],
+      "claims": [{"claim_id": "stakeholder:claim:001", "technology": "hw", "perspective": "stakeholder", "text": "운영자는 추가 메모리 계층의 전송 지연과 운영 복잡도를 함께 검토해야 한다.", "evidence_ids": ["ev-operator"], "conditions": ["데이터센터 추론"], "limitations": ["단일 공식 자료에 기반한다."]}],
+      "gaps": [], "limitations": [], "input_evidence_ids": ["ev-operator"]
+    },
+    "domain_findings": {
+      "perspective": "domain", "status": "complete",
+      "records": [{"technology": "hw", "perspective": "domain", "criterion": "지연", "basis": "direct", "evidence_level": "pilot", "scope": "direct", "stance_counts": {"support": 1}, "evidence_ids": ["ev-itme-ttft"], "assessment": "조건부", "assessment_vocab": "domain_fit", "value": null, "findings": "turn 5 조건의 TTFT 개선", "limitations": ["전체 처리량 배수가 아님"]}],
+      "claims": [{"claim_id": "domain:claim:001", "technology": "hw", "perspective": "domain", "text": "ITME는 turn 5에서 recomputation baseline 대비 1.81× TTFT speedup을 보고했다.", "evidence_ids": ["ev-itme-ttft"], "conditions": ["turn 5", "recomputation baseline", "TTFT"], "limitations": ["전체 처리량 배수가 아니다."]}],
+      "gaps": [], "limitations": [], "input_evidence_ids": ["ev-itme-ttft"]
+    },
+    "evidence_store": {
+      "ev-mla": {"id": "ev-mla", "claim_id": "technical:claim:002", "doc_id": "D1", "title": "DeepSeek-V2", "author_or_org": "DeepSeek-AI", "source_type": "paper", "primary_or_secondary": "primary", "direct_or_proxy": "direct", "url": "https://arxiv.org/abs/2405.04434", "published_at": "2024", "accessed_at": "2026-09-22", "page_or_locator": "p. 21", "quote": "Compared with DeepSeek 67B, DeepSeek-V2 reduces the KV cache by 93.3%.", "stance": "support", "evidence_level": "pilot", "metric_tag": "kv_cache_reduction", "perspective": "technical", "content_hash": "hash-d1"},
+      "ev-mla-adoption": {"id": "ev-mla-adoption", "claim_id": "market:claim:001", "doc_id": "D1", "title": "DeepSeek-V2", "author_or_org": "DeepSeek-AI", "source_type": "paper", "primary_or_secondary": "primary", "direct_or_proxy": "direct", "url": "https://arxiv.org/pdf/2405.04434?utm_source=test", "published_at": "2024", "accessed_at": "2026-09-22", "page_or_locator": "p. 1", "quote": "We release checkpoints and provide API access.", "stance": "support", "evidence_level": "announcement", "metric_tag": null, "perspective": "market", "content_hash": "hash-d1"},
+      "ev-itme": {"id": "ev-itme", "claim_id": "technical:claim:003", "doc_id": "D3", "title": "ITME", "author_or_org": "ITME Authors", "source_type": "paper", "primary_or_secondary": "primary", "direct_or_proxy": "direct", "url": "https://arxiv.org/abs/2606.12556", "published_at": "2026", "accessed_at": "2026-09-22", "page_or_locator": "p. 10", "quote": "ITME improves throughput by up to 35.7% under capacity pressure and demonstrates FPGA functional feasibility.", "stance": "support", "evidence_level": "pilot", "metric_tag": "throughput", "perspective": "technical", "content_hash": "hash-d3"},
+      "ev-itme-ttft": {"id": "ev-itme-ttft", "claim_id": "domain:claim:001", "doc_id": "D3", "title": "ITME", "author_or_org": "ITME Authors", "source_type": "paper", "primary_or_secondary": "primary", "direct_or_proxy": "direct", "url": "https://arxiv.org/abs/2606.12556", "published_at": "2026", "accessed_at": "2026-09-22", "page_or_locator": "p. 11", "quote": "At turn 5, ITME achieves 1.81x TTFT speedup over the recomputation baseline.", "stance": "support", "evidence_level": "pilot", "metric_tag": "ttft_speedup", "perspective": "domain", "content_hash": "hash-d3"},
+      "ev-operator": {"id": "ev-operator", "claim_id": "stakeholder:claim:001", "doc_id": null, "title": "CXL memory operations", "author_or_org": "Example Operator", "source_type": "official_web", "primary_or_secondary": "primary", "direct_or_proxy": "proxy", "url": "https://example.com/cxl-operations", "published_at": "2026-08-01", "accessed_at": "2026-09-22", "page_or_locator": "section:operations", "quote": "An additional memory tier introduces transfer latency and operational complexity.", "stance": "counter", "evidence_level": "unknown", "metric_tag": null, "perspective": "stakeholder", "content_hash": "hash-op"},
+      "ev-unused": {"id": "ev-unused", "claim_id": "unused:claim", "doc_id": "D9", "title": "Unused source", "author_or_org": "Unused", "source_type": "other", "primary_or_secondary": "secondary", "direct_or_proxy": "proxy", "url": "https://example.com/unused", "published_at": null, "accessed_at": "2026-09-22", "page_or_locator": "p. 1", "quote": "This evidence is not used.", "stance": "neutral", "evidence_level": "unknown", "metric_tag": null, "perspective": "technical", "content_hash": "hash-unused"}
+    },
+    "synthesis": {
+      "status": "complete", "as_of": "2026-09-22", "input_hash": "fixture",
+      "matrix": [
+        {"technology": "sw", "perspective": "technical", "criterion": "개입 계층", "basis": "direct", "assessment": "모델 구조", "assessment_vocab": "layer", "value": null, "n_evidence": 1, "evidence_level": "production", "stance_counts": {"support": 1}, "scope": "direct"},
+        {"technology": "hw", "perspective": "technical", "criterion": "개입 계층", "basis": "direct", "assessment": "메모리 계층", "assessment_vocab": "layer", "value": null, "n_evidence": 1, "evidence_level": "pilot", "stance_counts": {"support": 1}, "scope": "direct"},
+        {"technology": "hw", "perspective": "domain", "criterion": "지연", "basis": "direct", "assessment": "조건부", "assessment_vocab": "domain_fit", "value": null, "n_evidence": 1, "evidence_level": "pilot", "stance_counts": {"support": 1}, "scope": "direct"}
+      ],
+      "cross_findings": [
+        {"id": "cross:001", "kind": "conflict", "conflict_type": "condition", "technology": "hw", "record_refs": ["technical/hw/처리량", "stakeholder/hw/운영"], "evidence_ids": ["ev-itme", "ev-operator"], "detected_by": "rule", "rule_id": "SX3", "explanation": "기대 효과와 운영 복잡도가 함께 관찰된다.", "resolution": "unresolved"},
+        {"id": "cross:002", "kind": "complement", "conflict_type": null, "technology": "both", "record_refs": ["technical/sw/개입 계층", "technical/hw/개입 계층"], "evidence_ids": ["ev-mla", "ev-itme"], "detected_by": "rule", "rule_id": null, "explanation": "두 접근은 서로 다른 계층에 개입한다.", "resolution": "explained"}
+      ],
+      "contrast_table": [{"criterion": "도입 변경", "sw": "모델 구조 채택", "hw": "메모리 계층 추가", "relation": "independent", "evidence_ids": ["ev-mla", "ev-itme"]}],
+      "summary_claims": [{"claim_id": "synthesis:claim:001", "technology": "both", "perspective": "technical", "text": "두 접근은 개입 계층과 운영 전제가 달라 동일 지표의 직접 비교가 제한된다.", "evidence_ids": ["ev-mla", "ev-itme"], "conditions": ["공개된 실험 조건"], "limitations": ["실운용 자료가 제한적이다."]}],
+      "gaps": [{"technology": "both", "perspective": "domain", "criterion": "운영 비용", "reason": "장기 실운용 비용 자료 미확인", "missing_evidence": ["production cost"]}],
+      "imbalance": {}, "retry_requests": [], "limitations": ["기술별 공개 근거량이 다르다."], "dropped_sentences": [], "meta": {}
+    },
+    "report_sections": {}, "references": {}, "search_log_by_perspective": {}, "quality_by_perspective": {},
+    "retries": {"technical": 0, "market": 0, "stakeholder": 0, "domain": 0, "synthesis": 0, "report": 0},
+    "run_meta": {}
+  },
+  "cases": {
+    "complete": {"description": "모든 upstream 결과가 complete"},
+    "evidence_gap": {"description": "시장 관점에 확인 과제가 남음", "status": {"market_findings": "partial"}, "gap": {"market_findings": "실운용 채택 규모 미확인"}},
+    "invalid_evidence": {"description": "존재하지 않는 evidence ID", "replace_evidence": {"claim_id": "technical:claim:002", "evidence_id": "ev-missing"}},
+    "numeric_violation": {"description": "35.7%에 최대 조건이 빠진 writer 출력"},
+    "partial_upstream": {"description": "stakeholder 결과가 partial", "status": {"stakeholder_findings": "partial"}, "gap": {"stakeholder_findings": "투자 업계 직접 반응 미확인"}},
+    "duplicate_reference": {"description": "ev-mla와 ev-mla-adoption이 같은 D1 source를 참조"}
+  }
+}
