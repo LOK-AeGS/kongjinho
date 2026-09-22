@@ -2,7 +2,8 @@
 
 부모 State 는 graph/state.py 의 AppState(팀 공통 State) 하나다.
 각 노드는 AppState 의 자기 소유 키만 반환해야 한다. 선언되지 않은 키는 LangGraph가 조용히 버린다.
-별도 TRL·Judge 그래프 구현은 팀 그래프 담당 범위다.
+흐름(설계서 §8.1): technical → market·stakeholder·domain 병렬 → synthesis → report.
+실행 진입점은 루트 main.py, 아직 없는 노드의 임시 노드는 graph/stubs.py 에 있다.
 """
 from langgraph.graph import END, START, StateGraph
 

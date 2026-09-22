@@ -22,6 +22,7 @@ from agents.synthesis.rules import (
     TECHNOLOGIES,
     TEMPORAL_GAP_DAYS,
     condition_violations,
+    is_trl_record,
     numbers_in,
     trl_bounds,
 )
@@ -125,7 +126,7 @@ def analyze_relations(state: dict) -> dict:
                                     "한 관점은 기술군(class), 다른 관점은 대상 기술(direct) 근거에 기댐. 범위 불일치일 수 있음"))
 
         # --- SX1: 시장 증거 수준 ≥ announcement 인데 TRL 은 운영 환경(7단계) 근거 없음 ---
-        trl = [r for r in recs if r["assessment_vocab"] == "trl_stage"]
+        trl = [r for r in recs if is_trl_record(r)]
         market = [r for r in recs if r["perspective"] == "market"
                   and EVIDENCE_LEVEL_RANK.get(r["evidence_level"], 0) >= EVIDENCE_LEVEL_RANK["announcement"]]
         for t in trl:
