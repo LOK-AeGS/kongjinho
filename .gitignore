@@ -1,18 +1,39 @@
-.DS_Store
+# 비밀 값 (.env 는 절대 올리지 않음, 키 없는 예시 파일만 허용)
+.env
+.env.*
+!.env.example
+
+# Python·도구 산출물
 __pycache__/
 *.pyc
 .venv/
-.env
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+*.log
+
+# 편집기·OS
+.DS_Store
+.idea/
+.vscode/
+
+# 루트에 둔 스크린샷 (설계 다이어그램은 outputs/agent-architecture/ 에 있음)
+/*.png
+
+# 데이터·캐시 (Pool A 고정 코퍼스 data/technical/sources/ 는 올림)
 data/*.pdf
-outputs/**/domain_findings*.json
 data/search_cache/
 data/fetch_cache/
-outputs/index_artifacts/
+data/technical/web_cache/
+notebooks/data/
+
+# 실행 결과 (에이전트별 outputs/<에이전트>/, 부모 그래프 outputs/graph/)
+outputs/graph/
+outputs/technical/
+outputs/market/
 outputs/stakeholder/
 outputs/stakeholder-cache/
-outputs/synthesis/
 outputs/domain/
-notebooks/data/
-outputs/graph/
-data/technical/web_cache/
-outputs/technical/
+outputs/synthesis/
+outputs/index_artifacts/
+outputs/**/domain_findings*.json
