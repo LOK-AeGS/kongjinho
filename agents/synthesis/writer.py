@@ -78,7 +78,7 @@ class TemplateWriter:
         for (kind, rule, tech), g in groups.items():
             refs = ", ".join(g["refs"][:2]) + (" 외" if len(g["refs"]) > 2 else "")
             if kind == "conflict":
-                add(tech, f"{CONFLICT_LABEL.get(rule, '상충')}({rule}) 항목이 탐지됐다: {refs}.", g["ids"])
+                add(tech, f"{CONFLICT_LABEL.get(rule, '상충')} 항목이 탐지됐다: {refs}.", g["ids"])
             elif kind == "shared_evidence":
                 add(tech, f"같은 근거를 공유하는 관점이 있어 독립된 확인으로 세지 않는다: {refs}.", g["ids"])
             elif kind == "complement":
@@ -93,8 +93,8 @@ class TemplateWriter:
             elif r["perspective"] == "technical" and r.get("value"):
                 add(r["technology"], f"기술 조사 관점의 TRL 추정은 {r['value']} 범위이며 공개 정보 기반 추정이다.", r["evidence_ids"])
 
-        explanations = {f["id"]: (f["note"], False) for f in payload["cross_findings"] if f["kind"] == "conflict" and f.get("note")}
-        return {"claims": claims, "explanations": explanations}
+        # 템플릿은 상충의 원인을 찾을 수 없으므로 설명을 쓰지 않는다 (resolution=unresolved 유지)
+        return {"claims": claims, "explanations": {}}
 
     def revise(self, claim: dict, violations: list[str], payload: dict) -> dict | None:
         return None  # 템플릿 문장은 규칙대로 만들어지므로 고칠 수 없으면 제거한다
@@ -106,7 +106,7 @@ class OpenAIWriter:
     def __init__(self, model: str | None = None, client=None, max_output_tokens: int = 16000):
         from openai import OpenAI  # 오프라인 실행에서는 불러오지 않는다
 
-        self.model = model or os.getenv("SYNTHESIS_MODEL", "gpt-5.5")
+        self.model = model or os.getenv("SYNTHESIS_MODEL", "gpt-4.1")
         self.client = client or OpenAI(timeout=180, max_retries=1)
         self.max_output_tokens = max_output_tokens
 

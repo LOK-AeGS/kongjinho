@@ -57,6 +57,10 @@ class NodeContractTest(unittest.TestCase):
                     "gaps", "imbalance", "retry_requests", "limitations", "dropped_sentences", "meta"):
             self.assertIn(key, out["synthesis"])
 
+    def test_trace_follows_designed_graph(self):
+        trace = run(load())["meta"]["trace"]
+        self.assertEqual([t["node"] for t in trace], ["matrix", "relations", "write", "review"])
+
     def test_no_internal_fields_leak(self):
         for f in run(load())["cross_findings"]:
             self.assertFalse([k for k in f if k.startswith("_")])
@@ -224,6 +228,42 @@ class ReviewTest(unittest.TestCase):
     def test_c7_trl_must_match_matrix(self):
         v = check_claim(self.claim("ITME의 TRL 7로 판단된다.", ids=("technical:ev:002",), tech="hw"), self.ctx())
         self.assertTrue(any(x.startswith("C7") for x in v))
+
+    def test_c7_direct_wording_needs_direct_basis(self):
+        v = check_claim(self.claim("CXL 계층 추가 부담은 direct 근거로 확인된다.", ids=("domain:ev:002",), tech="hw"), self.ctx())
+        self.assertTrue(any(x.startswith("C7") for x in v))
+
+    def test_rule_code_in_text_is_violation(self):
+        v = check_claim(self.claim("MLA는 C6 기술군 DeepSeek 67B 대비 KV cache를 93.3% 줄였다."), self.ctx())
+        self.assertTrue(any("규칙 코드" in x for x in v))
+
+    def test_explanation_with_wrong_trl_is_dropped(self):
+        result = run(load())
+        sx1 = next(f for f in result["cross_findings"] if f["rule_id"] == "SX1" and f["technology"] == "hw")
+        writer = FixedWriter([self.claim("MLA는 DeepSeek 67B 대비 KV cache를 93.3% 줄였다.")],
+                             explanations={sx1["id"]: ("ITME 성숙도는 TRL 6-7 근거가 없다.", True)})
+        out = run(load(), writer)
+        finding = next(f for f in out["cross_findings"] if f["id"] == sx1["id"])
+        self.assertIsNone(finding["explanation"])
+        self.assertEqual(finding["resolution"], "unresolved")
+        self.assertTrue(any(d["stage"] == "explanation" for d in out["dropped_sentences"]))
+
+    def test_explanation_may_use_rule_thresholds(self):
+        """실제 gpt-4.1 출력에서 잘못 제거됐던 설명들. 규칙 기준값(TRL 7, 10%, 1년)은 허용한다."""
+        ids = {f["rule_id"] + f["technology"]: f["id"] for f in run(load())["cross_findings"] if f["rule_id"]}
+        texts = {
+            ids["SX1hw"]: "ITME의 상용화는 CXL 메모리 모듈 발표(기술군) 근거인데, TRL 근거는 실제 운영(7단계) 환경에 기반하지 않는다.",
+            ids["SX1sw"]: "MLA는 상용화 근거가 있지만 TRL 5-6에 해당하며 실제 운영 단계(TRL 7) 근거는 제시되지 않았다.",
+            ids["SX3hw"]: "35.7% 수치는 CPU-offload를 기준으로 한 최대값인데 시장 주장에서 조건이 빠졌다.",
+            ids["SX4hw"]: "두 CXL 시장 전망이 3.4와 15.8로 10%를 넘게 차이 나지만 둘 다 기술군 전망이다.",
+            ids["SX5hw"]: "인프라 부담과 시장 규모 근거의 발표 시점이 1년 이상 차이 난다.",
+        }
+        writer = FixedWriter([self.claim("MLA는 DeepSeek 67B 대비 KV cache를 93.3% 줄였다.")],
+                             explanations={k: (v, True) for k, v in texts.items()})
+        out = run(load(), writer)
+        self.assertEqual([d for d in out["dropped_sentences"] if d["stage"] == "explanation"], [])
+        explained = {f["id"] for f in out["cross_findings"] if f["resolution"] == "explained"}
+        self.assertTrue(set(texts) <= explained)
 
     def test_numbers_ignore_ids_and_product_names(self):
         self.assertEqual(numbers_in("market:claim:003, DeepSeek-V2, 8×H800, 67B"), ["8"])

@@ -19,6 +19,9 @@ EVIDENCE_LEVEL_RANK = {"unknown": 0, "forecast": 1, "announcement": 2, "pilot": 
 NUMERIC_GAP_RATIO = 0.10
 TEMPORAL_GAP_DAYS = 365
 
+# 상충 설명에서 쓸 수 있는 규칙 기준값 (SX1 운영 환경 = TRL 7단계, SX4 10%, SX5 12개월·1년·365일)
+RULE_THRESHOLD_NUMBERS = {"SX1": ("7",), "SX4": ("10",), "SX5": ("1", "12", "365")}
+
 # 근거 수 불균형 임계 (§6.4: 2배 이상이면 limitations 에 기록)
 IMBALANCE_RATIO = 2.0
 

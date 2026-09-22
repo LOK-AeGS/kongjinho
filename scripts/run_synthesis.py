@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 
 from agents.synthesis import make_node
+from agents.synthesis.subgraph import build_subgraph
+from agents.synthesis.writer import CONFLICT_LABEL, TemplateWriter
 
 DEFAULT_INPUT = Path("tests/agents/synthesis/fixtures/appstate_sample.json")
 
@@ -42,6 +44,11 @@ def render_markdown(state: dict, result: dict) -> str:
     if state.get("_note"):
         lines += ["", f"> ⚠️ {state['_note']}"]
 
+    lines += ["", "## 실행 경로", "", "설계: `START → matrix → relations → write → review → END` (분기·루프 없음)", "",
+              "| 순서 | 노드 | 산출 |", "|---|---|---|"]
+    lines += [f"| {t['step']} | {t['node']} | {t['output']} |" for t in meta.get("trace", [])]
+    lines += ["", "그래프 구조는 같은 폴더의 `graph.mmd` (Mermaid) 참고."]
+
     lines += ["", "## 요약 주장", ""]
     lines += [f"- **{c['claim_id']}** ({c['technology']}) {c['text']}  \n  근거: {', '.join(c['evidence_ids'])}"
               for c in result["summary_claims"]] or ["(없음)"]
@@ -54,8 +61,9 @@ def render_markdown(state: dict, result: dict) -> str:
 
     lines += ["", "## 관점 간 관계", "", "| ID | 종류 | 규칙 | 기술 | 관련 record | 설명 | 해소 |", "|---|---|---|---|---|---|---|"]
     for f in result["cross_findings"]:
-        lines.append(f"| {f['id']} | {f['kind']} | {f['rule_id'] or ''} | {f['technology']} | {'<br>'.join(f['record_refs'])} "
-                     f"| {f['explanation'] or ''} | {f['resolution']} |")
+        rule = f"{f['rule_id']} {CONFLICT_LABEL.get(f['rule_id'], '')}" if f["rule_id"] else ""
+        lines.append(f"| {f['id']} | {f['kind']} | {rule} | {f['technology']} | {'<br>'.join(f['record_refs'])} "
+                     f"| {f['explanation'] or '—'} | {f['resolution']} |")
 
     lines += ["", "## SW/HW 대조표", "", "| 기준 | SW | HW | 관계 |", "|---|---|---|---|"]
     lines += [f"| {r['criterion']} | {r['sw'] or '—'} | {r['hw'] or '—'} | {r['relation']} |" for r in result["contrast_table"]]
@@ -71,7 +79,12 @@ def render_markdown(state: dict, result: dict) -> str:
         lines += [f"- 근거 수: sw {imb['evidence_counts']['sw']} / hw {imb['evidence_counts']['hw']}"
                   f"{' (불균형)' if imb.get('flagged') else ''}"]
     lines += ["", "## 제거된 문장", ""]
-    lines += [f"- {d['text']}  \n  사유: {'; '.join(d['violations'])}" for d in result["dropped_sentences"]] or ["(없음)"]
+    for d in result["dropped_sentences"]:
+        lines.append(f"- {d['text']}  \n  사유: {'; '.join(d['violations'])}")
+        if d.get("revised_text"):
+            lines.append(f"  재생성: {d['revised_text']}  \n  재생성 후 사유: {'; '.join(d.get('revised_violations') or [])}")
+    if not result["dropped_sentences"]:
+        lines.append("(없음)")
     return "\n".join(lines) + "\n"
 
 
@@ -80,7 +93,7 @@ def main() -> None:
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT, help="AppState JSON (기본: 합성 fixture)")
     parser.add_argument("--writer", choices=("template", "openai"), default="template",
                         help="template: LLM 없이 규칙 문장 / openai: 실제 LLM 서술")
-    parser.add_argument("--model", default=None, help="openai 모델 ID (기본: 환경변수 SYNTHESIS_MODEL 또는 gpt-5.5)")
+    parser.add_argument("--model", default=None, help="openai 모델 ID (기본: 환경변수 SYNTHESIS_MODEL 또는 gpt-4.1)")
     parser.add_argument("--ask-key", action="store_true", help="OpenAI API 키를 화면에 표시하지 않고 입력")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/synthesis"))
     args = parser.parse_args()
@@ -103,6 +116,7 @@ def main() -> None:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "synthesis.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     (folder / "synthesis_report.md").write_text(render_markdown(state, result), encoding="utf-8")
+    (folder / "graph.mmd").write_text(build_subgraph(writer or TemplateWriter()).get_graph().draw_mermaid(), encoding="utf-8")
 
     counts, q = result["meta"]["counts"], result["meta"]["quality"]
     if state.get("_note"):
@@ -112,6 +126,8 @@ def main() -> None:
           f" / 일치 {counts['agreements']} / 보완 {counts['complements']}")
     print(f"요약 주장 {q.get('kept', 0)}개 (검사 {q.get('checked', 0)}, 재생성 {q.get('revised', 0)}, 제거 {q.get('dropped', 0)})"
           f" / 중립성 검사: {q.get('status')}")
+    path = " → ".join(t["node"] for t in result["meta"].get("trace", []))
+    print(f"실행 경로: START → {path} → END")
     print(f"결과 폴더: {folder.resolve()}")
 
 

@@ -64,6 +64,25 @@ def to_result(local: dict, writer) -> dict:
     }
 
 
+def _step_summary(node: str, update: dict) -> str:
+    """노드가 만든 것을 한 줄로. 실행 경로 확인용."""
+    if node == "matrix":
+        return (f"status={update.get('status')}, 매트릭스 {len(update.get('matrix') or [])}칸, "
+                f"공백 {len(update.get('gaps') or [])}, 재실행 요청 {len(update.get('retry_requests') or [])}")
+    if node == "relations":
+        kinds = {}
+        for f in update.get("cross_findings") or []:
+            kinds[f["kind"]] = kinds.get(f["kind"], 0) + 1
+        return f"관계 {sum(kinds.values())}건 {kinds}, 대조표 {len(update.get('contrast_table') or [])}행"
+    if node == "write":
+        errors = update.get("errors") or []
+        return f"초안 문장 {len(update.get('summary_claims') or [])}개" + (f", 오류 {errors}" if errors else "")
+    if node == "review":
+        q = update.get("quality") or {}
+        return f"검사 {q.get('checked')}, 유지 {q.get('kept')}, 재생성 {q.get('revised')}, 제거 {q.get('dropped')} → {q.get('status')}"
+    return ", ".join(sorted(update))
+
+
 def make_node(writer=None):
     """부모 그래프에 등록할 노드 함수를 만든다.
 
@@ -75,10 +94,19 @@ def make_node(writer=None):
 
     def synthesis_node(state: dict) -> dict:
         local = project_input(state)
+        result, trace = dict(local), []
         try:
-            result = subgraph.invoke(local)
+            # stream 으로 돌려 노드 실행 순서와 각 단계 산출물을 meta.trace 에 남긴다 (설계대로 돌았는지 확인용)
+            for mode, chunk in subgraph.stream(local, stream_mode=["updates", "values"]):
+                if mode == "values":
+                    result = chunk
+                    continue
+                for name, update in chunk.items():
+                    trace.append({"step": len(trace) + 1, "node": name, "output": _step_summary(name, update or {})})
         except Exception as exc:  # 예외를 밖으로 던지지 않고 failed 결과로 반환한다 (규칙 8)
-            result = {**local, "status": "failed", "errors": [f"평가 종합 실패: {type(exc).__name__}: {exc}"]}
-        return {"synthesis": to_result(result, writer)}
+            result = {**result, "status": "failed", "errors": [f"평가 종합 실패: {type(exc).__name__}: {exc}"]}
+        out = to_result(result, writer)
+        out["meta"]["trace"] = trace
+        return {"synthesis": out}
 
     return synthesis_node

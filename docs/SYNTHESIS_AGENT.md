@@ -74,7 +74,7 @@ agents/synthesis/
 └── rules.py        규칙 상수 (조건 필수 수치, 금지 수치, 우열 어휘, 임계값)
 
 scripts/run_synthesis.py                          단독 실행
-tests/agents/synthesis/test_synthesis.py          테스트 36개 (LLM·네트워크 없음)
+tests/agents/synthesis/test_synthesis.py          테스트 41개 (LLM·네트워크 없음)
 tests/agents/synthesis/fixtures/appstate_sample.json   합성 AppState 입력
 ```
 
@@ -132,8 +132,8 @@ LLM 에는 **근거 원문 전체가 아니라** 매트릭스, 관계 목록, re
 
 | 서술기 | 용도 | 동작 |
 |---|---|---|
-| `TemplateWriter` (기본) | 오프라인 테스트, fixture 실행 | 관계를 종류·규칙·기술별로 묶어 정해진 문장으로 옮김. TRL 범위 문장 추가. 기술군·전망 근거는 자동 표기 |
-| `OpenAIWriter` | 실제 서술 | OpenAI Responses API 구조화 출력. 요약 주장 5~10개 + 상충별 원인 설명. 기본 모델 `gpt-5.5`(환경변수 `SYNTHESIS_MODEL`로 변경), `max_output_tokens=16000` |
+| `TemplateWriter` (기본) | 오프라인 테스트, fixture 실행 | 관계를 종류·규칙·기술별로 묶어 정해진 문장으로 옮김. TRL 범위 문장 추가. 기술군·전망 근거는 자동 표기. **상충 원인 설명은 쓰지 않음** (원인을 찾을 수 없으므로 `unresolved` 유지) |
+| `OpenAIWriter` | 실제 서술 | OpenAI Responses API 구조화 출력. 요약 주장 5~10개 + 상충별 원인 설명. 기본 모델 **`gpt-4.1`**(`--model` 또는 환경변수 `SYNTHESIS_MODEL`로 변경), `max_output_tokens=16000` |
 
 `OpenAIWriter`는 `max_output_tokens`를 넉넉히 잡았습니다. 이해관계자 에이전트에서 추론 토큰 때문에 응답이 잘린 문제(ISSUE 3-1a)를 겪었기 때문입니다. 응답이 `completed`가 아니면 상세 사유와 함께 `limitations`에 남기고 계속 진행합니다.
 
@@ -148,9 +148,14 @@ LLM 에는 **근거 원문 전체가 아니라** 매트릭스, 관계 목록, re
 | C4 | 조건 필수 수치의 조건 토큰 동반, 기술별 금지 수치 |
 | C5 | 우열 어휘(우수·더 낫·승자·추천·권장·압도·우위·열위·월등) |
 | C6 | 온디바이스·엣지·모바일 없음. proxy 근거 인용 시 "기술군", forecast 근거 인용 시 "전망" 표기 |
-| C7 | 문장의 TRL 범위가 매트릭스 값과 같음. basis 가 direct 가 아닌 판정을 "직접 근거"로 쓰지 않음 |
+| C7 | 문장의 TRL 범위가 매트릭스 값과 같음. basis 가 direct 가 아닌 판정을 "직접 근거"(또는 "direct 근거")로 쓰지 않음 |
+| 규칙 코드 | 검사 규칙 코드(C1~C7, SX1~SX7)가 문장에 새어 들어가지 않음 (재생성 때 위반 사유를 따라 쓰는 경우) |
 
-위반 문장은 서술기의 `revise()`로 **한 번만** 다시 쓰고, 그래도 위반이면 제거해서 `dropped_sentences`에 사유와 함께 남깁니다. 상충 설명(`explanation`)에 우열 어휘가 있으면 설명만 지우고 `unresolved`로 둡니다.
+위반 문장은 서술기의 `revise()`로 **한 번만** 다시 쓰고, 그래도 위반이면 제거해서 `dropped_sentences`에 남깁니다. 원래 문장과 사유, 재생성한 문장과 재생성 후 사유를 함께 기록합니다.
+
+상충 설명(`explanation`)도 그 상충의 근거를 인용한 문장으로 보고 C3(수치)·C5(우열)·C7(TRL 범위)·규칙 코드·길이를 검사합니다. 위반하면 설명만 지우고 `unresolved`로 둡니다.
+- 수치 검사 기준에는 해당 상충이 가리키는 관점 주장 문장(예: SX3의 "35.7%")도 넣습니다.
+- 규칙 자체의 기준값은 허용합니다: SX1 의 TRL 7단계, SX4 의 10%, SX5 의 12개월·1년·365일.
 
 검사 결과는 `meta.quality`에 들어갑니다: `passed`(제거 없음) / `needs_review`(일부 제거) / `failed`(남은 문장 없음).
 
@@ -163,19 +168,37 @@ LLM 에는 **근거 원문 전체가 아니라** 매트릭스, 관계 목록, re
 ### API 키 없이 (비용 없음)
 
 ```bash
-# 테스트 36개
+# 테스트 41개
 python -m unittest tests.agents.synthesis.test_synthesis -v
 
 # 합성 fixture 로 전체 흐름 실행 (템플릿 서술)
 python -m scripts.run_synthesis
 ```
 
-`outputs/synthesis/<실행시각>/`에 두 파일이 생깁니다.
+`outputs/synthesis/<실행시각>/`에 세 파일이 생깁니다.
 
 | 파일 | 내용 |
 |---|---|
 | `synthesis.json` | `SynthesisResult` 전체 (부모 State 에 들어갈 값) |
-| `synthesis_report.md` | 사람이 읽는 보고서: 요약 주장, 매트릭스, 관계, 대조표, 공백, 재실행 요청, 한계, 제거된 문장 |
+| `synthesis_report.md` | 사람이 읽는 보고서: **실행 경로**, 요약 주장, 매트릭스, 관계, 대조표, 공백, 재실행 요청, 한계, 제거된 문장 |
+| `graph.mmd` | 서브그래프 구조 (LangGraph 가 그린 Mermaid). 설계한 4단계 직선 흐름인지 확인용 |
+
+### 설계대로 돌았는지 확인하기
+
+노드는 `stream`으로 실행되고, 실행된 순서와 각 단계의 산출이 `synthesis.meta.trace`에 남습니다. 콘솔과 보고서의 "실행 경로"에 이렇게 나옵니다.
+
+```
+실행 경로: START → matrix → relations → write → review → END
+```
+
+| 순서 | 노드 | 산출 (fixture, 템플릿 서술) |
+|---|---|---|
+| 1 | matrix | status=partial, 매트릭스 12칸, 공백 2, 재실행 요청 0 |
+| 2 | relations | 관계 15건 (conflict 9, shared_evidence 3, complement 3), 대조표 9행 |
+| 3 | write | 초안 문장 14개 |
+| 4 | review | 검사 14, 유지 14, 재생성 0, 제거 0 → passed |
+
+`graph.mmd`를 Mermaid 뷰어(GitHub, VS Code 확장 등)로 열면 `__start__ → matrix → relations → write → review → __end__`만 있고 분기·루프가 없는 것을 볼 수 있습니다.
 
 fixture 기준 결과: 매트릭스 12칸, 상충 9건(SX1~SX7 모두 탐지), 공유 근거 3건, 보완 3건, 요약 주장 14개 모두 검사 통과, 상태 `partial`(이해관계자·도메인 결과가 partial).
 
@@ -187,7 +210,22 @@ python -m scripts.run_synthesis --writer openai --ask-key       # 키를 직접 
 python -m scripts.run_synthesis --writer openai --model <모델ID>
 ```
 
-이 스크립트는 이해관계자 스크립트와 달리 `.env`의 `OPENAI_API_KEY`도 읽습니다. 실제 LLM 서술은 아직 실행해 보지 않았고, 가짜 client 로 요청·응답 처리만 테스트했습니다.
+이 스크립트는 이해관계자 스크립트와 달리 `.env`의 `OPENAI_API_KEY`도 읽습니다.
+
+### 모델 비교 (2026-09-22, 합성 fixture)
+
+| 모델 | 초안 → 유지 | 상충 설명 | 관찰 |
+|---|---|---|---|
+| gpt-5.5 | 8 → 8 | 9/9 | 품질 가장 좋음. 다만 영어 용어(direct, proxy, conflict)가 섞이고 설명이 규칙 재진술인데도 전부 "해소됨"으로 표시 |
+| gpt-4o | 9 → 7 | 9/9 | 사실 오류("MLA가 CXL에 오프로딩"), 과장("크게 성장할 전망"), 규칙 코드 노출("C6 기술군") |
+| **gpt-4.1** (기본) | 10 → 10 | 9/9 | gpt-4o 보다 지시를 잘 따름. 설명에 틀린 TRL("6-7")과 단위 오류("15.8억 USD")가 있었음 → 설명 검사 추가로 차단 |
+
+이 비교를 보고 한 변경:
+- 프롬프트: 한국어 용어 사용, 본문에 ID·규칙 코드 금지, 기술 이름(MLA·ITME) 사용, record_refs 의 관점·기준을 바꾸지 않기,
+  모든 상충에 설명, 규칙 재진술이면 `resolved=false`, 근거 없는 판단 보류 칸은 문장으로 쓰지 않기
+- 검사: 규칙 코드 노출 검사, "direct 근거" 영문 표기도 C7 대상, 상충 설명에도 C3·C5·C7 적용
+
+**코드 검사로 잡을 수 없는 것.** 문장의 뜻이 근거와 다른 경우(예: 공유 근거 쌍을 다른 기준으로 바꿔 쓰기, 근거에 없는 효과 덧붙이기)는 C1~C7 이 잡지 못합니다. 보고서에 쓰기 전에 사람이 `synthesis_report.md`의 요약 주장과 근거를 대조해야 합니다.
 
 ### 다른 에이전트 결과로 실행
 
@@ -211,10 +249,10 @@ build_graph(..., synthesis=make_node(), ...)                 # 템플릿 서술 
 
 | 묶음 | 내용 |
 |---|---|
-| 노드 계약 | `synthesis` 키만 반환, 내부 필드 비노출, 필요한 키만 읽음, 전 관점 누락 시 예외 없이 `failed`, 서술 실패 기록, 부모 그래프 안에서 동작 |
+| 노드 계약 | 실행 경로가 matrix → relations → write → review, `synthesis` 키만 반환, 내부 필드 비노출, 필요한 키만 읽음, 전 관점 누락 시 예외 없이 `failed`, 서술 실패 기록, 부모 그래프 안에서 동작 |
 | 매트릭스 | record 당 셀, content_hash 중복 제거, 누락 관점 → gap·재실행 요청, 없는 근거 ID 제외, not_applicable 제외, 2배 불균형, 기준일 이후 근거 |
 | 관계 | fixture 에서 SX1~SX7 모두 탐지, 공유 근거는 일치가 아님, 어휘가 다르면 보완·같으면 일치, SX1 은 TRL 7 미만일 때만, unknown 은 SX2 제외, **sw/hw·입력 순서를 바꿔도 결과 동일**, 대조표 관계 |
-| 검토 | C1·C3·C4·C5·C6·C7 위반 탐지, ID·제품명 숫자 제외, 1회 재생성 후 유지 / 재생성 후에도 위반이면 제거, 설명의 해소 상태, 템플릿 출력은 전부 통과 |
+| 검토 | C1·C3·C4·C5·C6·C7·규칙 코드 위반 탐지, "direct 근거" 표기, ID·제품명 숫자 제외, 1회 재생성 후 유지 / 재생성 후에도 위반이면 제거, 설명의 해소 상태, 틀린 TRL 설명 제거, **실제 gpt-4.1 출력에서 잘못 제거됐던 설명이 통과**, 템플릿 출력은 전부 통과 |
 | OpenAIWriter | 가짜 client 로 quote 만 전달하는지, 응답 미완료 시 예외 대신 기록하는지 |
 
 ---
