@@ -28,16 +28,11 @@ notebooks/  outputs/  data/
 
 ## 노드 연결
 
-```python
-from agents.domain import DomainAgentDeps, make_node as domain_node
-from agents.stakeholder import make_node as stakeholder_node
-from graph.build import build_graph
+엣지는 `graph/build.py`, 노드 조립과 실행은 루트 `main.py`에 있습니다. 자세한 내용은 [docs/PARENT_GRAPH.md](docs/PARENT_GRAPH.md).
 
-app = build_graph(
-    ...,
-    domain=domain_node(deps),
-    stakeholder=stakeholder_node(legacy=True),  # graph/state.py 기준일 때
-)
+```bash
+python main.py                          # 부모 그래프 전체를 오프라인으로 실행 (API 키 불필요)
+python main.py --live synthesis         # 평가 종합만 실제 LLM
 ```
 
 ## 아직 정하지 않은 것
@@ -84,6 +79,8 @@ cp .env.example .env
 | 무엇을 | 명령 | 확인할 것 |
 |---|---|---|
 | 전체 테스트 | `python -m pytest tests` | 설치된 선택 의존성에 따라 통과 또는 명시적 skip |
+| **부모 그래프 전체 흐름** | `python main.py` | `실행 경로: START → technical → market + stakeholder + domain → synthesis → report → END`, `outputs/graph/<실행시각>/summary.md` |
+| 부모 그래프 테스트 | `python -m unittest tests.graph.test_parent_graph -v` | `OK` |
 | 보고서 계약 테스트 | `python -m unittest tests.agents.report.test_report_agent -v` | API 없이 생성·인용·검증 계약 확인 |
 | 도메인 테스트만 | `python tests/agents/domain/test_domain_agent.py` | `전체 통과` |
 | 이해관계자 테스트만 | `python -m unittest tests.agents.stakeholder.test_stakeholder -v` | `OK` |
@@ -166,5 +163,5 @@ python -m agents.domain.tools.ablation --embedding ""            # BM25만 (빠�
 
 ### 3. 아직 할 수 없는 것
 
-- **전체 그래프 연결 실행**: 실행 진입점(`main.py`)이 없고 부모 State가 확정되지 않았습니다.
-  State 설계서를 반영한 뒤 추가할 예정입니다. ([ISSUE.md](ISSUE.md) 1번, 4-2)
+- **전체 그래프를 모두 실제 노드로 실행**: 기술 조사(①) 에이전트는 PR 전, 도메인(④)은 AppState 수정 브랜치가 merge 전이라
+  `main.py`에서 두 자리는 합성 fixture 재생 노드로 채웁니다. ([docs/PARENT_GRAPH.md](docs/PARENT_GRAPH.md))
