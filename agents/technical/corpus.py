@@ -150,6 +150,60 @@ def _split_page(text: str, chunk_chars: int, overlap_chars: int) -> list[tuple[i
     return parts
 
 
+# pdfplumber 기본값(3)은 arXiv 논문에서 단어를 붙여 버린다("Wepresent...").
+# 그러면 LLM 이 공백을 복원해 쓴 인용문이 validate_reference 의 원문 대조를 통과하지 못한다.
+# 도메인 에이전트(agents/domain/tools/fetch.py)와 같은 값을 쓴다.
+PDF_X_TOLERANCE = 1.5
+
+# 2단 조판 감지 기준. 가운데 거터를 가로지르는 단어가 이 비율 이하면 2단으로 본다
+# (제목처럼 전체 폭을 쓰는 줄이 몇 개 섞여 있어도 본문은 2단이다).
+_GUTTER_CROSS_RATIO = 0.03
+_GUTTER_MIN_SIDE_RATIO = 0.2
+
+
+def _find_gutter(words: list[dict], width: float) -> tuple[float, list[dict]] | None:
+    """2단 조판이면 (거터 x, 거터를 가로지르는 단어들)을, 1단이면 None 을 돌려준다."""
+    best: tuple[float, list[dict]] | None = None
+    for percent in range(42, 59):
+        x = width * percent / 100
+        crossing = [w for w in words if w["x0"] < x < w["x1"]]
+        left = sum(1 for w in words if w["x1"] <= x)
+        right = sum(1 for w in words if w["x0"] >= x)
+        if len(crossing) > len(words) * _GUTTER_CROSS_RATIO:
+            continue
+        if min(left, right) <= len(words) * _GUTTER_MIN_SIDE_RATIO:
+            continue
+        if best is None or len(crossing) < len(best[1]):
+            best = (x, crossing)
+    return best
+
+
+def _page_text(page, tolerance: float = PDF_X_TOLERANCE) -> str:
+    """페이지 텍스트를 읽기 순서대로 뽑는다.
+
+    pdfplumber 는 2단 조판을 한 줄씩 좌우로 오가며 읽어 문장을 뒤섞는다. 그 상태의 원문은
+    LLM 이 그대로 인용할 수 없어 근거 결합이 전부 실패한다. 2단이면 상단 전체폭 영역과
+    좌·우 단을 따로 뽑아 이어 붙인다. 본문 중간의 전체폭 표·그림은 여전히 뒤섞일 수 있다.
+    """
+    words = page.extract_words(x_tolerance=tolerance)
+    if not words:
+        return page.extract_text(x_tolerance=tolerance) or ""
+    found = _find_gutter(words, page.width)
+    if found is None:
+        return page.extract_text(x_tolerance=tolerance) or ""
+
+    gutter, crossing = found
+    height = page.height
+    header_bottom = max((w["bottom"] for w in crossing if w["bottom"] < height * 0.5), default=0.0)
+    regions = []
+    if header_bottom > 0:
+        regions.append((0, 0, page.width, header_bottom))
+    regions.append((0, header_bottom, gutter, height))
+    regions.append((gutter, header_bottom, page.width, height))
+    parts = [page.crop(box).extract_text(x_tolerance=tolerance) or "" for box in regions]
+    return "\n".join(part for part in parts if part.strip())
+
+
 def parse_corpus(
     documents: list[SourceDocument],
     source_dir: Path | None = None,
@@ -176,7 +230,7 @@ def parse_corpus(
                 )
             for page_number, page in enumerate(pdf.pages, start=1):
                 for start, end, text in _split_page(
-                    page.extract_text() or "", chunk_chars, overlap_chars
+                    _page_text(page), chunk_chars, overlap_chars
                 ):
                     locator = f"p.{page_number}:chars:{start}-{end}"
                     raw_id = f"{document.doc_id}|{locator}|{text}"

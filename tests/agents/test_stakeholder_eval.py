@@ -47,7 +47,7 @@ class StubClient:
         self.models = []
         self.responses = SimpleNamespace(parse=self._parse)
 
-    def _parse(self, *, model, instructions, input, tools, tool_choice, text_format, max_output_tokens, store):
+    def _parse(self, *, model, instructions, input, tools, tool_choice, text_format, max_output_tokens, store, **kwargs):
         self.calls.append(input)
         self.models.append(model)
         # 매 호출은 input JSON 문자열에 technology/group 텍스트를 담고 있다.
