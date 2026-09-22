@@ -18,7 +18,11 @@ def stub_web_search(query: str) -> list[SearchResult]:
     }]
 
 
-def tavily_web_search(query: str, max_results: int = 3) -> list[SearchResult]:
+# 출처 등급 필터가 등급표 밖 도메인을 전부 기각하므로, 질의당 3건만 받으면 통과하는
+# 결과가 거의 남지 않는다. 실측(질의 8건 기준): 3건씩 받으면 24건 중 5~6건만 등급을
+# 통과하고 최종 근거가 0~3건으로 실행마다 출렁였다. 10건씩 받으면 80건 중 22건이
+# 통과하고 근거 6건·주장 7건으로 안정됐다. 질의 언어(한국어/영어)는 영향이 없었다.
+def tavily_web_search(query: str, max_results: int = 10) -> list[SearchResult]:
     from langchain_tavily import TavilySearch
 
     tool = TavilySearch(max_results=max_results)

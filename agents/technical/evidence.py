@@ -18,17 +18,32 @@ def make_claim_id(technology: str, text: str, evidence_ids: list[str]) -> str:
     return "technical:claim:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
+def _candidate_containing(quote: str, candidates: dict[str, dict]) -> dict | None:
+    """인용문을 글자 그대로 포함하는 다른 후보를 찾는다. 없으면 None."""
+    for candidate in candidates.values():
+        if quote in normalize_text(candidate.get("text", "")):
+            return candidate
+    return None
+
+
 def validate_reference(reference: dict, candidates: dict[str, dict]) -> tuple[dict | None, str | None]:
+    quote = normalize_text(reference.get("quote", ""))
     candidate = candidates.get(reference.get("candidate_id", ""))
+    if not quote:
+        chunk_id = candidate["chunk_id"] if candidate else reference.get("candidate_id")
+        return None, f"빈 인용문: {chunk_id}"
+    if candidate is not None and quote in normalize_text(candidate.get("text", "")):
+        return candidate, None
+    # 인용문이 원문 그대로 다른 후보에 있으면 출처를 그쪽으로 바로잡는다. 모델이 붙인
+    # candidate_id 만 틀린 경우가 실측 실패의 다수였고(28건 중 12건이 인용한 chunk 와
+    # 일치율 30% 미만), 이 경로도 완전 일치를 요구하므로 지어낸 인용문은 여전히
+    # 통과하지 못한다.
+    relocated = _candidate_containing(quote, candidates)
+    if relocated is not None:
+        return relocated, None
     if candidate is None:
         return None, f"존재하지 않는 candidate_id: {reference.get('candidate_id')}"
-    quote = normalize_text(reference.get("quote", ""))
-    source = normalize_text(candidate.get("text", ""))
-    if not quote:
-        return None, f"빈 인용문: {candidate['chunk_id']}"
-    if quote not in source:
-        return None, f"원문에 없는 인용문: {candidate['chunk_id']}"
-    return candidate, None
+    return None, f"원문에 없는 인용문: {candidate['chunk_id']}"
 
 
 def to_parent_evidence(candidate: dict, quote: str, claim_id: str, *, accessed_at: str | None = None) -> dict:
