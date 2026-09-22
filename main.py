@@ -65,8 +65,12 @@ def build_nodes(live: set[str], fixture: dict, pdf_path: Path | None = None) -> 
     if "technical" in live:
         from agents.technical import make_node as technical_node
 
-        # 기본 의존성: Pool A 고정 PDF(BM25 + BGE-M3 + RRF) + Tavily + gpt-4.1-nano. 첫 호출 때 코퍼스를 파싱한다.
-        nodes["technical"], modes["technical"] = technical_node(), "실제 (Pool A RAG + Tavily, gpt-4.1-nano, TRL Gate)"
+        # 기본 의존성: Pool A 고정 PDF(BM25 + BGE-M3 + RRF) + Tavily + OPENAI_MODEL. 첫 호출 때 코퍼스를 파싱한다.
+        technical_model = os.getenv("OPENAI_MODEL", "gpt-4.1")
+        nodes["technical"], modes["technical"] = (
+            technical_node(),
+            f"실제 (Pool A RAG + Tavily, {technical_model}, TRL Gate)",
+        )
     else:
         nodes["technical"], modes["technical"] = replay_node("technical", fixture), "fixture 재생"
 
@@ -108,7 +112,11 @@ def build_nodes(live: set[str], fixture: dict, pdf_path: Path | None = None) -> 
     if "stakeholder" in live:
         from agents.stakeholder_eval import make_node as stakeholder_node
 
-        nodes["stakeholder"], modes["stakeholder"] = stakeholder_node(), "실제 (agents.stakeholder_eval, gpt-4.1-mini)"
+        stakeholder_model = os.getenv("STAKEHOLDER_MODEL", "gpt-5-mini")
+        nodes["stakeholder"], modes["stakeholder"] = (
+            stakeholder_node(model=stakeholder_model),
+            f"실제 (agents.stakeholder_eval, {stakeholder_model})",
+        )
     else:
         nodes["stakeholder"], modes["stakeholder"] = replay_node("stakeholder", fixture), "fixture 재생"
 

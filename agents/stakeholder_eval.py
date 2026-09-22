@@ -102,12 +102,25 @@ def summarize_technical(findings: dict | None) -> str:
 # 2단계: 웹 검색 + 발언 추출 + 분류 (LLM 호출 1회)
 # =========================================================
 
+def _reasoning_kwargs(model: str) -> dict:
+    """추론 모델이면 추론을 쓸 수 있는 가장 낮은 값으로 낮춘다.
+
+    gpt-5 계열은 추론 토큰이 max_output_tokens 를 함께 소모해서 답변이 잘리고 검색이 실패한다
+    (ISSUE 3-1a 와 같은 양상). 다만 이 호출은 web_search 를 쓰는데, API 가
+    "tools cannot be used with reasoning.effort 'minimal': web_search" 로 거부하므로
+    minimal 이 아니라 low 가 하한이다. (gpt-4.1 계열은 이 파라미터 자체를 거부한다.)
+    """
+    if model.startswith("gpt-5") and "chat" not in model:
+        return {"reasoning": {"effort": "low"}}
+    return {}
+
+
 def search_group_opinions(
     client,
     plan_item: dict,
     technical_findings: dict | None,
     *,
-    model: str = "gpt-4.1-mini",
+    model: str = "gpt-5-mini",
 ) -> list[StakeholderOpinion]:
     """한 (기술, 그룹) 조합에 대해 실제 웹 검색을 수행하고 발언을 구조화해 돌려준다."""
     import json
@@ -130,6 +143,7 @@ def search_group_opinions(
         text_format=StakeholderOpinionBatch,
         max_output_tokens=8000,
         store=False,
+        **_reasoning_kwargs(model),
     )
     if response.status != "completed" or response.output_parsed is None:
         return []
@@ -357,7 +371,7 @@ def run_stakeholder_eval(
     return findings, evidence_store, search_log
 
 
-def make_node(client=None, model: str = "gpt-4.1-mini"):
+def make_node(client=None, model: str = "gpt-5-mini"):
     """부모 그래프(graph/build.py)의 stakeholder= 자리에 꽂을 노드 함수를 만든다.
 
     부모 State에서 이 관점이 필요로 하는 것만 추려 쓴다 (다른 관점의 중간 결론은
