@@ -104,7 +104,7 @@ def main() -> int:
         fetch_body = None if args.no_fetch_body else (lambda url: fetch_document(url, cache_dir=fetch_cache_dir))
         deps = MarketAgentDeps(
             llm=llm, strong_llm=strong_llm,
-            web_search=lambda q: tavily_web_search(q, max_results=3),
+            web_search=tavily_web_search,
             retriever=None, fetch_body=fetch_body, page_budget=args.page_budget,
         )
         print(f"조사 시작: {args.model}/{args.strong_model}, 검색 라운드 최대 {args.rounds}회. API 비용이 발생합니다.", flush=True)

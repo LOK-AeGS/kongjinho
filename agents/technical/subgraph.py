@@ -250,8 +250,11 @@ def build_technical_graph(deps: TechnicalAgentDeps):
                     candidates = merge_candidates(candidates, web_candidates)
                     logs.append({**log, "round": attempt})
                 except Exception as exc:
-                    errors.append(f"{technology} Tavily 검색 실패 ({type(exc).__name__})")
-                    logs.append({"provider": "tavily", "technology": technology, "round": attempt, "status": "error"})
+                    # 타입명만 남기면 "패키지 미설치"와 "네트워크 오류"를 구분할 수 없어
+                    # 설정 문제를 조사 실패로 오인하게 된다. 사유를 함께 남긴다.
+                    reason = f"{type(exc).__name__}: {exc}"[:200]
+                    errors.append(f"{technology} Tavily 검색 실패 ({reason})")
+                    logs.append({"provider": "tavily", "technology": technology, "round": attempt, "status": "error", "error": reason})
 
         coverage = coverage_by_technology(candidates)
         missing = missing_criteria(coverage)
@@ -297,9 +300,15 @@ def build_technical_graph(deps: TechnicalAgentDeps):
         violations = _unique(violations)
         can_revise = bool(violations) and state["revision_round"] < MAX_REVISION_ROUNDS and not state["errors"]
         findings = _make_findings(state, state["trl_records"], metrics, metric_warnings, violations)
+        # 추출 자체가 실패하면 검사할 주장이 없어 violations 도 비는데, 그걸 passed 로
+        # 찍으면 "빈 결과"와 "문제 없음"이 구분되지 않는다. 실행 오류를 먼저 본다.
         quality = {
-            "status": "failed" if violations else "needs_review" if metric_warnings else "passed",
-            "violations": violations, "warnings": metric_warnings,
+            "status": (
+                "failed" if state["errors"] or violations
+                else "needs_review" if metric_warnings
+                else "passed"
+            ),
+            "violations": _unique(violations + list(state["errors"])), "warnings": metric_warnings,
             "checked_claim_ids": [item["claim_id"] for item in findings.get("claims", [])],
         }
         return {"needs_revision": can_revise, "quality_report": quality, "technical_findings": findings}
