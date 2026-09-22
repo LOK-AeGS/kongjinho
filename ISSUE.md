@@ -30,6 +30,10 @@ claims / gaps)로, 근거를 `graph.state.Evidence`(`id`/`page_or_locator`/
 
 ⬜ **이해관계자 (미해결)**
 
+> 참고: 별도 간소화 버전 `agents/stakeholder_eval.py`(PR #6)는 AppState 형식으로 들어왔고, 부모 그래프(`main.py --live stakeholder`)는 이쪽을 씁니다.
+> 시장(PR #4)·평가 종합(PR #5)·보고서(PR #7)도 AppState 형식입니다.
+
+
 | | 이해관계자 (`agents/stakeholder/node.py`) |
 |---|---|
 | 입력 | v0.3: `selected_tech`, `domain`, `as_of_date`를 읽음 (`as_of_date`는 AppState에서 `request.as_of`)<br>legacy: `state["request"]["sw"]` → **KeyError** |
@@ -42,6 +46,31 @@ claims / gaps)로, 근거를 `graph.state.Evidence`(`id`/`page_or_locator`/
   `subgraph.py` 등 내부 로직은 바꾸지 않아도 됩니다. 도메인의 변환 예시(`_to_team_*`
   함수, `agents/domain/node.py`)를 참고할 수 있습니다.
 - 변환 후 fixture로 돌려서 `evidence_store`와 `stakeholder_findings`가 실제로 채워지는지 확인합니다.
+
+### ⬜ 1-3. `Evidence.content_hash`의 의미가 정해지지 않아 에이전트마다 다름 (팀 결정 필요)
+- `content_hash`는 공유 키 `evidence_store` 안의 각 근거(`graph.state.Evidence`, `graph/state.py:114`)에 붙는 필드입니다.
+- 설계서 §7.1 에는 `content_hash: str` 한 줄만 있고 **무엇을 해시하는지 정의가 없습니다.**
+  바로 옆의 `id`는 "SHA-256(정규화 URL + 문서 내 위치 + 정규화 인용문)"으로 정의돼 있습니다.
+- 설계서의 쓰임새:
+  - §7.3 `n_evidence: int  # 서로 다른 content_hash 수`
+  - §8.6.1 "그 근거가 같은 content_hash 1건이면 일치가 아니라 공유 근거(shared_evidence)"
+  - §8.6.3 이중 계산 방지: "content_hash 기준 일치 판정"
+  - §3.5 웹 검색 기록 항목에 포함
+- 현재 구현:
+
+  | 에이전트 | `content_hash` 값 | 위치 |
+  |---|---|---|
+  | 시장 | 인용문 하나의 해시 | `agents/market/state.py:162` |
+  | 도메인 | 문서 전체(스냅샷)의 해시 (`content_sha256`) | `agents/domain/node.py:103`, `agents/domain/tools/evidence.py:74` |
+  | 이해관계자 | 페이지 전체(블록 전체)의 해시 | `agents/stakeholder/subgraph.py:45` |
+
+- **영향:** 평가 종합이 이 값으로 공유 근거, 매트릭스 근거 수(`n_evidence`), SX6 을 판단합니다.
+  같은 논문을 인용해도 시장 쪽은 "다른 근거", 도메인 쪽은 "같은 근거"로 세어집니다.
+  문서 단위일 때는 같은 논문의 장점 인용과 한계 인용이 SX6(같은 근거의 반대 stance)으로 잘못 잡힙니다.
+- **제안:** "수집한 원문 문서(스냅샷) 전체의 SHA-256"으로 정의합니다.
+  인용문 단위라면 `id`와 사실상 같은 값이 되어 필드를 따로 둘 이유가 약하고, §8.6.1 의 "같은 자료 = 근거 1건"과도 맞습니다. (추론이므로 팀 확인 필요)
+- **할 일:** 팀이 정의를 확정해 `graph/state.py`의 `Evidence.content_hash`에 주석으로 적고, 다른 에이전트가 맞춥니다.
+  평가 종합의 SX6 은 `content_hash`가 아니라 근거 `id` 기준으로 바꿉니다 (6-2).
 
 ---
 
@@ -128,10 +157,11 @@ claims / gaps)로, 근거를 `graph.state.Evidence`(`id`/`page_or_locator`/
   (`hw-accuracy-1`, `sw-power-1`의 근거 부족)을 보고했습니다. 실행별 결과 차이를
   감추지 않고 노트북 출력에 남겼습니다.
 
-### ⬜ 4-2. 전체 그래프를 한 번도 돌려보지 않음
-- `graph/build.py`는 있지만 실행 진입점(`main.py`)이 없습니다.
-- technical, market, synthesis, report 에이전트가 아직 없습니다.
-- **할 일:** State 확정 후 `main.py`를 만들고, 없는 에이전트는 임시 노드로 채워서 오프라인으로 전체 흐름을 돌려봅니다.
+### ⬜ 4-2. 전체 그래프를 모든 실제 노드로 돌려보지 않음
+- ✅ 2026-09-22 루트 `main.py`로 부모 그래프를 연결했습니다 (`docs/PARENT_GRAPH.md`).
+  오프라인 실행에서 `technical → market + stakeholder + domain(병렬) → synthesis → report` 순서를 확인했습니다.
+- ⬜ 기술 조사(①) 에이전트가 아직 없어 `graph/stubs.py`의 fixture 재생 노드로 채웁니다.
+- **할 일:** 기술 조사 PR 이 들어오면 `main.py`에 연결하고, `--live` 전체 실행으로 end-to-end 를 확인합니다.
 
 ---
 
@@ -144,3 +174,47 @@ claims / gaps)로, 근거를 `graph.state.Evidence`(`id`/`page_or_locator`/
 ### ✅ 5-2. ablation 실행 안내가 실제 옵션과 다름 (해결)
 - `agents/domain/tools/ablation.py` 맨 위 설명을 실제 옵션(`--cache`, 기본값
   `data/fetch_cache`)에 맞게 고쳤습니다.
+
+---
+
+## 6. 평가 종합 에이전트 (`agents/synthesis/`) 코드 리뷰 결과
+
+2026-09-22 리뷰. 테스트는 모두 통과하지만, 합성 fixture 가 실제 에이전트 데이터와 달라서 드러나지 않은 문제입니다.
+코드 위치와 설명은 `docs/SYNTHESIS_AGENT.md` 참고.
+
+### ⬜ 6-1. SX7(TRL 입력 불일치)이 실제 데이터에서 거의 항상 걸림 🔴
+- 위치: `agents/synthesis/relations.py:139-150`
+- 지금 조건: 시장·이해관계자 record 의 pilot 이상 근거가 `technical_findings.input_evidence_ids`에 없으면 상충.
+- 문제: 기술 조사(①)는 Pool A(D1·D3 논문)만 보므로 시장·이해관계자 웹 근거가 TRL 입력에 들어갈 수 없습니다.
+- 설계서 §8.6.1 의 SX7 은 "TRL 판정 **이후** 시장·이해관계자 근거가 새로 추가됨"입니다.
+- **할 일:** 근거의 `accessed_at`이 TRL 입력 근거의 수집 시각보다 늦은 경우로 조건을 바꿉니다.
+
+### ⬜ 6-2. SX6(같은 근거의 반대 stance)가 문서 단위로 잘못 걸림 🔴
+- 위치: `agents/synthesis/relations.py:176-186`, `agents/synthesis/matrix.py:29`(`content_key`)
+- 문제: `content_hash`로 "같은 근거"를 판단하는데, 도메인·이해관계자는 이 값이 문서 단위입니다 (1-3).
+  같은 논문의 장점 인용(p.2)과 한계 인용(p.11)이 SX6 으로 잡힙니다.
+- 또 아무 관점도 인용하지 않은 근거까지 훑어서, 관련 record 가 빈 상충 항목이 생깁니다.
+  시장 출력을 넣어 확인했을 때 실제로 발생했고, 그 문장은 C2 검사에서 제거되어 결과가 `needs_review`로 떨어졌습니다.
+- **할 일:** SX6 은 근거 `id` 기준으로 판단하고, 관점이 실제 인용한 근거만 봅니다.
+
+### ⬜ 6-3. SX4(수치 차이)가 연도를 값으로 읽고 단위를 무시함 🟡
+- 위치: `agents/synthesis/relations.py:166`
+- 인용문의 첫 숫자만 봐서 "In 2024 ... 15.8B by 2028"이면 2024 를 값으로 읽습니다. million / billion 도 구분하지 않습니다.
+- **할 일:** 연도(4자리) 제외, 단위 정규화.
+
+### ⬜ 6-4. SX5(시점 차이)가 `YYYY-MM` 날짜를 무시함 🟡
+- 위치: `agents/synthesis/relations.py:71`(`_date`)
+- `matrix.py`의 `_parse_date`는 `YYYY-MM`도 읽는데 relations 는 따로 만든 함수를 써서 버립니다. 설계서 §6.3 은 날짜를 `YYYY-MM`으로 기록합니다.
+- **할 일:** `matrix._parse_date`를 같이 씁니다.
+
+### ⬜ 6-5. LLM 서술의 재현성 없음 🟡
+- 위치: `agents/synthesis/writer.py:114`, `writer.py:28`
+- `temperature` 미지정이라 실행마다 문장이 달라지고, 실행 기록에 모델 이름만 남습니다 (설계서 §10.0 은 temperature·seed 기록 요구).
+- LLM 에 넘기는 record 순서가 입력 순서 그대로라, 순서 교환 테스트가 서술 부분까지는 보장하지 않습니다.
+- **할 일:** gpt-4.1 에 `temperature=0`, payload 정렬, `meta`에 temperature 기록.
+
+### ⬜ 6-6. 작은 정확도·표시 문제 🟢
+- `relations.py:230` 도메인에 "병행" 주장이 하나라도 있으면 대조표의 도메인 행이 전부 complement 로 표시됨
+- `relations.py:208-212` ID 번호를 규칙별로만 세어 `sx1:hw:001` 다음이 `sx1:sw:002`, 정렬도 hw 가 먼저
+- `review.py:24` C7 이 "TRL" 글자가 있을 때만 검사해서 "5-6단계"처럼 쓰면 매트릭스와 다른 값도 통과
+- `node.py:20` 요청에 기준일이 없으면 `date.today()`를 써서 같은 입력도 날짜에 따라 결과가 달라짐
