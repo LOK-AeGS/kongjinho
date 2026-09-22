@@ -1,42 +1,35 @@
 # ISSUE
 
 디렉터리 재구성(`refactor/agent-layout`) 이후 남은 문제 목록입니다.
-팀 State 설계서가 나오면 1번을 먼저 해결하고, 2번은 설계서에서 함께 정합니다.
+공통 State(`graph/state.py` AppState)는 확정됐습니다. 1-2(각 에이전트 변환)를 먼저 해결합니다.
 
 상태 표시: ⬜ 미해결 · ✅ 해결
 
 ---
 
-## 1. State (최우선, 설계서 반영 대기)
+## 1. State
 
-### ⬜ 1-1. 부모 State가 두 개로 나뉘어 있음
-- `graph/state.py`: `PipelineState` (최초 설계). 도메인 에이전트가 이 구조를 기준으로 합니다.
-- `graph/team_state.py`: `EvaluationState` (팀 설계서 v0.3). 이해관계자 에이전트가 이 구조를 기준으로 합니다.
-- 이해관계자는 `make_node(legacy=True)`로 PipelineState에도 붙일 수 있습니다.
-- **할 일:** 설계서 기준으로 하나로 통일하고, 두 에이전트의 `node.py`를 거기에 맞춥니다.
+### ✅ 1-1. 부모 State가 두 개로 나뉘어 있음 (해결)
+- 팀 공통 State를 `graph/state.py`의 `AppState`로 통일했습니다. `graph/team_state.py`(v0.3 EvaluationState)는 삭제했습니다.
+- 근거 형식(`Evidence`)과 `evidence_store` reducer(`merge_evidence_store`)도 `graph/state.py` 하나로 정했습니다.
+- 이해관계자 내부에서 근거 풀을 합칠 때 쓰던 reducer는 `agents/stakeholder/evidence.py`로 옮겼습니다.
 
-### ⬜ 1-2. 근거(evidence) 형식과 reducer가 두 벌
-| | 도메인 | 이해관계자 |
+### ⬜ 1-2. 두 에이전트의 `node.py`가 아직 AppState 형식을 쓰지 않음 (최우선)
+State 파일만 교체했고, 각 에이전트의 입출력 변환은 아직 예전 형식입니다.
+**지금 AppState 그래프에 두 노드를 그대로 연결하면 동작하지 않습니다.**
+LangGraph는 State에 없는 키를 반환하면 에러 없이 버리므로, 결과가 조용히 사라질 수 있습니다.
+
+| | 도메인 (`agents/domain/node.py`) | 이해관계자 (`agents/stakeholder/node.py`) |
 |---|---|---|
-| ID 키 | `evidence_id` | `id` |
-| 위치 키 | `locator` | `page_or_locator` |
-| reducer | `agents/domain/rag/evidence.py`의 `merge_evidence` | `graph/team_state.py`의 `merge_evidence` |
+| 입력 | `state["request"]["sw"]["name"]`을 읽음 → AppState에서는 `selected_tech["sw"]`라 **KeyError** | v0.3: `selected_tech`, `domain`, `as_of_date`를 읽음 (`as_of_date`는 AppState에서 `request.as_of`)<br>legacy: `state["request"]["sw"]` → **KeyError** |
+| 결과 키 | `domain_findings` (claims/fits/cited_evidence_ids) → `PerspectiveFindings`(records/claims/gaps)로 변환 필요 | v0.3: `stakeholder_eval`, `errors` → AppState에 없어서 **버려짐**. `stakeholder_findings`로 반환해야 함 |
+| 근거 | `evidence_id`/`locator` 형식 → `id`/`page_or_locator` 등 `Evidence` 형식으로 변환 필요 | 거의 같음. `evidence_level`, `metric_tag` 추가, `claim_ids`/`perspectives`/`bindings`는 AppState에 없음 |
+| 품질 | `quality_by_perspective`에 guard/lint/judge 딕셔너리 → `QualityReport`(status/violations/warnings/checked_claim_ids)로 변환 필요 | 쓰지 않음 |
+| 도메인 값 | 프롬프트에 데이터센터 고정 | AppState 기본값 `"datacenter_inference"`를 받으면 `datacenter`가 아니라서 **ValueError** |
 
-- 두 에이전트 모두 `evidence_store`에 씁니다. 그런데 한 키에는 reducer를 하나만 붙일 수 있습니다.
-- 이해관계자 reducer는 `incoming['id']`를 읽기 때문에, 도메인 근거가 들어오면 `KeyError`가 납니다.
-- **할 일:** 근거 형식 하나와 reducer 하나를 `graph/`에 정의하고, 각 에이전트 `node.py`에서 그 형식으로 변환합니다.
-
-### ⬜ 1-3. State에 없는 키는 조용히 버려짐
-- LangGraph는 State에 선언되지 않은 키를 반환하면 **에러 없이 버립니다.** 직접 확인했습니다.
-- 도메인 노드는 `domain_findings` 외에 `evidence_store`, `quality_by_perspective`, `search_log_by_perspective`도 반환합니다.
-  `PipelineState`에는 이 세 키가 없어서, 지금 연결하면 도메인이 모은 근거가 사라집니다.
-- **할 일:** 설계서의 State에 이 키들(또는 대체 키)을 reducer와 함께 선언합니다.
-
-### ⬜ 1-4. `domain_findings` 모양이 `graph/state.py` 정의와 다름
-- `graph/state.py`의 `DomainFindings`는 근거를 `evidence: list[Evidence]`로 findings 안에 담습니다.
-- 도메인 에이전트는 `cited_evidence_ids`만 담고, 근거 본문은 `evidence_store`에 둡니다.
-- 변환 함수 `to_team_findings()`는 `agents/domain/state.py`에 있습니다.
-- **할 일:** 설계서에서 근거를 findings 안에 둘지, 공유 `evidence_store`에 둘지 정합니다.
+- **할 일 (각 에이전트 담당):** `node.py`에서 AppState를 읽고, `*_findings`를 `PerspectiveFindings`로, 근거를 `graph.state.Evidence`로 변환해 반환합니다.
+  `subgraph.py` 등 내부 로직은 바꾸지 않아도 됩니다.
+- 변환 후 두 노드를 AppState 그래프에 연결해 fixture로 돌려서, `evidence_store`와 `*_findings`가 실제로 채워지는지 확인합니다.
 
 ---
 
@@ -45,8 +38,8 @@
 ### ⬜ 2-1. 평가 도메인이 데이터센터로 고정됨
 - 이해관계자: 도메인이 `datacenter`가 아니면 `ValueError`를 냅니다 (`agents/stakeholder/subgraph.py`의 `run_stakeholder`).
 - 도메인: 프롬프트에 데이터센터가 고정되어 있습니다 (`agents/domain/prompts.py`).
-- 반면 `PipelineState.request.domains`는 `list[str]`라서 여러 도메인을 받을 수 있게 되어 있습니다.
-- **정할 것:** 도메인을 하나로 할지 여러 개로 할지.
+- AppState는 `domain: str` 하나이고 기본값이 `"datacenter_inference"`입니다. 도메인은 하나로 정해졌습니다.
+- **할 일:** 이해관계자의 `datacenter` 검사를 AppState 값에 맞춥니다 (1-2와 함께).
 
 ### ⬜ 2-2. 이해관계자 노드가 State의 반복 한도를 읽지 않음
 - v0.3 노드(`stakeholder_agent`)는 검색 라운드, 수정 횟수, 질의 수를 `default_request()`의 기본값으로 씁니다.

@@ -55,7 +55,9 @@ class DomainFindings(TypedDict):
 
 
 class DomainAwareState(TypedDict, total=False):
-    """부모 PipelineState 에 더해져야 하는 키.
+    """최초 PipelineState 기준으로 도메인이 요구했던 부모 State 키.
+
+    공통 AppState(graph/state.py)에 evidence_store 등이 반영됐다. 형식 변환은 ISSUE.md 1번 참고.
 
     evidence_store 와 quality_by_perspective 는 여러 관점이 동시에 쓰므로 리듀서가 필요하다.
     domain_findings 는 작성자가 하나라 리듀서 없이 마지막 쓰기가 유효하다.

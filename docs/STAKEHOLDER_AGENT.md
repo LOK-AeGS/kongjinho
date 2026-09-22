@@ -78,11 +78,11 @@ API와 네트워크를 호출하지 않으며 보고서 첫머리에 실제 조�
 
 ```python
 from langgraph.graph import StateGraph
-from graph.team_state import EvaluationState
+# EvaluationState(v0.3)는 공통 AppState(graph/state.py)로 대체됐습니다. ISSUE.md 1번 참고.
 from agents.stakeholder import make_node
 from agents.stakeholder.subgraph import default_request
 
-builder = StateGraph(EvaluationState)
+builder = StateGraph(EvaluationState)  # 예전 형식 예시
 stakeholder_node = make_node()  # backend 생략 시 OpenAIBackend
 builder.add_node('stakeholder', stakeholder_node)
 config = default_request()

@@ -6,7 +6,7 @@ from datetime import date
 
 from langgraph.graph import END, START, StateGraph
 
-from graph.team_state import merge_evidence
+from .evidence import merge_evidence
 from .models import Extraction, StakeholderState
 from .web import digest, normalize
 

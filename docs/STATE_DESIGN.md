@@ -1,7 +1,7 @@
 # KV cache Multi-Agent State 설계
 
-> 이 문서는 최초 PipelineState 설계 기록입니다. 팀 설계서 v0.3 기준의 현재 연결 계약은
-> `graph/team_state.py`와 `docs/STAKEHOLDER_AGENT.md`의 “팀 연결 계약”을 따릅니다.
+> 이 문서는 최초 PipelineState 설계 기록입니다. 현재 팀 공통 State는 `graph/state.py`의 `AppState`입니다.
+> 아래 내용과 v0.3 EvaluationState는 더 이상 코드에 없고, 기록으로만 남깁니다.
 > 이해관계자 노드는 selected_tech/domain을 입력받아 stakeholder_eval/evidence_store/errors를 반환합니다.
 > evidence_store는 dict + idempotent merge이며, not_found와 검색 로그는 stakeholder_eval.search_outcomes에 보존합니다.
 > 아래 stakeholder_findings 방식은 legacy_stakeholder_agent에만 해당합니다.

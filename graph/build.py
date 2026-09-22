@@ -1,19 +1,18 @@
 """부모 그래프 연결. 각 에이전트의 make_node() 결과를 주입받아 Edge만 정의한다.
 
-현재는 이전 PipelineState(graph/state.py) 기준 6개 노드 예시다.
-stakeholder 에는 agents.stakeholder.make_node(legacy=True) 를 주입한다.
-팀 설계서 v0.3의 EvaluationState 는 graph/team_state.py 에 있다.
+부모 State 는 graph/state.py 의 AppState(팀 공통 State) 하나다.
+각 노드는 AppState 의 자기 소유 키만 반환해야 한다. 선언되지 않은 키는 LangGraph가 조용히 버린다.
 별도 TRL·Judge 그래프 구현은 팀 그래프 담당 범위다.
 """
 from langgraph.graph import END, START, StateGraph
 
-from graph.state import PipelineState
+from graph.state import AppState
 
 
 def build_graph(*, technical, market, stakeholder, domain, synthesis, report, checkpointer=None):
     # 각 함수는 해당 에이전트의 최종 결과 키 하나만 반환한다.
     # 내부 검색/수정 반복은 함수 안의 서브그래프가 마친 후 부모에 반환한다.
-    graph = StateGraph(PipelineState)
+    graph = StateGraph(AppState)
     for name, node in {
         "technical": technical,
         "market": market,

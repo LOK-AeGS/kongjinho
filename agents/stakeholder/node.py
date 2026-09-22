@@ -40,7 +40,8 @@ def legacy_stakeholder_agent(state, *, backend=None):
 def make_node(backend=None, *, legacy=False):
     """부모 그래프에 등록할 노드 함수를 만든다.
 
-    legacy=False: 팀 v0.3 EvaluationState(graph/team_state.py)용
-    legacy=True : 이전 PipelineState(graph/state.py)용
+    legacy=False: 팀 v0.3 EvaluationState 형식 (stakeholder_eval / evidence_store / errors)
+    legacy=True : 최초 PipelineState 형식 (stakeholder_findings)
+    두 형식 모두 공통 AppState(graph/state.py)와 아직 맞지 않는다. ISSUE.md 1번 참고.
     """
     return partial(legacy_stakeholder_agent if legacy else stakeholder_agent, backend=backend)

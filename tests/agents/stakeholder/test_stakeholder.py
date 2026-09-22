@@ -10,7 +10,20 @@ from agents.stakeholder.subgraph import GROUPS, default_request, run_stakeholder
 from agents.stakeholder.backend import OpenAIBackend, unpack_search
 from agents.stakeholder.models import Extraction, Observation
 from agents.stakeholder.web import PageFetcher, digest, parse_html
-from graph.team_state import EvaluationState, merge_evidence
+from operator import add
+from typing import Annotated, TypedDict
+from agents.stakeholder.evidence import merge_evidence
+
+
+class EvaluationState(TypedDict, total=False):
+    """v0.3 노드 출력의 병렬 병합 검사용. 공통 State(graph/state.py AppState) 교체 전 형식."""
+    selected_tech: dict
+    domain: str
+    tech_profiles: dict
+    market_eval: dict
+    stakeholder_eval: dict
+    evidence_store: Annotated[dict, merge_evidence]
+    errors: Annotated[list, add]
 
 URL='https://example.com/source'
 TEXT='The deployment has operational benefits but migration requires careful planning.'
