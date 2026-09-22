@@ -25,14 +25,11 @@ data/*.pdf
 data/search_cache/
 data/fetch_cache/
 data/technical/web_cache/
-notebooks/data/
 
 # 실행 결과 (에이전트별 outputs/<에이전트>/, 부모 그래프 outputs/graph/)
 outputs/graph/
 outputs/technical/
 outputs/market/
-outputs/stakeholder/
-outputs/stakeholder-cache/
 outputs/domain/
 outputs/synthesis/
 outputs/index_artifacts/
