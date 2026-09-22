@@ -112,7 +112,7 @@ class StakeholderPosition(TypedDict):
     technology_id: TechnologyID
     target_name: str
     target_scope: Literal["selected_technology", "technology_family", "other"]
-    group: Literal["competitor", "operator", "supplier", "investor"]
+    group: Literal["competitor", "adopter", "investor"]
     speaker: str
     affiliation: str | None
     stance: Literal["positive", "negative", "conditional", "neutral", "unknown"]

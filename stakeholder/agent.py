@@ -10,9 +10,8 @@ from team_state import merge_evidence
 from .models import Extraction, StakeholderState
 from .web import digest, normalize
 
-GROUPS = ('competitor', 'operator', 'supplier', 'investor')
-GROUP_LABELS = {'competitor': '경쟁 기술 진영', 'operator': '데이터센터 운영자 / 서빙 엔지니어',
-                'supplier': '메모리·서버 공급사', 'investor': '투자·애널리스트'}
+GROUPS = ('competitor', 'adopter', 'investor')
+GROUP_LABELS = {'competitor': '경쟁 기술 진영', 'adopter': '도입 기업·개발자', 'investor': '투자·산업 관계자'}
 
 
 def default_request(as_of_date=None):
@@ -225,7 +224,7 @@ def team_update(final, existing_evidence=None):
     direct = {(p['technology_id'], p['group']) for p in result['positions'] if p['target_scope'] == 'selected_technology'}
     return {'stakeholder_eval': {'perspective': 'stakeholder', 'findings': findings,
                 'evidence_ids': list(result['evidence_store']), 'limitations': result['completion']['gaps'] + result['completion']['errors'],
-                'confidence': len(direct) / 8, 'completion': result['completion'], 'search_outcomes': result['search_outcomes']},
+                'confidence': len(direct) / 6, 'completion': result['completion'], 'search_outcomes': result['search_outcomes']},
             'evidence_store': result['evidence_store'], 'errors': result['completion']['errors']}
 
 

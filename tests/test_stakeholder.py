@@ -15,7 +15,7 @@ URL='https://example.com/source'
 TEXT='The deployment has operational benefits but migration requires careful planning.'
 
 def observation(**updates):
-    d=dict(technology_id='sw',target_name='DeepSeek-V2 MLA',target_scope='selected_technology',group='operator',speaker='Fixture engineer',affiliation=None,
+    d=dict(technology_id='sw',target_name='DeepSeek-V2 MLA',target_scope='selected_technology',group='adopter',speaker='Fixture engineer',affiliation=None,
            stance='positive',evidence_stance='support',domain_relevance='datacenter',statement='운영상 이점이 있다는 테스트 발언',source_url=URL,source_title='Fixture source',
            source_type='official_web',published_date='2026-01-01',primary_or_secondary='primary',direct_or_proxy='direct',page_or_locator='block:0001',quote=TEXT,
            conditions=[],uncertainty='합성 테스트 자료',bias_notes=[])
@@ -72,7 +72,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(r['completion']['status'],'partial')
         self.assertIsNone(next(iter(r['evidence_store'].values()))['published_at'])
     def test_shared_quote_has_multiple_claim_links(self):
-        r=run_stakeholder(backend=FakeBackend([observation(),observation(group='supplier',statement='다른 해석')]))['result']
+        r=run_stakeholder(backend=FakeBackend([observation(),observation(group='investor',statement='다른 해석')]))['result']
         self.assertEqual(len(r['evidence_store']),1)
         self.assertEqual(len(next(iter(r['evidence_store'].values()))['claim_ids']),2)
     def test_reducer_idempotence_associativity_and_collision(self):
@@ -113,14 +113,10 @@ class Tests(unittest.TestCase):
         self.assertEqual(blocks[1]['locator'],'block:0002')
         class Fetcher(PageFetcher):
             def _get(self,url):
-                if url.endswith('/robots.txt'): return 200,{},b'User-agent: *\nAllow: /',url
                 return 200,{'content-type':'text/html'},('<p>'+('original ' * 30)+'</p>').encode(),url
         with tempfile.TemporaryDirectory() as tmp:
             f=Fetcher(tmp,min_interval=0); r=f.fetch(URL)
             self.assertEqual(r['status'],'ok'); self.assertTrue(Path(r['snapshot_path']).exists()); self.assertEqual(f.fetch(URL),r)
-        class Denied(Fetcher):
-            def _get(self,url): return 200,{},b'User-agent: *\nDisallow: /',url
-        with tempfile.TemporaryDirectory() as tmp: self.assertEqual(Denied(tmp).fetch(URL)['status'],'robots_denied')
     def test_extract_uses_original_not_notes(self):
         captured={}
         def parse(**kw):

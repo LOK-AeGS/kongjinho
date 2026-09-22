@@ -3,7 +3,7 @@ from typing import Literal, TypedDict
 from pydantic import BaseModel, ConfigDict
 
 TechnologyID = Literal["sw", "hw"]
-Group = Literal["competitor", "operator", "supplier", "investor"]
+Group = Literal["competitor", "adopter", "investor"]
 
 
 class Observation(BaseModel):

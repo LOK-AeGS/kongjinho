@@ -34,21 +34,9 @@
         "as_of_date": "2026-09-21"
       },
       {
-        "id": "sw:operator:r1",
+        "id": "sw:adopter:r1",
         "technology_id": "sw",
-        "group": "operator",
-        "query": "fixture support counter neutral",
-        "status": "ok",
-        "urls": [
-          "https://example.com/source"
-        ],
-        "provider": "offline_fixture",
-        "as_of_date": "2026-09-21"
-      },
-      {
-        "id": "sw:supplier:r1",
-        "technology_id": "sw",
-        "group": "supplier",
+        "group": "adopter",
         "query": "fixture support counter neutral",
         "status": "ok",
         "urls": [
@@ -82,21 +70,9 @@
         "as_of_date": "2026-09-21"
       },
       {
-        "id": "hw:operator:r1",
+        "id": "hw:adopter:r1",
         "technology_id": "hw",
-        "group": "operator",
-        "query": "fixture support counter neutral",
-        "status": "ok",
-        "urls": [
-          "https://example.com/source"
-        ],
-        "provider": "offline_fixture",
-        "as_of_date": "2026-09-21"
-      },
-      {
-        "id": "hw:supplier:r1",
-        "technology_id": "hw",
-        "group": "supplier",
+        "group": "adopter",
         "query": "fixture support counter neutral",
         "status": "ok",
         "urls": [
@@ -126,7 +102,7 @@
         "technology_id": "sw",
         "target_name": "DeepSeek-V2 MLA",
         "target_scope": "selected_technology",
-        "group": "operator",
+        "group": "adopter",
         "speaker": "Fixture engineer",
         "affiliation": null,
         "stance": "positive",

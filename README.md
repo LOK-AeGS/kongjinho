@@ -34,7 +34,8 @@ python run_stakeholder.py --ask-key --max-queries 8
 SDK의 일시 오류 재시도 1회는 이 논리 요청 횟수 외에 발생할 수 있습니다.
 이는 달러 단위 지출 상한이 아닙니다. 계정의 별도 예산 설정과 함께 사용하세요.
 `--max-queries 1 --rounds 1 --revisions 0`으로 연결 시험 규모를 줄일 수 있습니다.
-8개 기술/그룹 조합보다 검색 예산이 적으면 일부 조합은 unsearched가 됩니다.
+6개 기술/그룹 조합(2기술 × 3그룹: 경쟁 기술 진영/도입 기업·개발자/투자·산업 관계자)보다
+검색 예산이 적으면 일부 조합은 unsearched가 됩니다.
 
 ```bash
 python run_stakeholder.py --ask-key --max-queries 1 --rounds 1 --revisions 0
@@ -128,8 +129,8 @@ confidence는 직접 근거를 확보한 기술/그룹 비율이며, 진실성 �
 
 ## 제약과 검증 결과
 
-현재 fetcher는 공개 HTML을 지원합니다. PDF·JS 렌더링 필수 페이지·타 origin 리다이렉트는
-지원하지 않으며 실패 상태로 기록합니다. robots 제한과 확인 가능한 paywall을 기록하고 우회하지 않습니다.
+현재 fetcher는 공개 HTML을 지원합니다. PDF·JS 렌더링 필수 페이지는 지원하지 않으며
+실패 상태로 기록합니다. 확인 가능한 paywall을 기록하고 우회하지 않습니다.
 숨겨진 구독 장벽을 모두 탐지할 수는 없습니다. 링크의 원문 유형과 수집 품질은 제출 전 점검하세요.
 
 quote의 원문 포함 여부, locator, hash와 숫자/단위의 문자열 존재를 검사합니다.
@@ -137,7 +138,7 @@ quote의 원문 포함 여부, locator, hash와 숫자/단위의 문자열 존�
 이 부분은 qualitative Judge와 사람 검토가 필요합니다. 검색 요약문은 구조화 입력에서 제외합니다.
 
 15개 오프라인 테스트 통과: 원문 검증, 반증 미발견, 접근 실패, 예산, 날짜·수치,
-근거 다중 연결, reducer의 멱등성/결합성, 병렬 병합, 프롬프트 분리, 캐시와 robots 처리.
+근거 다중 연결, reducer의 멱등성/결합성, 병렬 병합, 프롬프트 분리, 캐시 처리.
 이전 실API 시험에서 환경 키의 AuthenticationError가 확인됐으며 이번 수정에서는 재호출하지 않았습니다.
 실제 검색 end-to-end 성공은 유효한 API 키로 확인해야 합니다.
 
