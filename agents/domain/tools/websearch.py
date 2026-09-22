@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from agents.domain.rag.evidence import SearchLogEntry, SourceType
+from agents.domain.tools.evidence import SearchLogEntry, SourceType
 
 # 출처 등급. 도메인 평가 근거는 공신력 순서가 판단 강도와 직결되므로 등급을 명시적으로 둔다.
 SOURCE_TIERS: dict[SourceType, tuple[str, ...]] = {

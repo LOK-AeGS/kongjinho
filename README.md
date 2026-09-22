@@ -18,16 +18,15 @@ agents/
 │   ├── __init__.py     make_node, DomainAgentDeps
 │   ├── node.py         부모 State ↔ DomainLocalState 변환
 │   ├── subgraph.py     plan_questions → retrieve → … → analyze
-│   ├── state.py        도메인이 부모 State에 요구하는 확장 키
-│   ├── prompts.py
-│   ├── rag/  quality/  runtime/  evaluation/
+│   ├── prompts.py      질문·판정·자체 품질 점검 프롬프트
+│   └── tools/          검색·수집·색인·재현성 도구
 └── stakeholder/        이해관계자 평가 (OpenAI Responses web_search)
     ├── __init__.py     make_node
     ├── node.py         부모 State ↔ StakeholderState 변환
     ├── subgraph.py     plan → search → extract → review 반복
     ├── models.py  backend.py  web.py  offline.py
 
-scripts/                에이전트 단독 실행 (python -m scripts.run_stakeholder)
+scripts/                에이전트 단독 실행 (python -m scripts.run_<이름>)
 tests/agents/<이름>/     에이전트별 테스트
 docs/                   에이전트별 설계 문서, State 설계
 notebooks/  outputs/  data/
@@ -121,29 +120,31 @@ python -m scripts.run_stakeholder --ask-key
 
 #### 도메인 에이전트
 
-단독 실행 스크립트 대신 노트북으로 실행합니다. (B) 설치가 필요합니다.
+단독 실행 스크립트나 노트북을 사용합니다. (B) 설치가 필요합니다.
 
 ```bash
+python -m scripts.run_domain
 jupyter notebook notebooks/06-domain-agent.ipynb
 ```
 
 - 위에서부터 셀을 차례로 실행합니다. 첫 셀이 `.env`에서 키를 읽습니다.
-- `OPENAI_API_KEY`는 필수입니다. 모델은 노트북의 `MODEL = "gpt-4o-mini"`에서 바꿀 수 있습니다.
+- `OPENAI_API_KEY`는 필수입니다. 기본 모델은 `gpt-4o`이며, 스크립트의 `--model`이나 노트북의 `MODEL`로 바꿀 수 있습니다.
 - `TAVILY_API_KEY`가 없으면 검색 캐시(`data/search_cache/`)를 재생하는 오프라인 모드로 돕니다.
   캐시는 git에 올라가지 않으므로, 새로 받은 레포에서는 Tavily 키가 있어야 실제 결과가 나옵니다.
-- 실행 결과는 노트북 셀 출력으로 확인합니다. status, 근거·주장·판정 개수, 품질 검사 결과, 인용 근거 순서로 나옵니다.
+- 스크립트 결과는 `outputs/domain/<실행시각>/`에 저장됩니다. 노트북은 status, 근거·주장·판정 개수,
+  품질 검사 결과, 인용 근거 순서로 출력합니다.
 
 #### 도메인 검색 방식 비교 실험 (API 키 불필요, 인터넷 필요)
 
 BM25 / dense / hybrid 검색 성능(Hit@k, MRR, 지연, 메모리)을 비교합니다. (B) 설치가 필요합니다.
 
 ```bash
-python -m agents.domain.evaluation.ablation --embedding BAAI/bge-m3   # 세 방식 모두
-python -m agents.domain.evaluation.ablation --embedding ""            # BM25만 (빠름)
+python -m agents.domain.tools.ablation --embedding BAAI/bge-m3   # 세 방식 모두
+python -m agents.domain.tools.ablation --embedding ""            # BM25만 (빠름)
 ```
 
 - 처음 실행하면 논문 원문을 내려받아 `data/fetch_cache/`에 저장하고, 임베딩 모델(bge-m3)도 내려받습니다. 시간이 걸립니다.
-- 결과는 `outputs/ablation.json`에 저장됩니다.
+- 결과는 `outputs/domain/ablation.json`에 저장됩니다.
 
 ### 3. 아직 할 수 없는 것
 

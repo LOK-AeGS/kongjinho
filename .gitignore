@@ -11,3 +11,5 @@ outputs/index_artifacts/
 outputs/stakeholder/
 outputs/stakeholder-cache/
 outputs/synthesis/
+outputs/domain/
+notebooks/data/
