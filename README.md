@@ -14,6 +14,11 @@ graph/                  공유 계약 + 연결
 └── build.py            add_node / add_edge 만
 
 agents/
+├── technical/          기술조사 (고정 PDF RAG + Tavily Search/Extract + TRL Gate)
+│   ├── __init__.py     make_node, TechnicalAgentDeps
+│   ├── node.py         부모 State ↔ TechnicalLocalState 변환
+│   ├── subgraph.py     collect → extract → TRL → validate
+│   └── corpus.py  retrieval.py  evidence.py  trl.py
 ├── domain/             도메인 평가 (Tavily + BM25/dense RAG)
 │   ├── __init__.py     make_node, DomainAgentDeps
 │   ├── node.py         부모 State ↔ DomainLocalState 변환
@@ -81,6 +86,7 @@ cp .env.example .env
 | 전체 테스트 | `python -m pytest tests` | 설치된 선택 의존성에 따라 통과 또는 명시적 skip |
 | **부모 그래프 전체 흐름** | `python main.py` | `실행 경로: START → technical → market + stakeholder + domain → synthesis → report → END`, `outputs/graph/<실행시각>/summary.md` |
 | 부모 그래프 테스트 | `python -m unittest tests.graph.test_parent_graph -v` | `OK` |
+| 기술조사 테스트만 | `python -m pytest -q -p no:cacheprovider tests/agents/technical/test_technical_agent.py` | `전체 통과` |
 | 보고서 계약 테스트 | `python -m unittest tests.agents.report.test_report_agent -v` | API 없이 생성·인용·검증 계약 확인 |
 | 도메인 테스트만 | `python tests/agents/domain/test_domain_agent.py` | `전체 통과` |
 | 이해관계자 테스트만 | `python -m unittest tests.agents.stakeholder.test_stakeholder -v` | `OK` |
@@ -90,6 +96,18 @@ cp .env.example .env
 - 이해관계자 fixture는 example.com을 쓰는 **합성 자료**입니다. 흐름이 끝까지 도는지만 확인할 수 있고, 실제 조사 결과는 아닙니다.
 
 ### 2. 실제 API로 (키 필요, 비용 발생)
+
+#### 기술조사 에이전트
+
+```bash
+python -m scripts.run_technical
+```
+
+- 입력 기술은 DeepSeek-V2 MLA와 ITME로 고정돼 있습니다.
+- `TAVILY_API_KEY`는 데이터센터 운영 원문 후보를 찾고 추출하는 데 사용합니다.
+- `OPENAI_API_KEY`는 `gpt-4.1-nano` 구조화 추출에 사용합니다.
+- 결과는 기본적으로 `outputs/technical/latest.json`에 저장됩니다.
+- 상세 규칙과 출력 계약은 [docs/TECHNICAL_AGENT.md](docs/TECHNICAL_AGENT.md)를 참고하세요.
 
 #### 이해관계자 에이전트
 

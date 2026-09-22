@@ -14,3 +14,5 @@ outputs/synthesis/
 outputs/domain/
 notebooks/data/
 outputs/graph/
+data/technical/web_cache/
+outputs/technical/

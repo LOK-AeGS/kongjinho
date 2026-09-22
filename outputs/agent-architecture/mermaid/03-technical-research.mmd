@@ -1,13 +1,18 @@
 flowchart TD
- A["입력<br/>선정 기술 · 원문 문서 · 조사 기준일"] --> B["조사 질문 생성<br/>원리 · 적용 범위 · 성능 · 한계 · 성숙도"]
- B --> C["RAG 검색 도구<br/>기술별 원문 검색"]
- C --> D["근거 적합성 검사<br/>질문 관련성 · 페이지 · 실험 조건"]
- D --> E{"근거가 충분한가?"}
- E -- "부족 · 재시도 가능" --> F["질의 재작성<br/>다른 절·표 검색"]
- F --> C
- E -- "충분" --> G["기술별 구조화 추출"]
- E -- "재시도 한도 도달" --> H["근거 부족 항목 기록"]
- H --> G
- G --> I["비교 조건 정규화<br/>모델 · 문맥 길이 · HW · 배치 · 측정 지표"]
- I --> J["TRL 추정<br/>검증 환경·운용 근거 연결<br/>공개 정보 기반 추정 명시"]
- J --> K["출력: technical_findings<br/>SW·HW 개요 / 성능 조건 / 한계 / TRL / 근거"]
+    A([START])
+    --> B["collect_and_check<br/><br/>PDF RAG: 원리·범위·성능·한계·검증 환경<br/>Tavily Search: 데이터센터 pilot·qualification·production 발견<br/>Tavily Extract: 선택 URL 원문 확보<br/>관련성·출처·시점·coverage 통합 검사"]
+
+    B --> C{"재검색이 필요한가?"}
+    C -- "예 · 최대 2라운드<br/>누락 축만 보완" --> B
+
+    C -- "아니오 또는 한도 도달" --> D["extract_normalize_and_bind<br/><br/>MLA·ITME 판정 단위 고정<br/>기술 사실 구조화 추출<br/>모델·문맥·HW·배치·지표 정규화<br/>quote·locator·evidence_id 결합<br/>direct·class 근거 분리"]
+
+    D --> E["trl_gate_assess<br/><br/>§6.2 Gate 1~9 순차 판정<br/>단계별 직접 근거 확인<br/>상향·차단·누락 근거 분리<br/>인접 단계 범위 계산<br/>공개 정보 기반 추정 표시"]
+
+    E --> F["validate_and_finalize<br/><br/>§6.2 규칙 Guard<br/>API·코드 존재 ≠ 운영 증거<br/>상용 판매 ≠ 지속 production<br/>수치·조건·참조 무결성 검사<br/>TRLRecord + technical_findings 생성"]
+
+    F --> G{"수정 가능한 규칙 위반인가?"}
+    G -- "예 · 수정 1회 이내" --> D
+    G -- "아니오 · 통과" --> H([END])
+    G -- "한도 도달" --> I["partial 반환<br/>위반·판단 보류·필요 증거 보존"]
+    I --> H

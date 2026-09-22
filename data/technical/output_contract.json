@@ -1,0 +1,8 @@
+{
+  "top_level": ["evidence_store", "technical_findings"],
+  "technical_findings": ["claims", "gaps", "input_evidence_ids", "limitations", "meta", "perspective", "records", "status"],
+  "record": ["assessment", "assessment_vocab", "basis", "criterion", "evidence_ids", "evidence_level", "findings", "limitations", "perspective", "scope", "stance_counts", "technology", "value"],
+  "claim": ["claim_id", "conditions", "evidence_ids", "limitations", "perspective", "technology", "text"],
+  "gap": ["criterion", "missing_evidence", "perspective", "reason", "technology"],
+  "evidence": ["accessed_at", "author_or_org", "claim_id", "content_hash", "direct_or_proxy", "doc_id", "evidence_level", "id", "metric_tag", "page_or_locator", "perspective", "primary_or_secondary", "published_at", "quote", "source_type", "stance", "title", "url"]
+}
