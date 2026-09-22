@@ -31,7 +31,7 @@ START → ① technical → ② market ─┐
 
 | 노드 | 기본 실행 (`python main.py`) | `--live` 실행 |
 |---|---|---|
-| ① technical | fixture 재생 | `agents.technical`: Pool A 고정 PDF RAG(BM25 + BGE-M3 + RRF) + Tavily, gpt-4.1-nano, 코드로 TRL Gate 판정 |
+| ① technical | fixture 재생 | `agents.technical`: Pool A 고정 PDF RAG(BM25 + BGE-M3 + RRF) + Tavily, gpt-4.1, 코드로 TRL Gate 판정 |
 | ② market | fixture 재생 | `agents.market`: gpt-4.1-mini/gpt-4.1 + Tavily |
 | ③ stakeholder | fixture 재생 | `agents.stakeholder_eval`: gpt-4.1-mini + OpenAI 웹 검색 |
 | ④ domain | fixture 재생 | `agents.domain`: gpt-4o + Tavily, 긴 문서는 bge-m3 임베딩 (`DOMAIN_MODEL`, `DOMAIN_EMBEDDING`) |

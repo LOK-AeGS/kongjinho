@@ -16,6 +16,12 @@ from typing import Literal
 
 Technology = Literal["sw", "hw"]
 
+# pdfplumber 기본값 3.0 은 이 코퍼스에서 단어 사이 공백을 지운다
+# ("ITMEemployslayer-wiseprefetching"). 그러면 인용 검증이 원문 대조에 실패해
+# 근거가 전부 기각되고 TRL 이 공백으로 남는다. 1.5 로 낮추면 붙음이 사라진다
+# (ITME 논문 6페이지 기준 25자 초과 토큰 437개 → 4개).
+PDF_X_TOLERANCE = 1.5
+
 
 class CorpusValidationError(ValueError):
     """코퍼스 파일 누락·변조·manifest 불일치."""
@@ -126,6 +132,39 @@ def validate_corpus(
     return checked
 
 
+def _column_boundary(page) -> float | None:
+    """2단 조판이면 좌우를 가르는 x 좌표를, 아니면 None 을 돌려준다.
+
+    2단 페이지를 통째로 읽으면 좌우 칼럼이 줄 단위로 섞여 문장이 끊긴다
+    ("its limited physical ca- weights and KV caches via RDMA pacity forces").
+    줄 시작 x 좌표가 좌우 두 무리로 갈리는지로 판정한다. 표·전면 그림이 있는
+    페이지는 한쪽 무리가 얇아져 자동으로 1단 처리된다.
+    """
+    line_left: dict[int, float] = {}
+    for word in page.extract_words(x_tolerance=PDF_X_TOLERANCE):
+        row = round(word["top"] / 3)
+        if row not in line_left or word["x0"] < line_left[row]:
+            line_left[row] = word["x0"]
+    starts = list(line_left.values())
+    if len(starts) < 20:
+        return None
+    middle = page.width / 2
+    right = [x for x in starts if x > middle]
+    if len(right) < len(starts) * 0.2 or len(starts) - len(right) < len(starts) * 0.2:
+        return None
+    boundary = min(right) - 2
+    return boundary if boundary > middle * 0.8 else None
+
+
+def _page_text(page) -> str:
+    boundary = _column_boundary(page)
+    if boundary is None:
+        return page.extract_text(x_tolerance=PDF_X_TOLERANCE) or ""
+    left = page.crop((0, 0, boundary, page.height)).extract_text(x_tolerance=PDF_X_TOLERANCE) or ""
+    right = page.crop((boundary, 0, page.width, page.height)).extract_text(x_tolerance=PDF_X_TOLERANCE) or ""
+    return f"{left}\n{right}"
+
+
 def _split_page(text: str, chunk_chars: int, overlap_chars: int) -> list[tuple[int, int, str]]:
     clean = normalize_text(text)
     if not clean:
@@ -176,7 +215,7 @@ def parse_corpus(
                 )
             for page_number, page in enumerate(pdf.pages, start=1):
                 for start, end, text in _split_page(
-                    page.extract_text() or "", chunk_chars, overlap_chars
+                    _page_text(page), chunk_chars, overlap_chars
                 ):
                     locator = f"p.{page_number}:chars:{start}-{end}"
                     raw_id = f"{document.doc_id}|{locator}|{text}"
