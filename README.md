@@ -123,9 +123,9 @@ CXL은 랙 스케일 인터커넥트 규격이라 온디바이스·엣지에는 
 
 | 에이전트 | Generator | 검증(Judge) 방식 |
 |---|---|---|
-| ① 기술 조사 | `gpt-4.1-nano` (관측 구조화) | 코드 — TRL Gate 연속 충족 계산, 인용 원문 대조, 수치·baseline 검사 |
+| ① 기술 조사 | `gpt-4.1` (관측 구조화) | 코드 — TRL Gate 연속 충족 계산, 인용 원문 대조, 수치·baseline 검사 |
 | ② 시장 평가 | `gpt-4.1-mini` (계획·판정) | 코드 rubric(6칸 충분/부분/부족) + `gpt-4.1` 반대 근거 재귀속 재검증 |
-| ③ 이해관계자 평가 | `gpt-4.1-mini` (Responses `web_search`) | 규칙 기반 편향 플래그, 누락 조합 1회 재검색 |
+| ③ 이해관계자 평가 | `gpt-5-mini` (Responses `web_search`) | 규칙 기반 편향 플래그, 누락 조합 1회 재검색 |
 | ④ 도메인 평가 | `gpt-4o` (판정·주장·self_check 단일 호출) | 프롬프트 내 self_check + 코드 참조 무결성 검사 |
 | ⑤ 평가 종합 | `gpt-4.1` (서술) | 코드 C1~C7 중립성 검사, 위반 문장 1회 재생성 후 제거 |
 | ⑥ 보고서 생성 | `gpt-4o-mini` (섹션 작성) | 결정적 validator(인용·수치·목차·REFERENCE), 위반 섹션만 최대 2회 부분 수정 |
@@ -340,7 +340,7 @@ python main.py --live all --debug       # 여섯 노드 전부 실제 실행 + �
 ### 3. 에이전트 단독 실행
 
 ```bash
-python -m scripts.run_technical                      # 기술 조사 (Tavily + gpt-4.1-nano)
+python -m scripts.run_technical                      # 기술 조사 (Tavily + gpt-4.1)
 python -m scripts.run_market --rounds 1              # 시장 평가 (--offline 로 키 없이 배선 확인)
 python -m scripts.run_domain                         # 도메인 평가 (--model, --embedding, --offline)
 python -m scripts.run_synthesis --writer openai      # 평가 종합 (생략 시 템플릿 서술, 비용 없음)
