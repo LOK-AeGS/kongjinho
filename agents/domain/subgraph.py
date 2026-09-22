@@ -5,8 +5,10 @@
 짧은 문서는 그대로 근거가 되고, 긴 문서(논문 등)만 청킹·색인해 필요한 부분을 뽑는다.
 임베딩이 쓰이는 지점은 후자 하나뿐이다.
 
-품질 검사는 두 층으로 나뉜다. 인용 대조·수치·날짜·참조 무결성은 결정적 guard 가 맡고,
-coverage 와 neutrality 만 LLM judge 가 본다. 표현 린터가 근거 없는 승자·추천·압도 표현을 막는다.
+품질 검사는 결정적 코드(guard/linter)와 별도 LLM judge로 나누지 않고, analyze 노드
+하나의 프롬프트에 흡수했다(v3, PROMPT_VERSION 참고). 남긴 코드 검증은 참조 무결성
+(존재하지 않는 근거 라벨 제거) 하나뿐이다 — 이건 품질 판단이 아니라 없으면
+evidence_store 조회에서 KeyError로 죽는 방어적 처리라서 남겼다.
 
 부모 State 와의 변환(노드 함수)은 node.py 에 있다.
 """
@@ -26,7 +28,6 @@ from agents.domain.prompts import (
     ANALYSIS_USER,
     DATACENTER_REQUIREMENTS,
     DOMAIN_NAME,
-    PROMPT_VERSION,
     QUESTION_SYSTEM,
     QUESTION_USER,
     REFINE_HINT,
@@ -34,12 +35,9 @@ from agents.domain.prompts import (
     SUFFICIENCY_USER,
     format_requirements,
 )
-from agents.domain.quality.guard import GuardReport, run_guard
-from agents.domain.quality.judge import JudgeResult, run_judge
-from agents.domain.quality.linter import LintReport, lint_claims
-from agents.domain.rag.evidence import Evidence, SearchLogEntry, merge_evidence, normalize_text
-from agents.domain.rag.fetch import fetch_document, pick_quote
-from agents.domain.rag.index import Chunk, build_index, chunk_parts
+from agents.domain.tools.evidence import Evidence, SearchLogEntry, merge_evidence, normalize_text
+from agents.domain.tools.fetch import fetch_document, pick_quote
+from agents.domain.tools.index import Chunk, build_index, chunk_parts
 
 AGENT_ID = "domain"
 PERSPECTIVE = "domain"
@@ -53,7 +51,7 @@ MAX_DOCUMENTS_PER_ROUND = 10
 # 과제 제약. 웹 문서는 사전에 페이지를 고를 수 없어 수집하면서 누적으로 막는다.
 PAGE_BUDGET = 200
 
-WEAK_SOURCE_TYPES = {"news", "other"}
+Basis = Literal["direct", "inferred", "unknown", "not_applicable"]
 
 
 class QuestionPlan(BaseModel):
@@ -69,25 +67,43 @@ class SufficiencyVerdict(BaseModel):
 class DraftClaim(BaseModel):
     claim_key: str = Field(description="이 주장의 짧은 식별자. 예: sw-memory-1")
     technology_ids: list[Literal["sw", "hw"]]
-    topic: str
-    statement: str = Field(description=f"한 문장, {MAX_STATEMENT_CHARS}자 이내")
-    basis: Literal["direct_evidence", "inference", "unknown"]
-    evidence_ids: list[str] = Field(description="제공된 근거 목록에 실재하는 ID만")
+    text: str = Field(description=f"한 문장, {MAX_STATEMENT_CHARS}자 이내")
+    basis: Basis
+    evidence_ids: list[str] = Field(description="제공된 근거 목록의 라벨(E1, E2, ...)만")
     conditions: list[str] = Field(description="측정·적용 전제(모델 크기, 문맥 길이, HW 등)")
-    uncertainty: str
+    limitations: list[str] = Field(description="이 주장의 한계나 불확실성")
 
 
-class DraftFit(BaseModel):
+class DraftRecord(BaseModel):
+    """요구사항 축 하나 × 기술 하나의 판정. 팀 공통 VerdictRecord 형태에 맞춘다."""
+
     technology_id: Literal["sw", "hw"]
-    requirements: list[str]
+    criterion: str = Field(description="요구사항 축 문장 그대로")
+    basis: Basis
+    evidence_level: Literal["forecast", "announcement", "pilot", "production", "unknown"]
+    scope: Literal["direct", "class", "mixed"]
     assessment: Literal["suitable", "conditional", "unsuitable", "unknown"]
-    claim_keys: list[str] = Field(description="같은 technology_id 주장의 claim_key 만")
+    assessment_vocab: str = "domain_fit_v1"
+    value: str | None = Field(default=None, description="관련 수치, 원문 그대로. 없으면 null")
+    findings: str = Field(description=f"판정 근거 요약, {MAX_STATEMENT_CHARS}자 이내")
     limitations: list[str]
+    claim_keys: list[str] = Field(description="같은 technology_id 주장의 claim_key 만")
+
+
+class SelfCheck(BaseModel):
+    """guard/linter/judge를 대체하는 자체 점검. node.py 에서 QualityReport로 변환된다."""
+
+    status: Literal["passed", "failed", "needs_review"]
+    violations: list[str] = Field(description="근거 없는 인용, 인용문에 없는 수치, 평가적 표현")
+    warnings: list[str] = Field(description="sw/hw 서술 불균형 등 차단하지 않는 경고")
+    covered_axes: list[str] = Field(description="실제로 근거를 찾아 다룬 요구사항 축")
+    missing_axes: list[str] = Field(description="근거가 없어 판단하지 못한 요구사항 축")
 
 
 class DomainAnalysis(BaseModel):
     claims: list[DraftClaim]
-    fits: list[DraftFit]
+    records: list[DraftRecord]
+    self_check: SelfCheck
 
 
 class DomainLocalState(TypedDict):
@@ -99,12 +115,13 @@ class DomainLocalState(TypedDict):
     as_of_date: str
     questions: list[str]
     evidence_store: dict[str, dict]  # evidence_id -> Evidence dict (멱등 병합)
-    source_texts: dict[str, str]  # url -> 정규화 원문 (인용 대조용)
+    source_texts: dict[str, str]  # url -> 정규화 원문 (참조용, 인용 대조 코드는 더는 없음)
     search_log: list[dict]
     pages_used: int
     condition_notes: list[str]
     claims: list[dict]
-    fits: list[dict]
+    records: list[dict]
+    self_check: dict
     search_rounds_used: int
     max_search_rounds: int
     evidence_sufficient: bool
@@ -129,7 +146,7 @@ def _digest(
     """LLM에 넘길 근거 요약과 표시 라벨 매핑을 만든다.
 
     실제 evidence_id 는 출처 신원 해시(domain:ev:100e7ab6d6e1)라 모델이 그대로 옮겨 적지
-    못한다. 실측에서 이 형태로 넘겼더니 주장 6건 전부가 근거를 인용하지 못했다.
+    못한다. 실측에서 이 형태로 넘겼더니 주장 전부가 근거를 인용하지 못했다.
     그래서 E1, E2 같은 짧은 라벨로 보여주고 여기서 실제 ID로 되돌린다.
     """
     lines: list[str] = []
@@ -341,9 +358,20 @@ def _route_after_check(state: DomainLocalState) -> str:
     return "analyze"
 
 
+_EMPTY_SELF_CHECK = {
+    "status": "failed",
+    "violations": [],
+    "warnings": [],
+    "covered_axes": [],
+    "missing_axes": list(DATACENTER_REQUIREMENTS),
+}
+
+
 def _analyze(state: DomainLocalState, deps: DomainAgentDeps) -> dict:
+    """판정·주장·자체 품질 점검을 한 번의 구조화 출력으로 받는다(PROMPT_VERSION v3)."""
     if not state["evidence_store"]:
-        return {"claims": [], "fits": []}
+        return {"claims": [], "records": [], "self_check": _EMPTY_SELF_CHECK}
+
     condition_hint = "\n".join(f"- {n}" for n in state["condition_notes"])
     digest, label_to_id = _digest(state["evidence_store"])
     try:
@@ -369,51 +397,42 @@ def _analyze(state: DomainLocalState, deps: DomainAgentDeps) -> dict:
             ]
         )
     except Exception as exc:
-        return {"claims": [], "fits": [], "errors": state["errors"] + [f"분석 실패: {exc}"]}
+        return {
+            "claims": [], "records": [], "self_check": _EMPTY_SELF_CHECK,
+            "errors": state["errors"] + [f"분석 실패: {type(exc).__name__}: {exc}"],
+        }
 
-    claims, fits, gaps = _shape(
-        analysis, state["evidence_store"], state["condition_notes"], label_to_id
-    )
-    return {"claims": claims, "fits": fits, "gaps": state["gaps"] + gaps}
+    claims, records, gaps = _shape(analysis, state["evidence_store"], label_to_id)
+    self_check = analysis.self_check.model_dump()
+    return {
+        "claims": claims,
+        "records": records,
+        "self_check": self_check,
+        "gaps": state["gaps"] + gaps + list(self_check.get("missing_axes", [])),
+    }
 
 
 def _shape(
     analysis: DomainAnalysis,
     evidence_store: dict[str, dict],
-    condition_notes: list[str],
-    label_to_id: dict[str, str] | None = None,
+    label_to_id: dict[str, str],
 ) -> tuple[list[dict], list[dict], list[str]]:
-    """모델 출력을 최종 스키마로 옮기면서 근거 강도를 조정한다.
+    """모델 출력을 최종 스키마로 옮긴다. 여기서 하는 일은 참조 무결성 확인뿐이다.
 
-    여기서 하는 일은 강등뿐이고, 사실 검증은 guard 가 따로 한다.
+    존재하지 않는 라벨을 조용히 걸러내지 않으면 evidence_store 조회에서 KeyError로
+    죽는다. 사실 판단(근거 충분성·표현 적절성)은 모델의 self_check가 맡는다.
     """
     gaps: list[str] = []
     claims: list[dict] = []
     id_by_key: dict[str, str] = {}
     techs_by_key: dict[str, list[str]] = {}
 
-    labels = label_to_id or {}
     for draft in analysis.claims:
-        # 모델은 E1 같은 라벨로 인용한다. 실제 ID 를 그대로 적은 경우도 함께 받아준다.
-        resolved = [labels.get(token.strip(), token.strip()) for token in draft.evidence_ids]
+        # 모델은 E1 같은 라벨로 인용한다. 실제 ID를 그대로 적은 경우도 함께 받아준다.
+        resolved = [label_to_id.get(token.strip(), token.strip()) for token in draft.evidence_ids]
         valid = [eid for eid in dict.fromkeys(resolved) if eid in evidence_store]
-        basis = draft.basis
-        if basis == "direct_evidence" and not valid:
-            basis = "unknown"
-            gaps.append(f"근거 없이 사실로 제시된 주장을 판단 보류로 내림: {draft.statement[:50]}")
-        elif basis == "direct_evidence" and all(
-            evidence_store[eid]["source_type"] in WEAK_SOURCE_TYPES for eid in valid
-        ):
-            basis = "inference"
-            gaps.append(f"매체 보도만 근거여서 추론으로 낮춤: {draft.statement[:50]}")
-
-        conditions = [c for c in draft.conditions if c.strip()]
-        uncertainty = draft.uncertainty.strip()
-        if basis == "inference":
-            conditions = conditions or condition_notes[:2] or ["적용 전제가 근거에 명시되지 않음"]
-            uncertainty = uncertainty or "근거에서 유추한 판단으로 적용 범위가 제한됨"
-        if basis == "unknown":
-            uncertainty = uncertainty or "판단을 뒷받침할 근거를 확보하지 못함"
+        if len(valid) < len(set(resolved)):
+            gaps.append(f"{draft.claim_key}: 존재하지 않는 근거 참조를 제거함")
 
         claim_id = f"{AGENT_ID}:claim:{len(claims) + 1:03d}"
         id_by_key[draft.claim_key] = claim_id
@@ -422,102 +441,60 @@ def _shape(
             {
                 "claim_id": claim_id,
                 "technology_ids": draft.technology_ids,
-                "topic": draft.topic,
-                "statement": draft.statement.strip()[:MAX_STATEMENT_CHARS],
-                "basis": basis,
+                "text": draft.text.strip()[:MAX_STATEMENT_CHARS],
+                "basis": draft.basis,
                 "evidence_ids": valid,
-                "conditions": conditions,
-                "uncertainty": uncertainty,
+                "conditions": [c for c in draft.conditions if c.strip()],
+                "limitations": [lim for lim in draft.limitations if lim.strip()],
             }
         )
+    claim_by_id = {c["claim_id"]: c for c in claims}
 
-    fits: list[dict] = []
-    for draft_fit in analysis.fits:
-        linked = []
-        for key in draft_fit.claim_keys:
+    records: list[dict] = []
+    for draft in analysis.records:
+        linked_claims: list[str] = []
+        for key in draft.claim_keys:
             if key not in id_by_key:
                 continue
-            if draft_fit.technology_id not in techs_by_key[key]:
-                gaps.append(f"{draft_fit.technology_id} 판정이 다른 기술 주장({key})을 참조해 연결 해제")
+            if draft.technology_id not in techs_by_key[key]:
+                gaps.append(
+                    f"{draft.technology_id}/{draft.criterion[:30]}: "
+                    f"다른 기술 주장({key})을 참조해 연결 해제"
+                )
                 continue
-            linked.append(id_by_key[key])
-        assessment = draft_fit.assessment
-        if not linked and assessment != "unknown":
+            linked_claims.append(id_by_key[key])
+
+        linked_evidence: list[str] = []
+        for cid in linked_claims:
+            linked_evidence.extend(claim_by_id[cid]["evidence_ids"])
+
+        assessment = draft.assessment
+        if not linked_claims and assessment not in ("unknown",):
             assessment = "unknown"
-            gaps.append(f"연결된 주장이 없어 {draft_fit.technology_id} 판정을 보류로 내림")
-        fits.append(
+            gaps.append(
+                f"{draft.technology_id}/{draft.criterion[:30]}: 연결된 주장이 없어 판정을 보류로 내림"
+            )
+
+        records.append(
             {
-                "technology_id": draft_fit.technology_id,
-                "domain": DOMAIN_NAME,
-                "requirements": draft_fit.requirements or list(DATACENTER_REQUIREMENTS),
+                "technology_id": draft.technology_id,
+                "criterion": draft.criterion,
+                "basis": draft.basis,
+                "evidence_level": draft.evidence_level,
+                "scope": draft.scope,
                 "assessment": assessment,
-                "claim_ids": linked,
-                "limitations": draft_fit.limitations,
+                "assessment_vocab": draft.assessment_vocab,
+                "value": draft.value,
+                "findings": draft.findings.strip()[:MAX_STATEMENT_CHARS],
+                "limitations": [lim for lim in draft.limitations if lim.strip()],
+                "claim_ids": linked_claims,
+                "evidence_ids": sorted(set(linked_evidence)),
             }
         )
 
-    for missing in {"sw", "hw"} - {f["technology_id"] for f in fits}:
-        gaps.append(f"{missing} 기술에 대한 도메인 판단을 생성하지 못함")
-    return claims, fits, gaps
-
-
-def _apply_quality(
-    state: DomainLocalState, deps: DomainAgentDeps
-) -> tuple[list[dict], list[dict], GuardReport, LintReport, JudgeResult, list[str]]:
-    """guard(결정적) → linter(표현) → judge(질적) 순서로 적용한다."""
-    gaps = list(state["gaps"])
-    guard = run_guard(
-        claims=state["claims"],
-        evidence_store=state["evidence_store"],
-        source_texts=state["source_texts"],
-        as_of_date=state["as_of_date"],
-    )
-    # 주장 자체에 걸린 위반과, 그 주장이 인용한 근거에 걸린 위반을 모두 본다.
-    # 근거가 원문 대조에 실패했는데 그것을 인용한 주장이 사실로 남으면 검사의 의미가 없다.
-    claim_level = {"citation", "numeric_unit", "reference_integrity"}
-    evidence_level = {"quote", "locator", "date"}
-    flagged_claims = {v.target_id for v in guard.violations if v.check in claim_level}
-    flagged_evidence = {v.target_id for v in guard.violations if v.check in evidence_level}
-
-    claims = []
-    for claim in state["claims"]:
-        tainted = [eid for eid in claim["evidence_ids"] if eid in flagged_evidence]
-        if claim["basis"] == "direct_evidence" and (claim["claim_id"] in flagged_claims or tainted):
-            reason = (
-                "결정적 검사에서 근거 대조에 실패함"
-                if claim["claim_id"] in flagged_claims
-                else f"인용한 근거가 검사에 실패함({tainted[:2]})"
-            )
-            claim = {**claim, "basis": "inference"}
-            claim["uncertainty"] = claim["uncertainty"] or reason
-            gaps.append(f"{claim['claim_id']}: guard 위반으로 추론으로 낮춤 - {reason}")
-        claims.append(claim)
-
-    lint = lint_claims(claims)
-    blocked = lint.blocking_ids
-    if blocked:
-        gaps.extend(f"{cid}: 평가 표현으로 차단됨" for cid in sorted(blocked))
-    claims = [c for c in claims if c["claim_id"] not in blocked]
-
-    kept_ids = {c["claim_id"] for c in claims}
-    fits = [
-        {**f, "claim_ids": [cid for cid in f["claim_ids"] if cid in kept_ids]}
-        for f in state["fits"]
-    ]
-    for fit in fits:
-        if not fit["claim_ids"] and fit["assessment"] != "unknown":
-            fit["assessment"] = "unknown"
-            gaps.append(f"{fit['technology_id']}: 남은 주장이 없어 판정 보류")
-
-    judge = run_judge(
-        deps.llm,
-        requirements=format_requirements(),
-        claims=claims,
-        fits=fits,
-        model_name=getattr(deps.llm, "model_name", "unknown"),
-    )
-    gaps.extend(f"coverage 미달 축: {axis}" for axis in judge.missing_axes)
-    return claims, fits, guard, lint, judge, gaps
+    for missing in {"sw", "hw"} - {r["technology_id"] for r in records}:
+        gaps.append(f"{missing} 기술에 대한 판정 레코드를 생성하지 못함")
+    return claims, records, gaps
 
 
 def _build_subgraph(deps: DomainAgentDeps):
@@ -539,9 +516,13 @@ def _build_subgraph(deps: DomainAgentDeps):
 
 __all__ = [
     "AGENT_ID",
+    "PERSPECTIVE",
     "PAGE_BUDGET",
     "DomainAgentDeps",
     "DomainAnalysis",
+    "DomainLocalState",
     "DraftClaim",
-    "DraftFit",
+    "DraftRecord",
+    "SelfCheck",
+    "_build_subgraph",
 ]

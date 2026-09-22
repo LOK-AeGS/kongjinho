@@ -14,22 +14,34 @@
 - 근거 형식(`Evidence`)과 `evidence_store` reducer(`merge_evidence_store`)도 `graph/state.py` 하나로 정했습니다.
 - 이해관계자 내부에서 근거 풀을 합칠 때 쓰던 reducer는 `agents/stakeholder/evidence.py`로 옮겼습니다.
 
-### ⬜ 1-2. 두 에이전트의 `node.py`가 아직 AppState 형식을 쓰지 않음 (최우선)
-State 파일만 교체했고, 각 에이전트의 입출력 변환은 아직 예전 형식입니다.
-**지금 AppState 그래프에 두 노드를 그대로 연결하면 동작하지 않습니다.**
-LangGraph는 State에 없는 키를 반환하면 에러 없이 버리므로, 결과가 조용히 사라질 수 있습니다.
+### 1-2. 두 에이전트의 `node.py`가 아직 AppState 형식을 쓰지 않음 (최우선)
 
-| | 도메인 (`agents/domain/node.py`) | 이해관계자 (`agents/stakeholder/node.py`) |
-|---|---|---|
-| 입력 | `state["request"]["sw"]["name"]`을 읽음 → AppState에서는 `selected_tech["sw"]`라 **KeyError** | v0.3: `selected_tech`, `domain`, `as_of_date`를 읽음 (`as_of_date`는 AppState에서 `request.as_of`)<br>legacy: `state["request"]["sw"]` → **KeyError** |
-| 결과 키 | `domain_findings` (claims/fits/cited_evidence_ids) → `PerspectiveFindings`(records/claims/gaps)로 변환 필요 | v0.3: `stakeholder_eval`, `errors` → AppState에 없어서 **버려짐**. `stakeholder_findings`로 반환해야 함 |
-| 근거 | `evidence_id`/`locator` 형식 → `id`/`page_or_locator` 등 `Evidence` 형식으로 변환 필요 | 거의 같음. `evidence_level`, `metric_tag` 추가, `claim_ids`/`perspectives`/`bindings`는 AppState에 없음 |
-| 품질 | `quality_by_perspective`에 guard/lint/judge 딕셔너리 → `QualityReport`(status/violations/warnings/checked_claim_ids)로 변환 필요 | 쓰지 않음 |
-| 도메인 값 | 프롬프트에 데이터센터 고정 | AppState 기본값 `"datacenter_inference"`를 받으면 `datacenter`가 아니라서 **ValueError** |
+**✅ 도메인 (해결, 2026-09-22)** — `agents/domain/node.py`를 AppState 기준으로 다시 썼습니다.
+`selected_tech["sw"]["name"]`/`request["as_of"]`를 읽고, `domain_findings`를
+`PerspectiveFindings`(records: 요구사항 축 × 기술마다 `VerdictRecord` 하나, 최대 12건 /
+claims / gaps)로, 근거를 `graph.state.Evidence`(`id`/`page_or_locator`/
+`primary_or_secondary`/`direct_or_proxy`/`stance` 등)로 변환합니다.
+`quality_by_perspective["domain"]`은 이제 guard/lint/judge 세 딕셔너리가 아니라
+`QualityReport`(status/violations/warnings/checked_claim_ids) 하나입니다 — 결정적 코드
+검증 3종을 없애고 분석 프롬프트의 자체 점검(self_check)으로 합쳤기 때문입니다
+(`docs/DOMAIN_AGENT.md` "품질 검증" 절 참고). AppState에는 오류·수집 페이지 수를 담을
+전용 필드가 없어 `run_meta["domain"]`에 남깁니다. `graph.build.build_graph(domain=...)`에
+연결해 실제 API로 end-to-end 실행까지 확인했습니다(4-1 참고).
 
-- **할 일 (각 에이전트 담당):** `node.py`에서 AppState를 읽고, `*_findings`를 `PerspectiveFindings`로, 근거를 `graph.state.Evidence`로 변환해 반환합니다.
-  `subgraph.py` 등 내부 로직은 바꾸지 않아도 됩니다.
-- 변환 후 두 노드를 AppState 그래프에 연결해 fixture로 돌려서, `evidence_store`와 `*_findings`가 실제로 채워지는지 확인합니다.
+⬜ **이해관계자 (미해결)**
+
+| | 이해관계자 (`agents/stakeholder/node.py`) |
+|---|---|
+| 입력 | v0.3: `selected_tech`, `domain`, `as_of_date`를 읽음 (`as_of_date`는 AppState에서 `request.as_of`)<br>legacy: `state["request"]["sw"]` → **KeyError** |
+| 결과 키 | v0.3: `stakeholder_eval`, `errors` → AppState에 없어서 **버려짐**. `stakeholder_findings`로 반환해야 함 |
+| 근거 | 거의 같음. `evidence_level`, `metric_tag` 추가, `claim_ids`/`perspectives`/`bindings`는 AppState에 없음 |
+| 도메인 값 | AppState 기본값 `"datacenter_inference"`를 받으면 `datacenter`가 아니라서 **ValueError** |
+
+- **할 일 (이해관계자 담당):** `node.py`에서 AppState를 읽고, `stakeholder_findings`를
+  `PerspectiveFindings`로, 근거를 `graph.state.Evidence`로 변환해 반환합니다.
+  `subgraph.py` 등 내부 로직은 바꾸지 않아도 됩니다. 도메인의 변환 예시(`_to_team_*`
+  함수, `agents/domain/node.py`)를 참고할 수 있습니다.
+- 변환 후 fixture로 돌려서 `evidence_store`와 `stakeholder_findings`가 실제로 채워지는지 확인합니다.
 
 ---
 
@@ -46,10 +58,13 @@ LangGraph는 State에 없는 키를 반환하면 에러 없이 버리므로, 결
 - 도메인은 `request.max_search_rounds`를 State에서 읽습니다.
 - **정할 것:** 반복 한도를 State에서 받을지 여부. 받는다면 키 이름도 정합니다.
 
-### ⬜ 2-3. 에이전트마다 LLM이 다름
-- 도메인: `gpt-4o-mini` (LangChain `init_chat_model` 경유)
-- 이해관계자: `gpt-5.5` (openai SDK 직접, Responses API)
-- **정할 것:** 팀 공통 모델로 통일할지 여부. 비용에도 영향을 줍니다.
+### 2-3. 에이전트마다 LLM이 다름
+
+**도메인: `gpt-4o`로 결정 (2026-09-22)** — 이전 `gpt-4o-mini`에서 변경. LangChain
+`init_chat_model` 경유, 실제 API로 end-to-end 실행 확인함(4-1 참고).
+
+⬜ 이해관계자: `gpt-5.5` (openai SDK 직접, Responses API) — 아직 gpt-4o로 통일할지
+정하지 않았습니다. **정할 것:** 팀 공통 모델로 통일할지 여부. 비용에도 영향을 줍니다.
 
 ### ⬜ 2-4. 수집량 한도의 기준이 다름
 - 도메인: 웹 문서를 누적 200페이지까지로 제한합니다 (`PAGE_BUDGET`).
@@ -97,11 +112,21 @@ LangGraph는 State에 없는 키를 반환하면 에러 없이 버리므로, 결
 
 ## 4. 검증
 
-### ⬜ 4-1. 재구성 후 실제 API로 실행해 보지 않음
-- 로직은 바꾸지 않았고, 오프라인 테스트 40개와 이해관계자 fixture 실행은 통과했습니다.
+### ✅ 4-1. 재구성 후 실제 API로 실행해 보지 않음 (해결)
 - 이해관계자: ✅ 2026-09-22 실제 API로 end-to-end 실행 확인 (3-1a 수정 후).
-- 도메인: ⬜ 재구성 후 실제 API로 실행하지 않았습니다.
-- **할 일:** 키를 넣고 도메인 노트북을 한 번 실행합니다.
+- 도메인: ✅ 2026-09-22 AppState 변환(1-2) 후 `python -m scripts.run_domain`과 노트북으로
+  실제 API(gpt-4o + Tavily) 4회 실행 확인. 최종 노트북 재실행은 14개 코드 셀이
+  모두 오류 없이 완료됐고, 근거 31건 / 주장 12건 / 판정 12건(6축×2기술),
+  `status=partial`이었습니다. ACM·OpenReview·IEEE Xplore 등이 403(봇 차단)을
+  반환했지만 그래프는 중단 없이 오류를 `run_meta["domain"].errors`에 기록하고
+  진행했습니다.
+- 3회 실행 중 품질 검증(self_check) 프롬프트를 두 번 다듬었습니다 — 근거가 경쟁 제품을
+  다루는데 대상 기술 실측처럼 쓴 사례를 1차에서 발견 → 2차 수정에서 과잉 반응(정상 근거
+  10건에 오탐) → 3차 수정에서 위반 3건으로 줄었고 전부 실제로 타당했습니다. 자세한 내용은
+  `docs/DOMAIN_AGENT.md`의 "품질 검증" 절 참고.
+- 같은 v3.2 프롬프트로 수행한 4차 최종 검증에서는 `needs_review` 위반 2건
+  (`hw-accuracy-1`, `sw-power-1`의 근거 부족)을 보고했습니다. 실행별 결과 차이를
+  감추지 않고 노트북 출력에 남겼습니다.
 
 ### ⬜ 4-2. 전체 그래프를 한 번도 돌려보지 않음
 - `graph/build.py`는 있지만 실행 진입점(`main.py`)이 없습니다.
@@ -112,13 +137,10 @@ LangGraph는 State에 없는 키를 반환하면 에러 없이 버리므로, 결
 
 ## 5. 작은 정리거리
 
-### ⬜ 5-1. 도메인 산출물 위치가 규칙과 다름
-- `outputs/ablation.json`, `outputs/run_manifest.json`이 `outputs/` 바로 아래에 있습니다.
-- 규칙 16번은 `outputs/<에이전트>/`입니다.
-- 코드에서 기본 경로를 쓰는 곳(`agents/domain/evaluation/ablation.py`, 노트북)을 함께 고쳐야 합니다.
+### ✅ 5-1. 도메인 산출물 위치가 규칙과 다름 (해결)
+- `agents/domain/tools/ablation.py`의 `--out`/`--artifacts` 기본값을 `outputs/domain/`
+  아래로 옮겼습니다. `scripts/run_domain.py`도 `outputs/domain/<timestamp>/`에 저장합니다.
 
-### ⬜ 5-2. ablation 실행 안내가 실제 옵션과 다름
-- `agents/domain/evaluation/ablation.py` 맨 위 설명에는 `--corpus data/corpus`라고 되어 있습니다.
-- 실제 옵션은 `--cache`(기본값 `data/fetch_cache`)이고, `--corpus` 옵션은 없습니다.
-- **할 일:** 도메인 담당자가 설명 문구를 실제 옵션에 맞게 고칩니다.
-
+### ✅ 5-2. ablation 실행 안내가 실제 옵션과 다름 (해결)
+- `agents/domain/tools/ablation.py` 맨 위 설명을 실제 옵션(`--cache`, 기본값
+  `data/fetch_cache`)에 맞게 고쳤습니다.

@@ -13,7 +13,7 @@ import pickle
 from dataclasses import dataclass
 from pathlib import Path
 
-from agents.domain.rag.index import BM25Index, Chunk, DenseIndex
+from agents.domain.tools.index import BM25Index, Chunk, DenseIndex
 
 
 def _sha256_file(path: Path) -> str:

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import httpx
 
-from agents.domain.rag.evidence import content_checksum, normalize_text
+from agents.domain.tools.evidence import content_checksum, normalize_text
 
 # 이 길이 이하면 통째로 써도 프롬프트에 부담이 없다. 넘으면 색인 대상으로 보낸다.
 SHORT_DOCUMENT_CHARS = 8000
