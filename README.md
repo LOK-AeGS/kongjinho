@@ -18,13 +18,7 @@ agents/
 │   ├── __init__.py     make_node, DomainAgentDeps
 │   ├── node.py         부모 State ↔ DomainLocalState 변환
 │   ├── subgraph.py     plan_questions → retrieve → … → analyze
-│   ├── prompts.py      질문·판정·자체 품질 점검 프롬프트
-│   └── tools/          검색·수집·색인·재현성 도구
-└── stakeholder/        이해관계자 평가 (OpenAI Responses web_search)
-    ├── __init__.py     make_node
-    ├── node.py         부모 State ↔ StakeholderState 변환
-    ├── subgraph.py     plan → search → extract → review 반복
-    ├── models.py  backend.py  web.py  offline.py
+\
 
 scripts/                에이전트 단독 실행 (python -m scripts.run_<이름>)
 tests/agents/<이름>/     에이전트별 테스트
@@ -81,7 +75,7 @@ API 키가 필요한 실행(2단계)을 하려면 `.env`를 만듭니다. `.env`
 ```bash
 cp .env.example .env
 # .env 를 열어 값 입력
-# OPENAI_API_KEY=sk-...     두 에이전트 공통
+# OPENAI_API_KEY=sk-...     LLM 사용 에이전트 공통
 # TAVILY_API_KEY=tvly-...   도메인 에이전트 웹 검색
 ```
 
@@ -89,7 +83,8 @@ cp .env.example .env
 
 | 무엇을 | 명령 | 확인할 것 |
 |---|---|---|
-| 전체 테스트 | `python -m pytest tests` | `40 passed` |
+| 전체 테스트 | `python -m pytest tests` | 설치된 선택 의존성에 따라 통과 또는 명시적 skip |
+| 보고서 계약 테스트 | `python -m unittest tests.agents.report.test_report_agent -v` | API 없이 생성·인용·검증 계약 확인 |
 | 도메인 테스트만 | `python tests/agents/domain/test_domain_agent.py` | `전체 통과` |
 | 이해관계자 테스트만 | `python -m unittest tests.agents.stakeholder.test_stakeholder -v` | `OK` |
 | 이해관계자 전체 흐름 (fixture 재생) | `python -m scripts.run_stakeholder --offline-fixture tests/agents/stakeholder/fixtures/web_replay.json --as-of 2026-09-21` | `상태: complete`, `outputs/stakeholder/<실행시각>/`에 결과 생성 |
@@ -133,6 +128,29 @@ jupyter notebook notebooks/06-domain-agent.ipynb
   캐시는 git에 올라가지 않으므로, 새로 받은 레포에서는 Tavily 키가 있어야 실제 결과가 나옵니다.
 - 스크립트 결과는 `outputs/domain/<실행시각>/`에 저장됩니다. 노트북은 status, 근거·주장·판정 개수,
   품질 검사 결과, 인용 근거 순서로 출력합니다.
+
+#### 보고서 생성 에이전트
+
+확정 AppState JSON을 섹션별 최소 payload로 나누어 LLM이 Markdown 본문과 SUMMARY를 작성한다.
+인용 연결, 수치 검증, REFERENCE 생성과 PDF 변환은 결정적 코드가 담당한다.
+
+```bash
+python -m scripts.run_report \
+  --state /absolute/path/to/state.json \
+  --output /absolute/path/to/report.md \
+  --model gpt-4o-mini
+```
+
+저장소 루트 `.env`의 `OPENAI_API_KEY`를 자동으로 읽으며 API 비용이 발생한다. 키를 따로 입력하지
+않는다. API 없이 fixture와 기존 템플릿 출력을 재현할 때는
+`python -m scripts.run_report --fixture --deterministic`을 사용한다. 상세 계약과 LLM 주입 방법은
+[`docs/REPORT_AGENT.md`](docs/REPORT_AGENT.md)를 참고한다.
+
+실제 테스트 환경에서 Report LLM 호출도 확인하려면 다음 통합 테스트를 실행한다.
+
+```bash
+python -m unittest tests.agents.report.test_report_llm_integration -v
+```
 
 #### 도메인 검색 방식 비교 실험 (API 키 불필요, 인터넷 필요)
 
