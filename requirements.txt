@@ -10,7 +10,7 @@ python-dotenv>=1.0.1
 
 # LLM
 # 이해관계자: openai SDK 직접 사용 (Responses web_search)
-# 도메인: LangChain 경유. langchain-openai 최신은 openai 3.x를 끌어온다.
+# 도메인·보고서: LangChain 경유. langchain-openai 최신은 openai 3.x를 끌어온다.
 # 이해관계자는 원래 openai<3 로 고정했으나 3.x 호환 여부를 확인해야 한다.
 openai>=2.0
 langchain>=1.0.2
