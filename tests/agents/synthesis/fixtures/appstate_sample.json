@@ -1,0 +1,686 @@
+{
+ "_note": "합성 fixture: 평가 종합 에이전트 테스트용. D1·D3 인용 외의 URL과 수치는 example.com 가짜 자료이며 실제 조사 결과가 아님.",
+ "request": {
+  "as_of": "2026-09-22",
+  "language": "ko",
+  "scope": "datacenter_inference",
+  "max_search_rounds": 2
+ },
+ "selected_tech": {
+  "sw": {
+   "name": "DeepSeek-V2 Multi-head Latent Attention",
+   "short_name": "MLA",
+   "technology": "sw",
+   "approach": "모델 구조",
+   "source_ids": [
+    "D1"
+   ],
+   "selection_reason": "어텐션 구조 자체를 바꿔 KV를 저차원 잠재 표현으로 줄인 사례"
+  },
+  "hw": {
+   "name": "ITME CXL-Hybrid Memory",
+   "short_name": "ITME",
+   "technology": "hw",
+   "approach": "메모리 계층",
+   "source_ids": [
+    "D3"
+   ],
+   "selection_reason": "분리형 CXL 계층 확장, 생산급 CMM 분석과 FPGA 프로토타입"
+  }
+ },
+ "domain": "datacenter_inference",
+ "corpus_manifest": [],
+ "technical_findings": {
+  "perspective": "technical",
+  "status": "complete",
+  "records": [
+   {
+    "technology": "sw",
+    "perspective": "technical",
+    "criterion": "성숙도(TRL)",
+    "basis": "direct",
+    "evidence_level": "pilot",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 1,
+     "counter": 0,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "technical:ev:001"
+    ],
+    "assessment": "5-6",
+    "assessment_vocab": "trl_stage",
+    "value": "5-6",
+    "findings": "DeepSeek 67B 대비 KV cache 93.3% 감소가 전체 모델 비교로 보고됨",
+    "limitations": []
+   },
+   {
+    "technology": "hw",
+    "perspective": "technical",
+    "criterion": "성숙도(TRL)",
+    "basis": "direct",
+    "evidence_level": "pilot",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 1,
+     "counter": 1,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "technical:ev:002",
+     "technical:ev:003"
+    ],
+    "assessment": "4-5",
+    "assessment_vocab": "trl_stage",
+    "value": "4-5",
+    "findings": "NVMe-oF 대비 1.80× 처리량, FPGA cache miss 시 1 GB/s 미만",
+    "limitations": []
+   }
+  ],
+  "claims": [
+   {
+    "claim_id": "technical:claim:001",
+    "technology": "sw",
+    "perspective": "technical",
+    "text": "MLA는 DeepSeek 67B 대비 KV cache를 93.3% 줄였다.",
+    "evidence_ids": [
+     "technical:ev:001"
+    ],
+    "conditions": [],
+    "limitations": []
+   },
+   {
+    "claim_id": "technical:claim:002",
+    "technology": "hw",
+    "perspective": "technical",
+    "text": "ITME는 NVMe-oF 기반 disaggregated storage 대비 처리량 1.80×를 보고했다.",
+    "evidence_ids": [
+     "technical:ev:002"
+    ],
+    "conditions": [],
+    "limitations": []
+   }
+  ],
+  "gaps": [],
+  "limitations": [],
+  "input_evidence_ids": [
+   "technical:ev:001",
+   "technical:ev:002",
+   "technical:ev:003"
+  ]
+ },
+ "market_findings": {
+  "perspective": "market",
+  "status": "complete",
+  "records": [
+   {
+    "technology": "sw",
+    "perspective": "market",
+    "criterion": "상용화·채택 현황",
+    "basis": "direct",
+    "evidence_level": "production",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 2,
+     "counter": 0,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "market:ev:001",
+     "market:ev:004"
+    ],
+    "assessment": "adopted",
+    "assessment_vocab": "market_signal",
+    "value": null,
+    "findings": "공개 API와 서빙 프레임워크에서 제공됨",
+    "limitations": []
+   },
+   {
+    "technology": "sw",
+    "perspective": "market",
+    "criterion": "시장 규모·성장성",
+    "basis": "not_applicable",
+    "evidence_level": "unknown",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 0,
+     "counter": 0,
+     "neutral": 0
+    },
+    "evidence_ids": [],
+    "assessment": "none",
+    "assessment_vocab": "market_signal",
+    "value": null,
+    "findings": "모델 구조 자체에는 독립 시장이 없음",
+    "limitations": []
+   },
+   {
+    "technology": "hw",
+    "perspective": "market",
+    "criterion": "시장 규모·성장성",
+    "basis": "inferred",
+    "evidence_level": "forecast",
+    "scope": "class",
+    "stance_counts": {
+     "support": 2,
+     "counter": 0,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "market:ev:002",
+     "market:ev:003"
+    ],
+    "assessment": "projected",
+    "assessment_vocab": "market_signal",
+    "value": null,
+    "findings": "CXL 메모리 확장 기술군 시장 전망",
+    "limitations": []
+   },
+   {
+    "technology": "hw",
+    "perspective": "market",
+    "criterion": "상용화·채택 현황",
+    "basis": "inferred",
+    "evidence_level": "announcement",
+    "scope": "class",
+    "stance_counts": {
+     "support": 1,
+     "counter": 0,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "market:ev:005"
+    ],
+    "assessment": "announced",
+    "assessment_vocab": "market_signal",
+    "value": null,
+    "findings": "CXL 메모리 모듈 출시 발표 (기술군)",
+    "limitations": []
+   }
+  ],
+  "claims": [
+   {
+    "claim_id": "market:claim:001",
+    "technology": "hw",
+    "perspective": "market",
+    "text": "CXL 메모리 확장 시장은 2028년 15.8 billion USD 규모로 전망된다.",
+    "evidence_ids": [
+     "market:ev:002"
+    ],
+    "conditions": [],
+    "limitations": []
+   },
+   {
+    "claim_id": "market:claim:002",
+    "technology": "hw",
+    "perspective": "market",
+    "text": "CXL 시장은 2028년 3.4 billion USD로 전망된다.",
+    "evidence_ids": [
+     "market:ev:003"
+    ],
+    "conditions": [],
+    "limitations": []
+   },
+   {
+    "claim_id": "market:claim:003",
+    "technology": "hw",
+    "perspective": "market",
+    "text": "ITME는 처리량을 35.7% 높였다.",
+    "evidence_ids": [
+     "technical:ev:002"
+    ],
+    "conditions": [],
+    "limitations": []
+   }
+  ],
+  "gaps": [],
+  "limitations": [],
+  "input_evidence_ids": []
+ },
+ "stakeholder_findings": {
+  "perspective": "stakeholder",
+  "status": "partial",
+  "records": [
+   {
+    "technology": "sw",
+    "perspective": "stakeholder",
+    "criterion": "도입 기업·개발자",
+    "basis": "direct",
+    "evidence_level": "announcement",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 1,
+     "counter": 1,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "stakeholder:ev:001",
+     "stakeholder:ev:002"
+    ],
+    "assessment": "conditional",
+    "assessment_vocab": "stakeholder_position",
+    "value": null,
+    "findings": "서빙 프레임워크 개발자들이 MLA 지원을 요청·구현함",
+    "limitations": []
+   },
+   {
+    "technology": "hw",
+    "perspective": "stakeholder",
+    "criterion": "투자·산업 관계자",
+    "basis": "unknown",
+    "evidence_level": "unknown",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 0,
+     "counter": 0,
+     "neutral": 0
+    },
+    "evidence_ids": [],
+    "assessment": "silent",
+    "assessment_vocab": "stakeholder_position",
+    "value": null,
+    "findings": "정해진 검색 범위에서 직접 반응을 찾지 못함",
+    "limitations": []
+   }
+  ],
+  "claims": [],
+  "gaps": [
+   {
+    "technology": "hw",
+    "perspective": "stakeholder",
+    "criterion": "투자·산업 관계자",
+    "reason": "not_found (검색 범위 내 직접 반응 없음)",
+    "missing_evidence": [
+     "투자·애널리스트의 ITME 직접 언급"
+    ]
+   }
+  ],
+  "limitations": [],
+  "input_evidence_ids": []
+ },
+ "domain_findings": {
+  "perspective": "domain",
+  "status": "partial",
+  "records": [
+   {
+    "technology": "sw",
+    "perspective": "domain",
+    "criterion": "HBM 용량 압박 완화",
+    "basis": "direct",
+    "evidence_level": "pilot",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 1,
+     "counter": 0,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "technical:ev:001"
+    ],
+    "assessment": "suitable",
+    "assessment_vocab": "domain_suitability",
+    "value": null,
+    "findings": "DeepSeek 67B 대비 KV cache 93.3% 감소 보고",
+    "limitations": []
+   },
+   {
+    "technology": "hw",
+    "perspective": "domain",
+    "criterion": "처리량·동시 요청 수",
+    "basis": "direct",
+    "evidence_level": "pilot",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 1,
+     "counter": 1,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "domain:ev:001",
+     "technical:ev:003"
+    ],
+    "assessment": "conditional",
+    "assessment_vocab": "domain_suitability",
+    "value": null,
+    "findings": "NVMe-oF 대비 1.80× 처리량, FPGA 대역폭 격차가 조건",
+    "limitations": []
+   },
+   {
+    "technology": "hw",
+    "perspective": "domain",
+    "criterion": "인프라 도입 비용·운영 부담",
+    "basis": "inferred",
+    "evidence_level": "announcement",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 0,
+     "counter": 2,
+     "neutral": 0
+    },
+    "evidence_ids": [
+     "domain:ev:002"
+    ],
+    "assessment": "conditional",
+    "assessment_vocab": "domain_suitability",
+    "value": null,
+    "findings": "CXL 계층 추가는 랙 전력과 신규 플랫폼을 요구",
+    "limitations": []
+   },
+   {
+    "technology": "hw",
+    "perspective": "domain",
+    "criterion": "전력·발열",
+    "basis": "unknown",
+    "evidence_level": "unknown",
+    "scope": "direct",
+    "stance_counts": {
+     "support": 0,
+     "counter": 0,
+     "neutral": 0
+    },
+    "evidence_ids": [],
+    "assessment": "not_assessed",
+    "assessment_vocab": "domain_suitability",
+    "value": null,
+    "findings": "근거 부족으로 판단 보류",
+    "limitations": []
+   }
+  ],
+  "claims": [
+   {
+    "claim_id": "domain:claim:001",
+    "technology": "both",
+    "perspective": "domain",
+    "text": "MLA로 압축한 잠재 KV도 장문맥 서빙에서 CXL 계층으로 오프로드할 수 있다는 병행 구성이 언급됐다.",
+    "evidence_ids": [
+     "domain:ev:003"
+    ],
+    "conditions": [],
+    "limitations": []
+   }
+  ],
+  "gaps": [
+   {
+    "technology": "hw",
+    "perspective": "domain",
+    "criterion": "전력·발열",
+    "reason": "근거 부족",
+    "missing_evidence": [
+     "CXL 계층 추가 전력 실측"
+    ]
+   }
+  ],
+  "limitations": [],
+  "input_evidence_ids": []
+ },
+ "evidence_store": {
+  "technical:ev:001": {
+   "id": "technical:ev:001",
+   "claim_id": "",
+   "doc_id": "D1",
+   "title": "DeepSeek-V2",
+   "author_or_org": "DeepSeek-AI",
+   "source_type": "paper",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://arxiv.org/abs/2405.04434",
+   "published_at": "2024-05-07",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "p.1",
+   "quote": "Compared with DeepSeek 67B, DeepSeek-V2 achieves significantly stronger performance, and meanwhile saves 42.5% of training costs, reduces the KV cache by 93.3%, and boosts the maximum generation throughput to 5.76 times.",
+   "stance": "support",
+   "evidence_level": "pilot",
+   "metric_tag": "kv_cache_reduction_pct",
+   "perspective": "technical",
+   "content_hash": "h-d1-abstract"
+  },
+  "technical:ev:002": {
+   "id": "technical:ev:002",
+   "claim_id": "",
+   "doc_id": "D3",
+   "title": "ITME",
+   "author_or_org": "Jang et al.",
+   "source_type": "paper",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://arxiv.org/abs/2606.12556",
+   "published_at": "2026-06-15",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "p.2",
+   "quote": "our evaluation shows that ITME achieves a 1.80× throughput improvement over NVMe-oF-based disaggregated storage baselines in large-scale LLM inference",
+   "stance": "support",
+   "evidence_level": "pilot",
+   "metric_tag": null,
+   "perspective": "technical",
+   "content_hash": "h-d3-p2"
+  },
+  "technical:ev:003": {
+   "id": "technical:ev:003",
+   "claim_id": "",
+   "doc_id": "D3",
+   "title": "ITME",
+   "author_or_org": "Jang et al.",
+   "source_type": "paper",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://arxiv.org/abs/2606.12556",
+   "published_at": "2026-06-15",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "p.11",
+   "quote": "the current FPGA prototype delivers less than 1 GB/s on cache misses",
+   "stance": "counter",
+   "evidence_level": "pilot",
+   "metric_tag": null,
+   "perspective": "technical",
+   "content_hash": "h-d3-p11"
+  },
+  "market:ev:001": {
+   "id": "market:ev:001",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "vLLM docs: deepseek_v2",
+   "author_or_org": "vLLM project",
+   "source_type": "official_web",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://docs.vllm.ai/en/stable/api/vllm/model_executor/models/deepseek_v2/",
+   "published_at": "2025-11-01",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "DeepseekV2MLAAttention",
+   "quote": "DeepseekV2MLAAttention",
+   "stance": "support",
+   "evidence_level": "announcement",
+   "metric_tag": null,
+   "perspective": "market",
+   "content_hash": "h-vllm-mla"
+  },
+  "market:ev:002": {
+   "id": "market:ev:002",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "CXL memory market outlook",
+   "author_or_org": "Example Research",
+   "source_type": "news",
+   "primary_or_secondary": "secondary",
+   "direct_or_proxy": "proxy",
+   "url": "https://example.com/cxl-market-a",
+   "published_at": "2024-05-10",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "para 3",
+   "quote": "The CXL memory expansion market is projected to reach 15.8 billion USD by 2028.",
+   "stance": "support",
+   "evidence_level": "forecast",
+   "metric_tag": "cxl_market_size_usd",
+   "perspective": "market",
+   "content_hash": "h-mkt-a"
+  },
+  "market:ev:003": {
+   "id": "market:ev:003",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "CXL market forecast",
+   "author_or_org": "Example Analyst",
+   "source_type": "news",
+   "primary_or_secondary": "secondary",
+   "direct_or_proxy": "proxy",
+   "url": "https://example.com/cxl-market-b",
+   "published_at": "2025-02-01",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "para 1",
+   "quote": "Analysts expect the CXL market to hit 3.4 billion USD in 2028.",
+   "stance": "support",
+   "evidence_level": "forecast",
+   "metric_tag": "cxl_market_size_usd",
+   "perspective": "market",
+   "content_hash": "h-mkt-b"
+  },
+  "market:ev:004": {
+   "id": "market:ev:004",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "DeepSeek API pricing",
+   "author_or_org": "DeepSeek",
+   "source_type": "official_web",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://example.com/deepseek-api",
+   "published_at": "2025-06-01",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "pricing table",
+   "quote": "DeepSeek-V2 is served in production through the public API.",
+   "stance": "support",
+   "evidence_level": "production",
+   "metric_tag": null,
+   "perspective": "market",
+   "content_hash": "h-ds-api"
+  },
+  "market:ev:005": {
+   "id": "market:ev:005",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "CXL memory module launch",
+   "author_or_org": "Example Vendor",
+   "source_type": "official_web",
+   "primary_or_secondary": "secondary",
+   "direct_or_proxy": "proxy",
+   "url": "https://example.com/cmm-launch",
+   "published_at": "2025-09-01",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "press release",
+   "quote": "The vendor announced CXL memory modules for AI inference servers.",
+   "stance": "support",
+   "evidence_level": "announcement",
+   "metric_tag": null,
+   "perspective": "market",
+   "content_hash": "h-cmm-launch"
+  },
+  "stakeholder:ev:001": {
+   "id": "stakeholder:ev:001",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "Support MLA in DeepSeek-v2 · Issue #237",
+   "author_or_org": "flashinfer-ai",
+   "source_type": "community",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://github.com/flashinfer-ai/flashinfer/issues/237",
+   "published_at": null,
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "block:0003",
+   "quote": "MLA was proposed for efficient inference",
+   "stance": "support",
+   "evidence_level": "announcement",
+   "metric_tag": null,
+   "perspective": "stakeholder",
+   "content_hash": "h-fi-237"
+  },
+  "stakeholder:ev:002": {
+   "id": "stakeholder:ev:002",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "vLLM docs: deepseek_v2",
+   "author_or_org": "vLLM project",
+   "source_type": "official_web",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://docs.vllm.ai/en/stable/api/vllm/model_executor/models/deepseek_v2/",
+   "published_at": "2025-11-01",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "DeepseekV2MLAAttention (limitations)",
+   "quote": "DeepseekV2MLAAttention",
+   "stance": "counter",
+   "evidence_level": "announcement",
+   "metric_tag": null,
+   "perspective": "stakeholder",
+   "content_hash": "h-vllm-mla"
+  },
+  "domain:ev:001": {
+   "id": "domain:ev:001",
+   "claim_id": "",
+   "doc_id": "D3",
+   "title": "ITME",
+   "author_or_org": "Jang et al.",
+   "source_type": "paper",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://arxiv.org/abs/2606.12556",
+   "published_at": "2026-06-15",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "p.2 (domain view)",
+   "quote": "our evaluation shows that ITME achieves a 1.80× throughput improvement over NVMe-oF-based disaggregated storage baselines in large-scale LLM inference",
+   "stance": "support",
+   "evidence_level": "pilot",
+   "metric_tag": null,
+   "perspective": "domain",
+   "content_hash": "h-d3-p2"
+  },
+  "domain:ev:002": {
+   "id": "domain:ev:002",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "CXL deployment considerations",
+   "author_or_org": "Example Vendor",
+   "source_type": "official_web",
+   "primary_or_secondary": "primary",
+   "direct_or_proxy": "direct",
+   "url": "https://example.com/cxl-ops",
+   "published_at": "2026-08-10",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "section 4",
+   "quote": "Adding a CXL memory tier increases rack power and requires new server platforms.",
+   "stance": "counter",
+   "evidence_level": "announcement",
+   "metric_tag": null,
+   "perspective": "domain",
+   "content_hash": "h-cxl-ops"
+  },
+  "domain:ev:003": {
+   "id": "domain:ev:003",
+   "claim_id": "",
+   "doc_id": null,
+   "title": "Serving MLA and tiered memory together",
+   "author_or_org": "Example Blog",
+   "source_type": "news",
+   "primary_or_secondary": "secondary",
+   "direct_or_proxy": "proxy",
+   "url": "https://example.com/mla-cxl",
+   "published_at": "2026-08-20",
+   "accessed_at": "2026-09-22T00:00:00+00:00",
+   "page_or_locator": "para 2",
+   "quote": "Compressed latent KV from MLA can still be offloaded to a CXL tier for long-context serving.",
+   "stance": "neutral",
+   "evidence_level": "pilot",
+   "metric_tag": null,
+   "perspective": "domain",
+   "content_hash": "h-mla-cxl"
+  }
+ },
+ "synthesis": null,
+ "report_sections": {},
+ "references": {},
+ "search_log_by_perspective": {},
+ "quality_by_perspective": {},
+ "retries": {},
+ "run_meta": {}
+}

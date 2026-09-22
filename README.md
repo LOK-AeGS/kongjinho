@@ -10,8 +10,7 @@
 
 ```
 graph/                  공유 계약 + 연결
-├── state.py            PipelineState (최초 설계)
-├── team_state.py       EvaluationState (팀 설계서 v0.3), evidence_store reducer
+├── state.py            AppState (팀 공통 State) + reducer + create_initial_state
 └── build.py            add_node / add_edge 만
 
 agents/
