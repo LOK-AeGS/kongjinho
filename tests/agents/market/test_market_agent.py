@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from agents.market.node import make_node, project_input, summarize_technical  # noqa: E402
-from agents.market.prompts import CompareOut, CounterCheck, InferenceItem, Judgement, PlanOut  # noqa: E402
+from agents.market.prompts import JUDGE_SYSTEM, CompareOut, CounterCheck, InferenceItem, Judgement, PlanOut  # noqa: E402
 from agents.market.quality import linter, rubric  # noqa: E402
 from agents.market.rag import tier  # noqa: E402
 from agents.market.rag.evidence import make_evidence_id, normalize_url  # noqa: E402
@@ -102,6 +102,15 @@ def test_근거_수_불균형을_감지한다():
 # --- 표현 린터 -----------------------------------------------------------------
 
 
+def test_판단_프롬프트는_이름이_비슷한_별개_기술을_경고한다():
+    """2026-09-22 실 API 실행에서 SK hynix IMTE를 대상 기술 ITME로 오귀속할 뻔한 사례(§JUDGE_SYSTEM 규칙 2).
+
+    LLM이 실제로 이 규칙을 지키는지는 실 API로만 확인 가능하다. 여기서는 규칙 문구 자체가
+    프롬프트에서 조용히 빠지지 않는지만 회귀 검사한다.
+    """
+    assert "발행 주체" in JUDGE_SYSTEM and "다른 별개 기술" in JUDGE_SYSTEM
+
+
 def test_우열_어휘를_잡는다():
     hits = linter.lint_statements([("c1", "A가 B보다 더 우수하고 압도적이다"), ("c2", "정상적인 사실 서술")])
     assert {h["claim_id"] for h in hits} == {"c1"}
@@ -117,6 +126,18 @@ def test_등급표에_없는_도메인은_기타로_분류되고_걸러진다():
     kept, dropped = tier.filter_trusted([{"url": "https://arxiv.org/abs/1"}, {"url": "https://random-blog.example.net/post"}])
     assert len(kept) == 1 and len(dropped) == 1
     assert "기타" not in dropped[0] and "등급표에 없어" in dropped[0]
+
+
+def test_등급표는_실행에서_부당하게_걸러졌던_정당한_출처를_포함한다():
+    """2026-09-22 실 API 실행 3회에서 걸러진 도메인 중 정당한 출처였던 것들."""
+    assert tier.classify("https://api-docs.deepseek.com/quick_start") == "vendor"  # 대상 SW 원저작사
+    assert tier.classify("https://www.databricks.com/blog/x") == "vendor"
+    assert tier.classify("https://www.redhat.com/en/blog/x") == "vendor"
+    assert tier.classify("https://www.mordorintelligence.com/industry-reports/x") == "research"
+    assert tier.classify("https://www.trendforce.com/news/x") == "research"
+    assert tier.classify("https://www.alphaxiv.org/abs/2606.12556") == "paper"
+    assert tier.classify("https://ar5iv.labs.arxiv.org/html/2606.12556") == "paper"  # arxiv.org 하위 도메인으로 이미 포함
+    assert tier.classify("https://www.semanticscholar.org/paper/ITME") == "paper"  # 대상 HW 논문 원문 링크가 걸렸던 사례
 
 
 # --- 본문 수집·청킹·색인 (Pool B) ----------------------------------------------
