@@ -5,8 +5,8 @@
   python main.py --live market,stakeholder,synthesis,report   # 가능한 노드 전부 실제 실행 (비용 발생)
 
 노드별 실행 방식
-  technical, domain : 임시 노드 (fixture 재생). 기술 조사는 PR 전, 도메인은 AppState 수정 브랜치가 merge 전.
-  market, stakeholder: 기본 fixture 재생, --live 면 실제 에이전트 (Tavily·OpenAI)
+  technical          : 임시 노드 (fixture 재생). 기술 조사 에이전트 PR 전.
+  market, stakeholder, domain: 기본 fixture 재생, --live 면 실제 에이전트 (Tavily·OpenAI)
   synthesis          : 기본 템플릿 서술 (LLM 없음), --live 면 OpenAIWriter
   report             : 기본 deterministic (LLM 없음), --live 면 LLM 작성
 
@@ -26,7 +26,7 @@ from graph.state import create_initial_state
 from graph.stubs import DEFAULT_FIXTURE, load_fixture, replay_node
 
 AGENTS = ("technical", "market", "stakeholder", "domain", "synthesis", "report")
-LIVE_CAPABLE = ("market", "stakeholder", "synthesis", "report")
+LIVE_CAPABLE = ("market", "stakeholder", "domain", "synthesis", "report")
 
 
 def load_env(path: Path = Path(".env")) -> None:
@@ -44,7 +44,24 @@ def build_nodes(live: set[str], fixture: dict) -> tuple[dict, dict]:
     nodes, modes = {}, {}
 
     nodes["technical"], modes["technical"] = replay_node("technical", fixture), "임시 (fixture 재생, 기술 조사 PR 전)"
-    nodes["domain"], modes["domain"] = replay_node("domain", fixture), "임시 (fixture 재생, 도메인 AppState 수정 merge 전)"
+
+    if "domain" in live:
+        from langchain.chat_models import init_chat_model
+
+        from agents.domain import DomainAgentDeps, make_node as domain_node
+        from agents.domain.tools.websearch import build_search_provider
+
+        # scripts/run_domain.py 와 같은 설정. 임베딩은 긴 문서 색인에만 쓰인다 (DOMAIN_EMBEDDING="" 이면 BM25만).
+        embedding = os.getenv("DOMAIN_EMBEDDING", "BAAI/bge-m3") or None
+        deps = DomainAgentDeps(
+            llm=init_chat_model(os.getenv("DOMAIN_MODEL", "gpt-4o"), model_provider="openai", temperature=0),
+            search_provider=build_search_provider(Path("data/search_cache")),
+            embedding_model=embedding,
+            fetch_cache_dir=Path("data/fetch_cache"),
+        )
+        nodes["domain"], modes["domain"] = domain_node(deps), f"실제 ({os.getenv('DOMAIN_MODEL', 'gpt-4o')} + Tavily, 임베딩 {embedding or '없음'})"
+    else:
+        nodes["domain"], modes["domain"] = replay_node("domain", fixture), "fixture 재생"
 
     if "market" in live:
         from langchain_openai import ChatOpenAI
@@ -168,8 +185,8 @@ def main() -> int:
         load_env()
         if not os.getenv("OPENAI_API_KEY"):
             parser.error("OPENAI_API_KEY 가 없습니다. .env 에 넣으세요.")
-        if "market" in live and not os.getenv("TAVILY_API_KEY"):
-            parser.error("시장 실제 실행에는 TAVILY_API_KEY 가 필요합니다.")
+        if live & {"market", "domain"} and not os.getenv("TAVILY_API_KEY"):
+            parser.error("시장·도메인 실제 실행에는 TAVILY_API_KEY 가 필요합니다.")
         print(f"실제 실행 노드: {', '.join(sorted(live, key=AGENTS.index))} (API 비용이 발생합니다)")
 
     fixture = load_fixture(args.fixture)

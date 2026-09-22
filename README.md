@@ -163,5 +163,5 @@ python -m agents.domain.tools.ablation --embedding ""            # BM25만 (빠�
 
 ### 3. 아직 할 수 없는 것
 
-- **전체 그래프를 모두 실제 노드로 실행**: 기술 조사(①) 에이전트는 PR 전, 도메인(④)은 AppState 수정 브랜치가 merge 전이라
-  `main.py`에서 두 자리는 합성 fixture 재생 노드로 채웁니다. ([docs/PARENT_GRAPH.md](docs/PARENT_GRAPH.md))
+- **전체 그래프를 모두 실제 노드로 실행**: 기술 조사(①) 에이전트가 PR 전이라 `main.py`에서 그 자리는
+  합성 fixture 재생 노드로 채웁니다. ([docs/PARENT_GRAPH.md](docs/PARENT_GRAPH.md))

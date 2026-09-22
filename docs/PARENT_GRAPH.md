@@ -21,7 +21,7 @@ START → ① technical → ② market ─┐
 | `graph/state.py` | 공통 State `AppState`, reducer, `create_initial_state` |
 | `graph/stubs.py` | **임시 노드**: 아직 AppState 형식 노드가 없는 자리를 합성 fixture 재생으로 채움 |
 | `main.py` | 실행 진입점. 노드 조립 → `build_graph` → 실행 → 결과 저장 |
-| `tests/graph/test_parent_graph.py` | 부모 그래프 테스트 9개 (API·네트워크 없음) |
+| `tests/graph/test_parent_graph.py` | 부모 그래프 테스트 10개 (API·네트워크 없음) |
 
 규칙대로 엣지는 `graph/build.py`에만 있고, `main.py`는 각 에이전트의 `make_node()`만 가져다 씁니다.
 
@@ -34,7 +34,7 @@ START → ① technical → ② market ─┐
 | ① technical | 임시 (fixture 재생) | 불가 | 기술 조사 에이전트 PR 전 |
 | ② market | fixture 재생 | `agents.market` (gpt-4.1-mini/gpt-4.1 + Tavily) | AppState 형식 ✅ |
 | ③ stakeholder | fixture 재생 | `agents.stakeholder_eval` (gpt-4.1-mini, OpenAI 웹 검색) | AppState 형식 ✅. 기존 `agents/stakeholder/`는 옛 형식 |
-| ④ domain | 임시 (fixture 재생) | 불가 | `fix/domain-appstate-and-quality-prompt` 브랜치가 merge 되면 연결 |
+| ④ domain | fixture 재생 | `agents.domain` (gpt-4o + Tavily, 긴 문서는 bge-m3 임베딩) | AppState 형식 ✅ (PR #8). 모델·임베딩은 환경변수 `DOMAIN_MODEL`, `DOMAIN_EMBEDDING`(빈 값이면 BM25만) |
 | ⑤ synthesis | 실제 노드, 템플릿 서술 | `agents.synthesis` + gpt-4.1 서술 | AppState 형식 ✅ |
 | ⑥ report | 실제 노드, deterministic | `agents.report` (gpt-4o-mini) | AppState 형식 ✅ |
 
@@ -56,13 +56,13 @@ python main.py
 python main.py --live synthesis
 python main.py --live synthesis,report
 
-# 가능한 노드 전부 실제 실행 (market 은 TAVILY_API_KEY 도 필요)
-python main.py --live market,stakeholder,synthesis,report --rounds 1
+# 가능한 노드 전부 실제 실행 (market·domain 은 TAVILY_API_KEY 도 필요)
+python main.py --live market,stakeholder,domain,synthesis,report --rounds 1
 ```
 
 | 옵션 | 내용 |
 |---|---|
-| `--live` | 실제로 실행할 노드 (쉼표 구분): `market`, `stakeholder`, `synthesis`, `report` |
+| `--live` | 실제로 실행할 노드 (쉼표 구분): `market`, `stakeholder`, `domain`, `synthesis`, `report` |
 | `--rounds` | 실제 실행 노드의 최대 검색 라운드 (기본 1, `request.max_search_rounds`로 들어감) |
 | `--as-of` | 조사 기준일 (기본: fixture 의 기준일) |
 | `--fixture` | 재생 노드가 쓸 AppState JSON |
@@ -125,6 +125,7 @@ python -m unittest tests.graph.test_parent_graph -v
 | 종합·보고서 생성 | `synthesis` 매트릭스와 `report_sections`가 만들어짐 |
 | 에이전트 간 검사 연결 | fixture 의 조건 누락 수치를 보고서 검사가 잡음 |
 | 실제 노드 연결 | 실제 시장·이해관계자 노드를 가짜 LLM·검색으로 꽂아도 그래프가 끝까지 돌고, 빈 결과도 종합·보고서가 한계로 처리 |
+| 실제 도메인 노드 실패 | 실제 도메인 노드가 LLM 없이 실패해도 `failed` 결과로 끝나고 그래프는 종합·보고서까지 진행 |
 | 재생 노드 | 그 관점이 인용한 근거만 돌려줌 |
 
 ---
@@ -132,5 +133,5 @@ python -m unittest tests.graph.test_parent_graph -v
 ## 5. 아직 없는 것
 
 - **재실행 라우팅.** 평가 종합이 `retry_requests`를 남기지만, 부모 그래프에 그 관점을 다시 돌리는 조건부 엣지는 없습니다. 설계서 §8.1 은 재시도를 각 에이전트 내부 루프로 두므로 필수는 아닙니다.
-- **① 기술 조사, ④ 도메인 실제 노드.** 위 2장 참고.
+- **① 기술 조사 실제 노드.** 에이전트 PR 전이라 fixture 재생 노드로 채웁니다.
 - **체크포인트.** `build_graph(checkpointer=...)`는 받을 수 있지만 `main.py`에서는 쓰지 않습니다.

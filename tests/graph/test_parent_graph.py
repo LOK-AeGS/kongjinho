@@ -106,6 +106,32 @@ class RealNodeWiringTest(unittest.TestCase):
         self.assertGreater(len(final["report_sections"]), 0)
 
 
+    def test_real_domain_node_failure_does_not_stop_graph(self):
+        """실제 도메인 노드가 LLM 없이 실패해도 failed 결과로 끝나고, 그래프는 종합·보고서까지 간다."""
+        from agents.domain import DomainAgentDeps, make_node as domain_node
+
+        class NoLLM:
+            def with_structured_output(self, schema):
+                raise RuntimeError("오프라인: LLM 호출 없음")
+
+            def invoke(self, *args, **kwargs):
+                raise RuntimeError("오프라인: LLM 호출 없음")
+
+        class NoSearch:
+            def search(self, query):
+                raise RuntimeError("오프라인: 검색 없음")
+
+        fixture = load_fixture()
+        nodes, _ = build_nodes(set(), fixture)
+        nodes["domain"] = domain_node(DomainAgentDeps(llm=NoLLM(), search_provider=NoSearch()))
+        final, trace = run_graph(nodes, initial_state(fixture))
+        self.assertEqual(steps_view(trace), ["technical", "market + stakeholder + domain", "synthesis", "report"])
+        self.assertEqual([t for t in trace if t["error"]], [])
+        self.assertEqual(final["domain_findings"]["status"], "failed")
+        self.assertIn("domain", final["quality_by_perspective"])
+        self.assertIsNotNone(final["synthesis"])
+
+
 class ReplayNodeTest(unittest.TestCase):
     def test_replay_returns_only_cited_evidence(self):
         fixture = load_fixture()
