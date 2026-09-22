@@ -30,3 +30,6 @@ sentence-transformers>=5.1.1
 
 # 노트북
 notebook>=7.4.5
+
+# 보고서 PDF 출력 (agents/report/pdf.py)
+reportlab>=4.4.9,<5

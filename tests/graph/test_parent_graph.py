@@ -132,6 +132,23 @@ class RealNodeWiringTest(unittest.TestCase):
         self.assertIsNotNone(final["synthesis"])
 
 
+class PdfOutputTest(unittest.TestCase):
+    def test_report_node_writes_pdf(self):
+        try:
+            import reportlab  # noqa: F401
+        except ImportError:
+            self.skipTest("reportlab 미설치")
+        import tempfile
+        fixture = load_fixture()
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = Path(tmp) / "report.pdf"
+            nodes, _ = build_nodes(set(), fixture, pdf)
+            final, _ = run_graph(nodes, initial_state(fixture))
+            self.assertTrue(pdf.is_file() and pdf.stat().st_size > 0)
+            self.assertEqual(Path(final["run_meta"]["report"]["pdf_path"]).resolve(), pdf.resolve())
+            self.assertIn("final_markdown", final["report_sections"])
+
+
 class ReplayNodeTest(unittest.TestCase):
     def test_replay_returns_only_cited_evidence(self):
         fixture = load_fixture()

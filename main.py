@@ -10,7 +10,8 @@
   synthesis          : 기본 템플릿 서술 (LLM 없음), --live 면 OpenAIWriter
   report             : 기본 deterministic (LLM 없음), --live 면 LLM 작성
 
-결과: outputs/graph/<실행시각>/ 에 summary.md, report.md, final_state.json, trace.json, graph.mmd
+결과: outputs/graph/<실행시각>/ 에 report.pdf, report.md, summary.md, final_state.json, trace.json, graph.mmd
+      (PDF 는 reportlab 과 한글 폰트가 필요. --no-pdf 로 끌 수 있음)
 """
 
 from __future__ import annotations
@@ -39,8 +40,8 @@ def load_env(path: Path = Path(".env")) -> None:
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def build_nodes(live: set[str], fixture: dict) -> tuple[dict, dict]:
-    """노드 함수와 노드별 실행 방식 설명을 만든다."""
+def build_nodes(live: set[str], fixture: dict, pdf_path: Path | None = None) -> tuple[dict, dict]:
+    """노드 함수와 노드별 실행 방식 설명을 만든다. pdf_path 를 주면 보고서 노드가 PDF 도 저장한다."""
     nodes, modes = {}, {}
 
     nodes["technical"], modes["technical"] = replay_node("technical", fixture), "임시 (fixture 재생, 기술 조사 PR 전)"
@@ -100,10 +101,11 @@ def build_nodes(live: set[str], fixture: dict) -> tuple[dict, dict]:
     from agents.report import ReportAgentDeps, make_node as report_node
 
     if "report" in live:
-        deps = ReportAgentDeps()
+        deps = ReportAgentDeps(pdf_output_path=pdf_path)
         nodes["report"], modes["report"] = report_node(deps), f"실제 ({deps.model})"
     else:
-        nodes["report"], modes["report"] = report_node(ReportAgentDeps(generation_mode="deterministic")), "실제 노드, deterministic (LLM 없음)"
+        deps = ReportAgentDeps(generation_mode="deterministic", pdf_output_path=pdf_path)
+        nodes["report"], modes["report"] = report_node(deps), "실제 노드, deterministic (LLM 없음)"
 
     return nodes, modes
 
@@ -164,7 +166,8 @@ def render_summary(modes: dict, trace: list[dict], final: dict, fixture_note: st
               f"공유 근거 {counts.get('shared_evidence', 0)}, 보완 {counts.get('complements', 0)}, "
               f"요약 주장 {len(synthesis.get('summary_claims') or [])}개",
               f"- report_sections: {len(final.get('report_sections') or {})}개 섹션, references {len(final.get('references') or {})}건",
-              "", "보고서 본문은 같은 폴더의 `report.md`, 평가 종합 상세는 `final_state.json`의 `synthesis` 참고."]
+              f"- PDF: {((final.get('run_meta') or {}).get('report') or {}).get('pdf_path') or '만들지 않음'}",
+              "", "보고서는 같은 폴더의 `report.pdf`·`report.md`, 평가 종합 상세는 `final_state.json`의 `synthesis` 참고."]
     return "\n".join(lines) + "\n"
 
 
@@ -175,6 +178,7 @@ def main() -> int:
     parser.add_argument("--as-of", default=None, help="조사 기준일 YYYY-MM-DD (기본: fixture 의 기준일)")
     parser.add_argument("--rounds", type=int, default=1, help="실제 실행 노드의 최대 검색 라운드")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/graph"))
+    parser.add_argument("--no-pdf", action="store_true", help="보고서 PDF 를 만들지 않음 (reportlab 없이 실행할 때)")
     args = parser.parse_args()
 
     live = {x.strip() for x in args.live.split(",") if x.strip()}
@@ -196,15 +200,24 @@ def main() -> int:
         selected_tech=fixture["selected_tech"],
         corpus_manifest=fixture.get("corpus_manifest") or [],
     )
-    nodes, modes = build_nodes(live, fixture)
-    final, trace = run_graph(nodes, initial)
-
+    # 보고서 노드가 실행 중에 PDF 를 쓰므로 결과 폴더를 먼저 만든다.
     folder = args.output_dir / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     folder.mkdir(parents=True, exist_ok=True)
+    pdf_path = None if args.no_pdf else (folder / "report.pdf").resolve()
+    if pdf_path:
+        try:
+            import reportlab  # noqa: F401
+        except ImportError:
+            parser.error("PDF 생성에는 reportlab 이 필요합니다: pip install 'reportlab>=4.4.9,<5' (또는 --no-pdf)")
+
+    nodes, modes = build_nodes(live, fixture, pdf_path)
+    final, trace = run_graph(nodes, initial)
     replayed = [a for a in AGENTS if modes[a].startswith(("임시", "fixture"))]
     note = f"{', '.join(replayed)} 는 합성 fixture 결과이며 실제 조사가 아닙니다." if replayed else None
     (folder / "summary.md").write_text(render_summary(modes, trace, final, note), encoding="utf-8")
-    (folder / "report.md").write_text("\n\n".join((final.get("report_sections") or {}).values()) + "\n", encoding="utf-8")
+    sections = final.get("report_sections") or {}
+    # final_markdown 이 보고서 에이전트가 만든 완성본이다 (섹션을 다시 이어 붙이면 본문이 중복된다).
+    (folder / "report.md").write_text(sections.get("final_markdown") or "\n\n".join(sections.values()), encoding="utf-8")
     (folder / "final_state.json").write_text(json.dumps(final, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     (folder / "trace.json").write_text(json.dumps(trace, ensure_ascii=False, indent=2), encoding="utf-8")
     (folder / "graph.mmd").write_text(build_graph(**nodes).get_graph().draw_mermaid(), encoding="utf-8")
@@ -215,6 +228,8 @@ def main() -> int:
         print(f"  {a:<12} {status[a]:<13} {modes[a]}")
     if note:
         print(f"주의: {note}")
+    pdf = ((final.get("run_meta") or {}).get("report") or {}).get("pdf_path")
+    print(f"보고서 PDF: {pdf or '만들지 않음'}")
     print(f"결과 폴더: {folder.resolve()}")
     return 0 if all(not t["error"] for t in trace) else 1
 
