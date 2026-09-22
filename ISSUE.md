@@ -101,3 +101,9 @@
 - `outputs/ablation.json`, `outputs/run_manifest.json`이 `outputs/` 바로 아래에 있습니다.
 - 규칙 16번은 `outputs/<에이전트>/`입니다.
 - 코드에서 기본 경로를 쓰는 곳(`agents/domain/evaluation/ablation.py`, 노트북)을 함께 고쳐야 합니다.
+
+### ⬜ 5-2. ablation 실행 안내가 실제 옵션과 다름
+- `agents/domain/evaluation/ablation.py` 맨 위 설명에는 `--corpus data/corpus`라고 되어 있습니다.
+- 실제 옵션은 `--cache`(기본값 `data/fetch_cache`)이고, `--corpus` 옵션은 없습니다.
+- **할 일:** 도메인 담당자가 설명 문구를 실제 옵션에 맞게 고칩니다.
+
