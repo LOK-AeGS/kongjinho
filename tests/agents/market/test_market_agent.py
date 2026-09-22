@@ -343,8 +343,9 @@ def make_state():
 
 
 def stub_web_search(query):
-    return [{"title": f"기사: {query}", "url": f"https://news.example.com/{abs(hash(query))}",
-             "content": f"{query}에 대한 데이터센터 관련 근거 문장입니다.", "organization": "example news",
+    # 출처 등급 필터(rag/tier.py)를 통과해야 흐름 검증이 가능하므로 등급표에 있는 도메인을 쓴다.
+    return [{"title": f"기사: {query}", "url": f"https://www.reuters.com/{abs(hash(query))}",
+             "content": f"{query}에 대한 데이터센터 관련 근거 문장입니다.", "organization": "Reuters",
              "published_date": "2026-07", "source_type": "news"}]
 
 

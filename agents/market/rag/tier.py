@@ -63,6 +63,11 @@ def is_trusted(url: str) -> bool:
     return classify(url) != "other"
 
 
+def trusted_domains() -> list[str]:
+    """등급표의 모든 도메인. 검색 단계에서 후보를 좁히는 데 쓴다(Tavily include_domains)."""
+    return [domain for _, domains in _TIER_TABLE for domain in domains]
+
+
 def filter_trusted(results: list[dict]) -> tuple[list[dict], list[str]]:
     """신뢰 등급 결과만 남긴다. (통과한 결과, 걸러진 사유 로그)를 돌려준다."""
     kept: list[dict] = []

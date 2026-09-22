@@ -152,6 +152,15 @@ def search(s: MarketLocal, deps: MarketAgentDeps) -> dict:
         tid, aspect = q["slot_key"].split(":")
         try:
             results = list(deps.web_search(q["text"]))
+            # 출처 등급 필터는 관점과 무관하게 항상 적용한다. 예전에는 _collect_body 안에만
+            # 있어서 RAG_ASPECTS 에 없는 size 질의의 결과가 걸러지지 않고 근거가 됐다.
+            # 오프라인 배선 확인용 [STUB] 결과는 is_stub 로 따로 표시되므로 등급 판정에서 뺀다.
+            stubs = [r for r in results if r["title"].startswith("[STUB]")]
+            results, dropped = tier.filter_trusted(
+                [r for r in results if not r["title"].startswith("[STUB]")]
+            )
+            results += stubs
+            search_log += [{"message": m} for m in dropped]
             if aspect in RAG_ASPECTS:
                 if deps.retriever is not None:
                     results += list(deps.retriever(_rag_query(s["query_bank"][q["slot_key"]]), tid))

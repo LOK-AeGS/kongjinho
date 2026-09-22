@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agents.market.node import make_node  # noqa: E402
 from agents.market.rag.fetch import fetch_document  # noqa: E402
+from agents.market.rag import tier  # noqa: E402
 from agents.market.rag.tools import stub_web_search, tavily_web_search  # noqa: E402
 from agents.market.subgraph import MarketAgentDeps  # noqa: E402
 
@@ -104,7 +105,7 @@ def main() -> int:
         fetch_body = None if args.no_fetch_body else (lambda url: fetch_document(url, cache_dir=fetch_cache_dir))
         deps = MarketAgentDeps(
             llm=llm, strong_llm=strong_llm,
-            web_search=tavily_web_search,
+            web_search=lambda q: tavily_web_search(q, include_domains=tier.trusted_domains()),
             retriever=None, fetch_body=fetch_body, page_budget=args.page_budget,
         )
         print(f"조사 시작: {args.model}/{args.strong_model}, 검색 라운드 최대 {args.rounds}회. API 비용이 발생합니다.", flush=True)
