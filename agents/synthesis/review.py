@@ -15,6 +15,7 @@ from agents.synthesis.rules import (
     RANKING_WORDS,
     RULE_THRESHOLD_NUMBERS,
     condition_violations,
+    is_trl_record,
     number_present,
     numbers_in,
     trl_bounds,
@@ -35,7 +36,7 @@ def review_context(state: dict) -> dict:
             for eid in r.get("evidence_ids", []):
                 cited.add(eid)
                 records_by_evidence.setdefault(eid, []).append(r)
-            if r.get("assessment_vocab") == "trl_stage" and r.get("value"):
+            if is_trl_record(r) and r.get("value"):
                 trl.setdefault(r["technology"], set()).add(trl_bounds(r["value"]))
         for c in result.get("claims") or []:
             cited |= set(c.get("evidence_ids", []))

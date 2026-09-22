@@ -77,6 +77,14 @@ def condition_violations(text: str, technology: str | None) -> list[str]:
     return problems
 
 
+def is_trl_record(record: dict) -> bool:
+    """TRL 판정 record 인지. 설계서 §2.2.5 는 assessment_vocab="trl_stage" 이지만,
+    기술 조사 에이전트는 criterion="trl", assessment_vocab="estimated|unknown", value="TRL 5" 로 낸다. 둘 다 받는다."""
+    if record.get("assessment_vocab") == "trl_stage":
+        return True
+    return record.get("perspective") == "technical" and str(record.get("criterion", "")).strip().lower() in ("trl", "성숙도(trl)")
+
+
 def trl_bounds(value: str | None) -> tuple[int, int] | None:
     """TRL 값 "4", "4-5", "4–5" 를 (하한, 상한)으로. 해석할 수 없으면 None."""
     if not value:

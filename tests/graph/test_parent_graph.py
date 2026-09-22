@@ -10,17 +10,13 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from graph.state import create_initial_state  # noqa: E402
 from graph.stubs import cited_evidence, load_fixture, replay_node  # noqa: E402
-from main import build_nodes, node_status, run_graph, steps_view  # noqa: E402
+from main import build_nodes, initial_state as main_initial_state, node_status, run_graph, steps_view  # noqa: E402
 
 
-def initial_state(fixture):
-    return create_initial_state(
-        request={"as_of": fixture["request"]["as_of"], "language": "ko", "scope": "datacenter_inference", "max_search_rounds": 1},
-        selected_tech=fixture["selected_tech"],
-        corpus_manifest=[],
-    )
+def initial_state(fixture=None):
+    """main.py 와 같은 초기값: 팀 고정 입력 + Pool A manifest."""
+    return main_initial_state(rounds=1)
 
 
 class OfflineGraphTest(unittest.TestCase):
@@ -39,6 +35,17 @@ class OfflineGraphTest(unittest.TestCase):
 
     def test_no_node_errors(self):
         self.assertEqual([t for t in self.trace if t["error"]], [])
+
+    def test_on_step_receives_each_node_output(self):
+        """디버깅용 콜백이 노드마다 한 번씩, 그 노드의 반환값과 함께 호출된다."""
+        seen = []
+        nodes, _ = build_nodes(set(), self.fixture)
+        run_graph(nodes, initial_state(), lambda record, update: seen.append((record["node"], sorted(update))))
+        self.assertEqual(sorted(n for n, _ in seen), sorted(["technical", "market", "stakeholder", "domain", "synthesis", "report"]))
+        self.assertIn("synthesis", dict(seen)["synthesis"])
+
+    def test_trace_records_seconds(self):
+        self.assertTrue(all(t["seconds"] is not None and t["seconds"] >= 0 for t in self.trace))
 
     def test_each_node_writes_only_its_keys(self):
         owned = {
@@ -147,6 +154,31 @@ class PdfOutputTest(unittest.TestCase):
             self.assertTrue(pdf.is_file() and pdf.stat().st_size > 0)
             self.assertEqual(Path(final["run_meta"]["report"]["pdf_path"]).resolve(), pdf.resolve())
             self.assertIn("final_markdown", final["report_sections"])
+
+
+class TechnicalNodeTest(unittest.TestCase):
+    def test_initial_state_uses_team_fixed_input(self):
+        from agents.technical.config import DEFAULT_SELECTED_TECH
+        state = initial_state()
+        self.assertEqual(state["selected_tech"], DEFAULT_SELECTED_TECH)
+        self.assertGreater(len(state["corpus_manifest"]), 0)  # Pool A 고정 코퍼스
+
+    def test_real_technical_node_runs_inside_graph(self):
+        """실제 기술 조사 노드를 가짜 retriever·Tavily·analyzer 로 꽂아도 1단계에서 끝까지 돈다."""
+        import importlib
+        fakes = importlib.import_module("tests.agents.technical.test_technical_agent")
+        from agents.technical import make_node as technical_node
+
+        deps, _ = fakes._deps()
+        fixture = load_fixture()
+        nodes, _ = build_nodes(set(), fixture)
+        nodes["technical"] = technical_node(deps)
+        final, trace = run_graph(nodes, initial_state())
+        self.assertEqual(steps_view(trace), ["technical", "market + stakeholder + domain", "synthesis", "report"])
+        self.assertEqual([t for t in trace if t["error"]], [])
+        self.assertNotEqual(final["technical_findings"]["status"], "failed", final["technical_findings"]["limitations"])
+        self.assertTrue(any(r["criterion"] == "trl" for r in final["technical_findings"]["records"]))
+        self.assertIsNotNone(final["synthesis"])
 
 
 class ReplayNodeTest(unittest.TestCase):

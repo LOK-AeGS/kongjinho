@@ -38,6 +38,7 @@ notebooks/  outputs/  data/
 ```bash
 python main.py                          # 부모 그래프 전체를 오프라인으로 실행 (API 키 불필요)
 python main.py --live synthesis         # 평가 종합만 실제 LLM
+python main.py --live all --debug       # 여섯 노드 전부 실제 실행 + 단계별 중간 결과 출력 (비용 발생)
 ```
 
 ## 아직 정하지 않은 것
@@ -181,5 +182,4 @@ python -m agents.domain.tools.ablation --embedding ""            # BM25만 (빠�
 
 ### 3. 아직 할 수 없는 것
 
-- **전체 그래프를 모두 실제 노드로 실행**: 기술 조사(①) 에이전트가 PR 전이라 `main.py`에서 그 자리는
-  합성 fixture 재생 노드로 채웁니다. ([docs/PARENT_GRAPH.md](docs/PARENT_GRAPH.md))
+- 여섯 에이전트가 모두 연결됐습니다. `python main.py --live all`로 전부 실제 실행할 수 있습니다. ([docs/PARENT_GRAPH.md](docs/PARENT_GRAPH.md))

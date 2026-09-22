@@ -72,6 +72,14 @@ claims / gaps)로, 근거를 `graph.state.Evidence`(`id`/`page_or_locator`/
 - **할 일:** 팀이 정의를 확정해 `graph/state.py`의 `Evidence.content_hash`에 주석으로 적고, 다른 에이전트가 맞춥니다.
   평가 종합의 SX6 은 `content_hash`가 아니라 근거 `id` 기준으로 바꿉니다 (6-2).
 
+### ⬜ 1-4. 기술 조사의 TRL record 형식이 설계서 어휘와 다름
+- 설계서 §2.2.5: TRL 칸은 `assessment_vocab="trl_stage"`, `value`는 `"1"`~`"9"` 또는 `"4–5"`.
+- 기술 조사 에이전트(PR #9): `criterion="trl"`, `assessment_vocab="estimated|unknown"`(허용 값 목록), `value="TRL 5"`.
+  다른 기준도 `assessment_vocab`에 어휘 이름 대신 허용 값 목록(`"supported|conditional|unsupported|unknown"`)을 넣습니다.
+- 영향: 평가 종합은 `assessment_vocab`으로 TRL 칸을 찾고 일치·보완을 가릅니다. 어휘 이름이 아니라 값 목록이면 비교 의미가 달라집니다.
+- 조치(평가 종합 쪽): `agents/synthesis/rules.py`의 `is_trl_record()`가 두 형식을 모두 TRL 칸으로 인식하도록 맞췄습니다. 보고서는 기준 이름에 "trl"이 있는지로 찾아서 영향 없습니다.
+- **할 일:** 팀이 어휘 표기(`trl_stage` vs 값 목록)를 하나로 정합니다.
+
 ---
 
 ## 2. 설계서에서 함께 정할 것
@@ -160,8 +168,8 @@ claims / gaps)로, 근거를 `graph.state.Evidence`(`id`/`page_or_locator`/
 ### ⬜ 4-2. 전체 그래프를 모든 실제 노드로 돌려보지 않음
 - ✅ 2026-09-22 루트 `main.py`로 부모 그래프를 연결했습니다 (`docs/PARENT_GRAPH.md`).
   오프라인 실행에서 `technical → market + stakeholder + domain(병렬) → synthesis → report` 순서를 확인했습니다.
-- ⬜ 기술 조사(①) 에이전트가 아직 없어 `graph/stubs.py`의 fixture 재생 노드로 채웁니다.
-- **할 일:** 기술 조사 PR 이 들어오면 `main.py`에 연결하고, `--live` 전체 실행으로 end-to-end 를 확인합니다.
+- ✅ 기술 조사(PR #9)까지 여섯 에이전트를 모두 연결했습니다. `python main.py --live all`
+- ⬜ 여섯 노드 전부 실제 실행(`--live all`)으로 end-to-end 결과를 확인해야 합니다.
 
 ---
 

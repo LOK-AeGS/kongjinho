@@ -172,6 +172,14 @@ class RelationsTest(unittest.TestCase):
         hw_sx1 = [f for f in run(state)["cross_findings"] if f["rule_id"] == "SX1" and f["technology"] == "hw"]
         self.assertEqual(hw_sx1, [])
 
+    def test_sx1_accepts_technical_agent_trl_format(self):
+        """기술 조사 에이전트 형식(criterion=trl, vocab=estimated|unknown, value="TRL 4")도 TRL record 로 본다."""
+        state = load()
+        rec = state["technical_findings"]["records"][1]
+        rec.update(criterion="trl", assessment_vocab="estimated|unknown", assessment="estimated", value="TRL 4")
+        hw_sx1 = [f for f in run(state)["cross_findings"] if f["rule_id"] == "SX1" and f["technology"] == "hw"]
+        self.assertTrue(hw_sx1)
+
     def test_unknown_basis_does_not_trigger_sx2(self):
         refs = [r for f in run(load())["cross_findings"] if f["rule_id"] == "SX2" for r in f["record_refs"]]
         self.assertNotIn("domain/hw/전력·발열", refs)
