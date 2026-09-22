@@ -1,0 +1,79 @@
+{
+  "chunk_count": 213,
+  "avg_chunk_chars": 1017.0,
+  "golden_set_size": 16,
+  "embedding": {
+    "model_name": "BAAI/bge-m3",
+    "device": "mps:0",
+    "normalize_embeddings": true,
+    "batch_size": 16,
+    "dimension": 1024,
+    "torch_version": "2.14.0",
+    "platform": "Darwin arm64"
+  },
+  "results": [
+    {
+      "method": "bm25",
+      "hit_at_1": 0.562,
+      "hit_at_3": 0.625,
+      "hit_at_5": 0.688,
+      "mrr": 0.606,
+      "mean_latency_ms": 0.2,
+      "p95_latency_ms": 0.3,
+      "peak_memory_mb": 0.0,
+      "queries": 16
+    },
+    {
+      "method": "dense:BAAI/bge-m3",
+      "hit_at_1": 0.875,
+      "hit_at_3": 0.875,
+      "hit_at_5": 0.875,
+      "mrr": 0.875,
+      "mean_latency_ms": 35.3,
+      "p95_latency_ms": 42.3,
+      "peak_memory_mb": 0.1,
+      "queries": 16
+    },
+    {
+      "method": "hybrid:bm25+dense",
+      "hit_at_1": 0.812,
+      "hit_at_3": 0.875,
+      "hit_at_5": 0.875,
+      "mrr": 0.833,
+      "mean_latency_ms": 33.7,
+      "p95_latency_ms": 37.5,
+      "peak_memory_mb": 0.1,
+      "queries": 16
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "parsed_chunks",
+      "path": "outputs/index_artifacts/parsed_chunks.jsonl",
+      "sha256": "1e0c5e299bba66c456dc6a2db1dacca73af0092f9199198d0f8d0bcf41fc4147",
+      "bytes": 254733,
+      "note": "213 chunks, id mapping 포함"
+    },
+    {
+      "name": "bm25_index",
+      "path": "outputs/index_artifacts/bm25.pkl",
+      "sha256": "60d0eb2604a608829e53307f8a24911f7e486cc7655538c560ccc12cb9c679e3",
+      "bytes": 378134,
+      "note": "rank_bm25 BM25Okapi pickle"
+    },
+    {
+      "name": "faiss_index",
+      "path": "outputs/index_artifacts/faiss",
+      "sha256": "93dd8f9820c14bd98fdc594bc15f8ac4cd76a15007873e1428cf2d5f0b92bc5e",
+      "bytes": 1121222,
+      "note": "model=BAAI/bge-m3, dim=1024"
+    },
+    {
+      "name": "fetch_cache",
+      "path": "data/fetch_cache",
+      "sha256": "ed6417077daaa82be0eb2ed2d7081c323bfa66aaa9082ffda516205eb000be10",
+      "bytes": 8000893,
+      "note": "12 files"
+    }
+  ]
+}
