@@ -29,6 +29,11 @@ def _evidence_owners(evidence_id: str, findings: dict[str, dict | None]) -> set[
     return owners
 
 
+# 기술 조사는 고정 입력·고정 코퍼스(Pool A)라 다시 돌려도 같은 근거가 나온다. 그 근거를 잘못 옮긴 보고서 문장은
+# 관점 재작업이 아니라 보고서 재작성 피드백으로 고친다(live: technical을 재작업시켜도 같은 문장이 v2에 그대로 남았다).
+FIXED_INPUT_PERSPECTIVES = frozenset({"technical"})
+
+
 def _entailment_rework_targets(llm_criteria: dict, findings: dict[str, dict | None]) -> list[str]:
     targets = []
     unsupported = (llm_criteria.get("groundedness") or {}).get("unsupported_items") or []
@@ -37,7 +42,11 @@ def _entailment_rework_targets(llm_criteria: dict, findings: dict[str, dict | No
         owners = [_evidence_owners(evidence_id, findings) for evidence_id in evidence_ids]
         if evidence_ids and all(len(value) == 1 for value in owners):
             perspective = next(iter(owners[0]))
-            if all(next(iter(value)) == perspective for value in owners) and perspective not in targets:
+            if (
+                all(next(iter(value)) == perspective for value in owners)
+                and perspective not in targets
+                and perspective not in FIXED_INPUT_PERSPECTIVES
+            ):
                 targets.append(perspective)
     return targets
 

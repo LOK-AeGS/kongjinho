@@ -709,3 +709,14 @@ def test_better_rework_result_replaces_previous_findings():
     update = worker(state)
     assert update["market_findings"] is better
     assert "note" not in update["node_status"]["market"]
+
+
+def test_unsupported_sentence_on_fixed_technical_evidence_goes_to_report_rewrite():
+    # 기술 조사는 고정 입력이라 재작업해도 같은 근거가 나온다. 그 근거를 잘못 옮긴 문장은 보고서 재작성으로 고친다.
+    from agents.quality.node import _entailment_rework_targets
+
+    llm = {"groundedness": {"unsupported_items": [
+        {"sentence": "- ITME 35.7% 조건 누락 상충. 〔근거: technical:ev:x〕", "evidence_ids": ["technical:ev:x"]},
+        {"sentence": "- ITME 처리량은 63% 증가했다. 〔근거: domain:ev:y〕", "evidence_ids": ["domain:ev:y"]},
+    ]}}
+    assert _entailment_rework_targets(llm, {}) == ["domain"]
