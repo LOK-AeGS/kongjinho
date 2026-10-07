@@ -19,6 +19,15 @@ from graph.supervisor import (
 from graph.workers import as_worker
 from main import build_nodes, initial_state, run_graph
 
+# 기본 기준(근거 3건, coverage 0.5)을 통과하는 관점 결과. complete라도 supervisor가 근거를 직접 센다.
+GROUNDED_STORE = {f"ok:e{i}": {} for i in range(3)}
+GROUNDED = {
+    "status": "complete",
+    "records": [{"basis": "direct", "evidence_ids": [evidence_id]} for evidence_id in GROUNDED_STORE],
+    "claims": [],
+    "gaps": [],
+}
+
 
 def test_assess_sufficiency_complete_partial_and_failed():
     policy = SupervisorPolicy(min_evidence={name: 2 for name in ("technical", "market", "stakeholder", "domain")})
@@ -30,7 +39,8 @@ def test_assess_sufficiency_complete_partial_and_failed():
     ], "claims": [], "gaps": []}
     lacking = {"status": "partial", "records": [{"basis": "unknown", "evidence_ids": ["e1"]}], "claims": [], "gaps": []}
     failed = {"status": "failed", "records": [], "claims": [], "gaps": []}
-    assert assess_sufficiency("market", complete, store, policy)[0] == "sufficient"
+    assert assess_sufficiency("market", complete, store, policy)[0] == "insufficient"
+    assert assess_sufficiency("market", {**enough, "status": "complete"}, store, policy)[0] == "sufficient"
     assert assess_sufficiency("market", enough, store, policy)[0] == "sufficient"
     assert assess_sufficiency("market", lacking, store, policy)[0] == "insufficient"
     assert assess_sufficiency("market", failed, store, policy)[0] == "insufficient"
@@ -102,16 +112,14 @@ def test_supervisor_accepts_valid_proposal_with_llm_source():
 def test_supervisor_state_summary_distinguishes_execution_and_sufficiency_states():
     state = initial_state()
     state.update({
-        "technical_findings": {
-            "status": "complete", "records": [], "claims": [], "gaps": [],
-        },
+        "technical_findings": GROUNDED,
         "market_findings": {
             "status": "partial",
             "records": [{"basis": "unknown", "evidence_ids": ["market:e1"]}],
             "claims": [],
             "gaps": [],
         },
-        "evidence_store": {"market:e1": {}},
+        "evidence_store": {"market:e1": {}, **GROUNDED_STORE},
         "node_status": {
             "technical": {
                 "status": "done", "attempts": 1, "completed_step": 1,
@@ -130,7 +138,7 @@ def test_supervisor_state_summary_distinguishes_execution_and_sufficiency_states
     summary = state_summary(state)
     perspectives = summary["perspectives"]
     assert perspectives["technical"]["state"] == "sufficient"
-    assert perspectives["technical"]["sufficiency_reason"] == "status=complete"
+    assert perspectives["technical"]["sufficiency_reason"] == "complete, 근거 3건, coverage 1.00"
     assert perspectives["market"]["state"] == "insufficient"
     assert "근거 1건(<3)" in perspectives["market"]["sufficiency_reason"]
     assert perspectives["stakeholder"] == {
@@ -147,8 +155,8 @@ def test_supervisor_state_summary_distinguishes_execution_and_sufficiency_states
     assert all(item["meaning"] for item in summary["allowed"])
 
 
-def test_allowed_set_exposes_rework_subsets_and_accept_choice():
-    sufficient = {"status": "complete", "records": [], "claims": [], "gaps": []}
+def test_allowed_set_exposes_rework_subsets_without_accept_while_budget_left():
+    sufficient = GROUNDED
     insufficient = {
         "status": "partial",
         "records": [{"basis": "unknown", "evidence_ids": []}],
@@ -161,6 +169,7 @@ def test_allowed_set_exposes_rework_subsets_and_accept_choice():
         "market_findings": insufficient,
         "stakeholder_findings": sufficient,
         "domain_findings": insufficient,
+        "evidence_store": GROUNDED_STORE,
         "node_status": {
             name: {"attempts": 1, "completed_step": 1, "sufficiency": None}
             for name in ("technical", "market", "stakeholder", "domain")
@@ -171,14 +180,15 @@ def test_allowed_set_exposes_rework_subsets_and_accept_choice():
     assert ("rework", ("market",)) in choices
     assert ("rework", ("domain",)) in choices
     assert ("rework", ("market", "domain")) in choices
-    assert ("accept_insufficient", ("market", "domain")) in choices
+    assert {action for action, _ in choices} == {"rework"}
 
 
-def test_quality_failure_allowed_set_has_upstream_report_and_finish_choices():
-    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+def test_quality_failure_before_report_cap_must_loop():
+    complete = GROUNDED
     state = initial_state()
     state.update({
         **{f"{name}_findings": complete for name in ("technical", "market", "stakeholder", "domain")},
+        "evidence_store": GROUNDED_STORE,
         "node_status": {
             **{
                 name: {"attempts": 1, "completed_step": 1, "sufficiency": "sufficient"}
@@ -201,8 +211,14 @@ def test_quality_failure_allowed_set_has_upstream_report_and_finish_choices():
     assert choices == {
         ("quality_rework", ("domain",)),
         ("rewrite_report", ("report",)),
-        ("finish", ()),
     }
+
+    def try_finish(_summary, _allowed):
+        return {"action": "finish", "targets": [], "reason": "품질 미달이지만 종료한다."}
+
+    update = decide(state, proposer=try_finish)
+    assert update["next"] == ["domain"]
+    assert update["last_decision"]["source"] == "fallback"
 
 
 def test_adversarial_rework_proposer_still_terminates_within_max_steps():
@@ -253,7 +269,7 @@ def test_failed_quality_rewrites_report_until_version_limit():
 
 
 def test_quality_failure_at_report_cap_does_not_dispatch_perspective_rework():
-    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    complete = GROUNDED
     status = {
         name: {"status": "done", "attempts": 1, "completed_step": 1}
         for name in ("technical", "market", "stakeholder", "domain")
@@ -271,7 +287,7 @@ def test_quality_failure_at_report_cap_does_not_dispatch_perspective_rework():
         "market_findings": complete,
         "stakeholder_findings": complete,
         "domain_findings": complete,
-        "evidence_store": {},
+        "evidence_store": GROUNDED_STORE,
         "synthesis": {"status": "complete"},
         "report_version": 2,
         "eval_result": {
@@ -521,13 +537,18 @@ def test_quality_node_unsupported_entailment_fails_groundedness_with_sentence():
         "eval_result": result,
         "rework": {},
     }
-    update = decide(supervisor_state)
+    # 이 테스트는 품질 판정 → 관점 재작업 라우팅만 본다. 관점당 근거 1건 픽스처가 충분성 단계에서 막히지 않게 기준을 낮춘다.
+    relaxed = SupervisorPolicy(
+        min_evidence={name: 1 for name in ("technical", "market", "stakeholder", "domain")},
+        min_coverage=0.0,
+    )
+    update = decide(supervisor_state, relaxed)
     assert update["next"] == ["domain"]
     assert "품질 평가 지적으로 관점 재작업" in update["last_decision"]["reason"]
 
 
 def test_stale_report_dispatch_clears_old_rework_directive():
-    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    complete = GROUNDED
     status = {
         name: {"status": "done", "attempts": 1, "completed_step": 1}
         for name in ("technical", "market", "stakeholder", "domain")
@@ -544,7 +565,7 @@ def test_stale_report_dispatch_clears_old_rework_directive():
         "market_findings": complete,
         "stakeholder_findings": complete,
         "domain_findings": complete,
-        "evidence_store": {},
+        "evidence_store": GROUNDED_STORE,
         "synthesis": {"status": "complete"},
         "report_version": 1,
         "eval_result": {"passed": False, "evaluated_report_version": 1},
@@ -564,7 +585,7 @@ def test_stale_report_dispatch_clears_old_rework_directive():
 
 
 def test_perspective_rework_preserves_report_feedback_until_stale_report_runs():
-    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    complete = GROUNDED
     status = {
         name: {"status": "done", "attempts": 1, "completed_step": 1}
         for name in ("market", "stakeholder", "domain")
@@ -583,7 +604,7 @@ def test_perspective_rework_preserves_report_feedback_until_stale_report_runs():
         "market_findings": complete,
         "stakeholder_findings": complete,
         "domain_findings": complete,
-        "evidence_store": {},
+        "evidence_store": GROUNDED_STORE,
         "synthesis": {"status": "complete"},
         "report_version": 1,
         "eval_result": {
@@ -619,7 +640,7 @@ def test_perspective_rework_preserves_report_feedback_until_stale_report_runs():
 
 
 def test_consumed_directive_is_removed_on_next_dispatch():
-    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    complete = GROUNDED
     status = {
         name: {"status": "done", "attempts": 1, "completed_step": 1}
         for name in ("technical", "market", "stakeholder", "domain")
@@ -636,7 +657,7 @@ def test_consumed_directive_is_removed_on_next_dispatch():
         "market_findings": complete,
         "stakeholder_findings": complete,
         "domain_findings": complete,
-        "evidence_store": {},
+        "evidence_store": GROUNDED_STORE,
         "synthesis": {"status": "complete"},
         "report_version": 1,
         "rework": {"report": {
