@@ -62,6 +62,26 @@ def test_domain_claim_with_number_missing_from_cited_quote_is_dropped_to_gap():
     assert limitations
 
 
+def test_domain_record_findings_number_missing_from_quote_is_cleared():
+    # live 3차: value는 비어 있고 findings에 5.76배가 남아 "5.76배 … 수치가 확인되지 않아 제외"로 렌더됐다.
+    records = [
+        {"technology_id": "sw", "criterion": "처리량", "claim_ids": [], "evidence_ids": ["domain:ev:a"],
+         "value": None, "findings": "DeepSeek-V2는 8x H800 단일 노드에서 최대 5.76배의 처리량 증가를 보였다.",
+         "limitations": []},
+        {"technology_id": "sw", "criterion": "HBM", "claim_ids": [], "evidence_ids": ["domain:ev:b"],
+         "value": None, "findings": "MLA는 KV cache를 93.3% 줄인다.", "limitations": []},
+    ]
+    store = {
+        "domain:ev:a": {"quote": "MLA significantly reduces the KV cache during inference."},
+        "domain:ev:b": {"quote": "DeepSeek-V2 reduces the KV cache by 93.3% compared with DeepSeek 67B."},
+    }
+    _, cleaned, gaps, _, _ = _bind_numeric_claims([], records, store)
+    assert cleaned[0]["findings"] == ""
+    assert "수치가 인용 근거 원문에서 확인되지 않아 제외" in cleaned[0]["limitations"]
+    assert any("5.76" in gap["missing_evidence"] for gap in gaps)
+    assert cleaned[1]["findings"] == "MLA는 KV cache를 93.3% 줄인다."
+
+
 def _one_technology_section(gaps):
     # 보고서 전체로는 SW·HW가 균형을 이루고(5.1), 4.3만 SW를 다루는 live 1차 상황을 재현한다.
     store = {
@@ -164,3 +184,12 @@ def test_table_cell_drops_metric_whose_condition_is_not_in_evidence():
     }
     assert _safe_cell("suitable (93.3%)", ["e1"], context) == "suitable"
     assert _safe_cell("supported", ["e1"], context) == "supported"
+
+
+def test_number_match_does_not_glue_axis_ticks():
+    # live: 그림 축 눈금 '1.8 1.6 1.4'를 1.81로 읽어 1.81이 없는 조각을 인용한 주장이 통과했다.
+    from graph.metrics import unsupported_values
+
+    assert unsupported_values({"1.81"}, "1.8 1.6 1.4 1.2 Speedup over Recompute TTFT") == {"1.81"}
+    assert unsupported_values({"5.76"}, "boosts the maximum generation throughput to 5 . 76 times") == set()
+    assert unsupported_values({"35.7"}, "up to a 35.7\\% throughput improvement") == set()

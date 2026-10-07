@@ -1,5 +1,7 @@
 # Multi-Agent Orchestration 과제 — 남은 작업 정리
 
+> 착수 시점의 작업 목록이다. 아래 "현재 상태" 표는 그 시점(고정 DAG) 기준이다.
+
 - 작성일: 2026-10-07
 - 근거: 10/06·10/07 수업 전사, 과제 가이드(Agent Pattern / Mandatory Items / State Schema / 품질 평가 / Deliverables), 현재 코드(`kongjinho/`)
 - **마감: 오늘(10/7) 퇴근 전** (늦어도 다음 주 수요일 평가 전. 강사는 "웬만하면 오늘"을 권장)

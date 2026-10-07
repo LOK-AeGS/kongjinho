@@ -97,6 +97,7 @@ ANALYSIS_SYSTEM = """당신은 데이터센터 도메인 평가자입니다.
   판단할 수 없으면 basis=unknown, 그 기술에 해당하지 않는 축이면 not_applicable로 둡니다.
 - 커뮤니티 게시물·매체 보도만 근거인 주장은 basis=direct로 올리지 않고 inferred로 낮춥니다.
 - text(주장)는 한 문장, {max_chars}자 이내로 씁니다. 여러 논점을 한 문장에 섞지 마세요.
+- text·conditions·limitations·findings 는 한국어로 씁니다. 수치·단위·제품명·논문 고유명사는 원문 표기 그대로 둡니다.
 - evidence_ids 에는 아래 근거 목록의 대괄호 라벨(E1, E2, ...)을 그대로 적습니다.
   근거 없이 주장을 세우지 말고, 인용할 근거가 없으면 basis 를 unknown 으로 두세요.
 - 주장마다 claim_key를 직접 붙이고(예: sw-memory-1, hw-latency-2),

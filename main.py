@@ -480,7 +480,9 @@ def main() -> int:
     pdf = ((final.get("run_meta") or {}).get("report") or {}).get("pdf_path")
     print(f"보고서 PDF: {pdf or '만들지 않음'}")
     print(f"결과 폴더: {folder.resolve()}")
-    return 0 if all(not t["error"] for t in trace) else 1
+    # 품질 평가 미달(needs_review)로 끝난 실행도 실패로 돌려준다. 예전에는 trace 오류만 봐서 미달 보고서도 0이었다.
+    passed = bool((final.get("eval_result") or {}).get("passed"))
+    return 0 if passed and all(not t["error"] for t in trace) else 1
 
 
 if __name__ == "__main__":

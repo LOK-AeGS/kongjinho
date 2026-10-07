@@ -15,6 +15,8 @@ from graph.decision_log import DecisionLogger
 PERSPECTIVES = ("technical", "market", "stakeholder", "domain")
 MAX_REWORK_PER_AGENT = 1
 MAX_REPORT_VERSIONS = 2
+# 종합·보고서·품질 평가가 예외로 실패했을 때 같은 노드를 부르는 최대 횟수(첫 시도 포함).
+MAX_FAILED_ATTEMPTS = 2
 DEFAULT_SUPERVISOR_MODEL = "gpt-4.1"
 
 
@@ -34,6 +36,7 @@ class SupervisorPolicy:
     })
     min_coverage: float = 0.5
     rework_search_rounds: int = 2
+    max_failed_attempts: int = MAX_FAILED_ATTEMPTS
 
 
 def assess_sufficiency(
@@ -54,8 +57,7 @@ def assess_sufficiency(
     focus = focus[:5]
     if status == "failed":
         return "insufficient", "status=failed", focus
-    if status == "complete":
-        return "sufficient", "status=complete", focus
+    # complete도 에이전트 자기 보고를 믿지 않고 같은 기준으로 근거를 다시 센다(충분성 판정은 supervisor 책임).
 
     records = findings.get("records") or []
     cited = {
@@ -72,7 +74,7 @@ def assess_sufficiency(
         f"근거 {len(cited)}건" + (f"(<{required})" if len(cited) < required else ""),
         f"coverage {coverage:.2f}" + (f"(<{policy.min_coverage:g})" if coverage < policy.min_coverage else ""),
     ]
-    return ("sufficient" if enough else "insufficient"), f"partial, {', '.join(comparisons)}", focus
+    return ("sufficient" if enough else "insufficient"), f"{status}, {', '.join(comparisons)}", focus
 
 
 def _attempts(state: dict, name: str) -> int:
@@ -137,10 +139,10 @@ def _build_plan(state: dict, policy: SupervisorPolicy) -> dict:
         ((state.get("node_status") or {}).get("technical") or {}).get("sufficiency")
         == "accepted_insufficient"
     )
+    # 근거 부족 판정 + 재작업 예산이 남았으면 재작업만 허용한다(가이드 B). 부족 수용은 예산 소진 뒤에만.
     if technical["verdict"] == "insufficient" and technical["budget_left"] and not technical_accepted:
         retry = _choice("rework", ["technical"], f"technical 근거 부족으로 재작업: {technical['reason']}")
-        accept = _choice("accept_insufficient", ["technical"], f"technical 부족 상태를 수용: {technical['reason']}")
-        return {"allowed": [retry, accept], "default": retry, "assessments": assessments, "accepted": accepted}
+        return {"allowed": [retry], "default": retry, "assessments": assessments, "accepted": accepted}
     if technical["verdict"] == "insufficient":
         accepted.append(f"technical({technical['reason']})")
 
@@ -163,17 +165,22 @@ def _build_plan(state: dict, policy: SupervisorPolicy) -> dict:
         else:
             accepted.append(f"{name}({result['reason']})")
     if candidates:
+        # 어떤 부분집합을 먼저 재작업할지는 고를 수 있지만, 예산이 남은 부족 관점은 결국 모두 재작업된다.
         allowed = [
             _choice("rework", subset, "근거 부족 관점 재작업: " + ", ".join(subset))
             for subset in _subsets(candidates)
         ]
-        allowed.append(_choice(
-            "accept_insufficient",
-            candidates,
-            "재작업 대신 부족 상태를 수용: " + ", ".join(candidates),
-        ))
         default = next(item for item in allowed if item["action"] == "rework" and item["targets"] == candidates)
         return {"allowed": allowed, "default": default, "assessments": assessments, "accepted": accepted}
+
+    # 하위 단계가 예외로 실패를 반복하면 max_steps까지 같은 노드를 다시 부르지 않고 종료한다
+    # (live: OpenAI 403으로 quality_eval이 14번 재호출됐다). 상태·마지막 오류는 node_status에 남는다.
+    for name in ("synthesis", "report", "quality_eval"):
+        status = (state.get("node_status") or {}).get(name) or {}
+        if status.get("status") == "failed" and _attempts(state, name) >= policy.max_failed_attempts:
+            reason = f"{name} 실패 {_attempts(state, name)}회로 종료: {str(status.get('last_error') or '')[:120]}"
+            default = _choice("finish", [], reason)
+            return {"allowed": [default], "default": default, "assessments": assessments, "accepted": accepted}
 
     suffix = f"; 재작업 상한으로 부족 상태 수용: {', '.join(accepted)}" if accepted else ""
     synthesis_missing = not state.get("synthesis") or _attempts(state, "synthesis") == 0
@@ -212,9 +219,9 @@ def _build_plan(state: dict, policy: SupervisorPolicy) -> dict:
         for subset in _subsets(targets)
     ]
     rewrite = _choice("rewrite_report", ["report"], "품질 평가 지적을 반영해 report 재작성")
-    finish = _choice("finish", [], "품질 미달 상태로 종료(needs_review)")
-    allowed.extend([rewrite, finish])
-    default = allowed[len(allowed) - 2] if not targets else next(
+    # 버전 상한 전의 품질 미달은 반드시 루프를 돈다(가이드 D). 종료는 위의 상한 분기에서만 허용한다.
+    allowed.append(rewrite)
+    default = rewrite if not targets else next(
         item for item in allowed if item["action"] == "quality_rework" and item["targets"] == targets
     )
     return {"allowed": allowed, "default": default, "assessments": assessments, "accepted": accepted}
@@ -263,7 +270,6 @@ def _allowed_meaning(decision: dict) -> str:
     meanings = {
         "dispatch": "아직 실행하지 않은 관점의 최초 조사를 시작한다.",
         "rework": "이미 실행했지만 근거가 부족한 관점을 예산 안에서 재조사한다.",
-        "accept_insufficient": "근거 부족을 명시적으로 수용하고 다음 단계로 진행한다.",
         "synthesis": "판정이 끝난 네 관점을 종합하거나 최신 관점 결과로 종합을 갱신한다.",
         "report": "종합 결과를 바탕으로 최초 보고서 또는 stale 보고서를 작성한다.",
         "quality_eval": "현재 report_version을 품질 평가한다.",
@@ -365,7 +371,7 @@ def make_llm_proposer(model: str | None = None):
     class LLMDecision(BaseModel):
         model_config = ConfigDict(extra="forbid")
         action: Literal[
-            "dispatch", "rework", "accept_insufficient", "synthesis", "report",
+            "dispatch", "rework", "synthesis", "report",
             "quality_eval", "quality_rework", "rewrite_report", "finish",
         ]
         targets: list[str]
@@ -445,11 +451,6 @@ def decide(
             for name in targets:
                 assessment = plan["assessments"][name]
                 rework[name] = _directive(assessment["reason"], assessment["focus"], state, name, policy)
-    elif action == "accept_insufficient":
-        for name in targets:
-            status_updates.setdefault(name, dict(statuses.get(name) or {}))["sufficiency"] = "accepted_insufficient"
-        pending = [name for name in PERSPECTIVES[1:] if _attempts(state, name) == 0]
-        next_nodes = pending or ["synthesis"]
     elif action in {"synthesis", "report", "quality_eval"}:
         next_nodes = [action]
     elif action == "rewrite_report":

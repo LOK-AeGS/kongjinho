@@ -217,14 +217,20 @@ def _bind_numeric_claims(claims: list[dict], records: list[dict], evidence_store
         record["claim_ids"] = [
             claim_id for claim_id in record.get("claim_ids", []) if claim_id not in dropped_ids
         ]
-        values = measurement_values(str(record.get("value") or ""))
         quoted = "\n".join(
             (evidence_store.get(evidence_id) or {}).get("quote", "")
             for evidence_id in record.get("evidence_ids", [])
         )
-        missing = sorted(unsupported_values(values, quoted), key=float)
+        # findings 문장의 수치도 대조한다. value만 비우면 findings의 수치가 '제외' 한계와 같은 줄에 실려
+        # 보고서에서 "93.3% 줄인다 … 수치가 확인되지 않아 제외"처럼 자기모순 문장이 됐다(live 2·3차).
+        missing_value = unsupported_values(measurement_values(str(record.get("value") or "")), quoted)
+        missing_findings = unsupported_values(measurement_values(str(record.get("findings") or "")), quoted)
+        missing = sorted(missing_value | missing_findings, key=float)
         if missing:
-            record["value"] = None
+            if missing_value:
+                record["value"] = None
+            if missing_findings:
+                record["findings"] = ""
             line = "수치가 인용 근거 원문에서 확인되지 않아 제외"
             if line not in record["limitations"]:
                 record["limitations"].append(line)

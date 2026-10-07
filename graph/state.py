@@ -427,13 +427,13 @@ class AppState(TypedDict):
 
 
 class SupervisorState(AppState, total=False):
-    # 제어 vs 페이로드 분리: 라우팅은 node_status·rework·step_count·next만 읽는다. 관점 결과(*_findings)는 supervisor가 충분도 계산에만 읽고 수정하지 않는다.
+    # 제어 vs 페이로드 분리: supervisor가 쓰는 키는 제어 메타(step_count·next·node_status·rework·last_decision)뿐. 페이로드(*_findings·evidence_store·synthesis·eval_result)와 report_version은 판단에 읽기만 한다.
     # 관측성 위치: 결정 전체 로그는 State 밖 outputs/graph/<run>/decisions.jsonl({trace_id, step, node, decision, reason, source, ts}). State엔 last_decision 1건만. LangSmith에는 run metadata로 trace_id.
-    # 지속성 비용: 최종 보고서 Markdown·PDF는 파일로 쓰고 State엔 artifacts의 URI만. 원문 본문은 기존 fetch_cache, 결정 로그는 JSONL. last_decision은 덮어쓰기로 체크포인트마다 커지지 않음.
+    # 지속성 비용: 최종 보고서 Markdown·PDF는 파일로 쓰고 State엔 artifacts의 URI만(섹션별 본문 report_sections는 State에 남음). 원문 본문은 기존 fetch_cache, 결정 로그는 JSONL. last_decision은 덮어쓰기로 체크포인트마다 커지지 않음.
     # 상관: trace_id = LangGraph checkpoint thread_id = LangSmith metadata/tags = decisions.jsonl 키.
-    # 재개/복구: node_status(attempts·completed_step·last_error)와 rework만 있으면 supervisor가 다음 행동을 재계산 가능. MemorySaver 체크포인터를 기본 연결.
+    # 재개/복구: supervisor 결정은 State만으로 재계산되는 함수, 재개용 상태는 node_status(attempts·completed_step·last_error)와 rework. MemorySaver(thread_id=trace_id)는 실행 중 메모리 체크포인트라 프로세스 재시작 복구는 하지 않음.
     # 동시 처리: 병렬 worker가 함께 쓰는 키는 reducer: evidence_store(멱등 병합), node_status·artifacts·quality_by_perspective·search_log_by_perspective·run_meta(dict 병합). 그 외 키는 노드별 소유.
-    # 종료 보장: step_count >= max_steps면 강제 END(사유 기록), MAX_REWORK_PER_AGENT=1, MAX_REPORT_VERSIONS=2, 모든 분기가 유한 카운터를 소모.
+    # 종료 보장: supervisor 실행이 max_steps에 닿으면 강제 END(사유 기록), MAX_REWORK_PER_AGENT=1, MAX_REPORT_VERSIONS=2(상한 전 품질 미달은 반드시 재작업·재작성), MAX_FAILED_ATTEMPTS=2(하위 단계 예외 반복 시 종료), 모든 분기가 유한 카운터를 소모.
     trace_id: str
     step_count: int
     max_steps: int

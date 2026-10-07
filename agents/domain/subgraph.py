@@ -15,6 +15,7 @@ evidence_store 조회에서 KeyError로 죽는 방어적 처리라서 남겼다.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -38,6 +39,7 @@ from agents.domain.prompts import (
 from agents.domain.tools.evidence import Evidence, SearchLogEntry, merge_evidence, normalize_text
 from agents.domain.tools.fetch import fetch_document, pick_quote
 from agents.domain.tools.index import Chunk, build_index, chunk_parts
+from graph.rules import TECHNOLOGY_TERMS
 
 AGENT_ID = "domain"
 PERSPECTIVE = "domain"
@@ -45,6 +47,8 @@ PERSPECTIVE = "domain"
 MAX_STATEMENT_CHARS = 240
 MAX_QUESTIONS_PER_ROUND = 6
 RESULTS_PER_QUESTION = 4
+# 기술 정식 이름 단독 검색(원문 확보용)은 1위만 받는다. 문서 수 상한(MAX_DOCUMENTS_PER_ROUND)을 질문 몫으로 남긴다.
+ANCHOR_RESULTS = 1
 CHUNKS_PER_QUESTION = 3
 # 라운드당 본문 수집 상한. 수집·파싱·임베딩이 문서 수에 비례해 늘어나므로 묶어 둔다.
 MAX_DOCUMENTS_PER_ROUND = 10
@@ -161,6 +165,27 @@ def _digest(
     return ("\n".join(lines) if lines else "(수집된 근거 없음)"), label_to_id
 
 
+def _mentions_technology(text: str, technology: str) -> bool:
+    lowered = text.casefold()
+    return any(
+        re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", lowered)
+        for term in TECHNOLOGY_TERMS.get(technology, ())
+    )
+
+
+def _expand_query(question: str, state: DomainLocalState) -> str:
+    """약어만 쓴 질의에 정식 기술명을 붙인다.
+
+    실측: 'ITME' 약어 질의 10건이 ITME 논문을 한 번도 찾지 못했고(SRE 책·NVIDIA 문서가 돌아옴),
+    정식 이름을 넣자 arxiv 원문이 첫 결과로 나왔다.
+    """
+    extra = [
+        name for technology, name in (("sw", state["sw_name"]), ("hw", state["hw_name"]))
+        if name.casefold() not in question.casefold() and _mentions_technology(question, technology)
+    ]
+    return f"{question} {' '.join(extra)}" if extra else question
+
+
 def _plan_questions(state: DomainLocalState, deps: DomainAgentDeps) -> dict:
     """요구사항 축마다 기대 효과와 제약을 짝으로 묻게 해 검색 편향을 막는다."""
     refine = (
@@ -226,15 +251,18 @@ def _retrieve(state: DomainLocalState, deps: DomainAgentDeps) -> dict:
     seen_urls = set(source_texts)
 
     # 1) 질문별로 검색해 후보 URL을 모은다(중복 URL은 처음 만난 질문에 귀속).
+    #    맨 앞에 기술 정식 이름 단독 검색을 둬 원문을 먼저 확보한다. 긴 자연어 질문은 다른 단어가 검색을 끌고 가
+    #    이름을 덧붙여도 ITME 논문이 나오지 않았다(이름 단독 질의는 arxiv 원문이 1위). 원문 청크는 3)에서 질문별로 고른다.
     candidates: list[tuple[str, object]] = []  # (question, SearchResult)
-    for question in state["questions"]:
+    anchors = [state["sw_name"], state["hw_name"]]
+    for question in anchors + state["questions"]:
         try:
-            results, log = deps.search_provider.search(question)
+            results, log = deps.search_provider.search(_expand_query(question, state))
         except Exception as exc:
             errors.append(f"검색 실패({question[:40]}): {type(exc).__name__}: {exc}")
             continue
         logs.append(log.__dict__ if isinstance(log, SearchLogEntry) else dict(log))
-        for result in results[:RESULTS_PER_QUESTION]:
+        for result in results[:ANCHOR_RESULTS if question in anchors else RESULTS_PER_QUESTION]:
             if result.url in seen_urls:
                 continue
             seen_urls.add(result.url)
@@ -433,6 +461,21 @@ def _shape(
         valid = [eid for eid in dict.fromkeys(resolved) if eid in evidence_store]
         if len(valid) < len(set(resolved)):
             gaps.append(f"{draft.claim_key}: 존재하지 않는 근거 참조를 제거함")
+        # 기술별 주장이 그 기술을 다루지 않는 근거만 인용했으면 싣지 않는다(출처가 있는 것처럼 보이는 오귀속).
+        about_claim_technology = [
+            eid for eid in valid
+            if any(
+                _mentions_technology(
+                    f"{evidence_store[eid].get('title', '')} {evidence_store[eid].get('quote', '')}", technology
+                )
+                for technology in draft.technology_ids
+            )
+        ]
+        if valid and not about_claim_technology:
+            gaps.append(
+                f"{'/'.join(draft.technology_ids)}: 인용 근거가 해당 기술을 다루지 않아 주장 제외({draft.claim_key})"
+            )
+            continue
 
         claim_id = f"{AGENT_ID}:claim:{len(claims) + 1:03d}"
         id_by_key[draft.claim_key] = claim_id

@@ -13,7 +13,7 @@
 | bias_control | 전체 출처/기술 균형, 4.1~4.4 섹션별 출처 집중과 단일 기술 편중 | 없음 | code 통과 |
 | coverage | 4.1~4.4 존재, 실질 내용 또는 사유 있는 판단 보류, 인용 존재 | 없음 | code 통과 |
 
-함의 판정이 실패하고 인용 ID의 소유 관점이 하나로 확정되면 해당 관점을 `rework_targets`에 넣는다. `technical:`·`market:`·`domain:`은 prefix로, prefix 없는 stakeholder ID는 관점별 findings의 인용 관계로 소유자를 찾는다.
+함의 판정이 실패하고 인용 ID의 소유 관점이 하나로 확정되면 해당 관점을 `rework_targets`에 넣는다. `technical:`·`market:`·`domain:`은 prefix로, prefix 없는 stakeholder ID는 관점별 findings의 인용 관계로 소유자를 찾는다. 단 technical은 고정 입력·고정 코퍼스(Pool A)라 다시 돌려도 같은 근거가 나오므로 `rework_targets`에 넣지 않고, 그 문장은 보고서 재작성 피드백으로만 고친다.
 
 ## 실험 설계
 

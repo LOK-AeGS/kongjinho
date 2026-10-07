@@ -11,8 +11,25 @@ try:
 except ModuleNotFoundError:  # 오프라인 최소 테스트 환경
     from typing import TypedDict
 
+from agents.report.budget import omitted_note
 from agents.report.prompts import SYSTEM_RULES, build_repair_prompt
 from agents.report.state import ReportAgentDeps, SectionDraft, SectionId, ValidationIssue
+
+
+def _with_omitted_note(markdown: str, payload: dict) -> str:
+    """생략 공개 문장은 코드가 센 수로만 붙인다.
+
+    LLM에게 맡기면 생략이 없어도 "2건 중 2건만 실었다", 심지어 "5건 중 6건만 실었다"를 썼다(live 4차).
+    관점 섹션은 결정적 writer와 같이 주장 기준, 종합 섹션은 synthesis 입력의 생략 수를 쓴다.
+    """
+    lines = [
+        line for line in markdown.splitlines()
+        if not line.strip().lstrip("-* ").startswith("분량 제한으로")
+    ]
+    counts = ((payload.get("omitted") or {}).get("claims")
+              or (payload.get("synthesis") or {}).get("omitted") or {})
+    note = omitted_note(int(counts.get("total", 0)), int(counts.get("kept", 0))) if counts else ""
+    return "\n".join(lines + [note] if note else lines).strip()
 
 
 class LLMSectionOutput(TypedDict):
@@ -70,7 +87,7 @@ class LLMSectionWriter:
         return {
             "section_id": section_id,
             "title": str(payload["section_title"]),
-            "markdown": output["markdown"].strip(),
+            "markdown": _with_omitted_note(output["markdown"].strip(), payload),
             "claim_ids": list(dict.fromkeys(output["claim_ids"])),
             "evidence_ids": list(dict.fromkeys(output["evidence_ids"])),
         }

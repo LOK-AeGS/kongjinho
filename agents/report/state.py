@@ -112,6 +112,7 @@ class NormalizedInput(TypedDict):
     upstream_gaps: list[str]
     not_found_present: bool
     quality_feedback: list[str]
+    unsupported_items: list[dict]  # 직전 품질 평가가 '인용 근거가 뒷받침하지 않음'으로 지목한 문장(재작성 때만)
 
 
 class SectionWriter(Protocol):

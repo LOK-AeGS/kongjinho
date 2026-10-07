@@ -155,6 +155,13 @@ def analyze_relations(state: dict) -> dict:
         text = " ".join([claim.get("text", "")] + list(claim.get("conditions") or []))
         problems = condition_violations(text, claim.get("technology"))
         if problems:
+            # 인용 근거 원문에 조건이 있으면 보고서가 그 조건을 붙여 쓰므로 상충이 아니다. 금지 수치는 원문과 무관하게 남긴다.
+            # live 5차: technical 주장이 원문의 "up to"를 빼고 구조화돼, "35.7%는 CPU-offload 대비 최대값임에도 조건이
+            # 기록되지 않았다"는 자기모순 상충 문장이 보고서 세 곳에 실리고 품질 평가 groundedness를 떨어뜨렸다.
+            quotes = " ".join(str((store.get(e) or {}).get("quote") or "") for e in claim.get("evidence_ids", []))
+            recoverable = set(problems) - set(condition_violations(f"{text} {quotes}", claim.get("technology")))
+            problems = [p for p in problems if not (p.startswith("C4 조건 누락") and p in recoverable)]
+        if problems:
             out.append(_finding("conflict", claim.get("technology", "both"), [f"{claim.get('perspective')}/claim/{claim.get('claim_id')}"],
                                 [e for e in claim.get("evidence_ids", []) if e in store], "SX3", "condition", "; ".join(problems)))
 
