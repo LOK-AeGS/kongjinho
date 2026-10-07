@@ -18,7 +18,7 @@ from agents.domain.subgraph import (
     DomainLocalState,
     _build_subgraph,
 )
-from graph.metrics import measurement_values
+from graph.metrics import measurement_values, unsupported_values
 
 _EMPTY_SELF_CHECK = {
     "status": "failed",
@@ -188,12 +188,11 @@ def _bind_numeric_claims(claims: list[dict], records: list[dict], evidence_store
     dropped_ids: set[str] = set()
     for claim in claims:
         values = measurement_values(claim.get("text", ""))
-        quoted = {
-            value
+        quoted = "\n".join(
+            (evidence_store.get(evidence_id) or {}).get("quote", "")
             for evidence_id in claim.get("evidence_ids", [])
-            for value in measurement_values((evidence_store.get(evidence_id) or {}).get("quote", ""))
-        }
-        missing = sorted(values - quoted, key=float)
+        )
+        missing = sorted(unsupported_values(values, quoted), key=float)
         if not missing:
             kept_claims.append(claim)
             continue
@@ -219,12 +218,11 @@ def _bind_numeric_claims(claims: list[dict], records: list[dict], evidence_store
             claim_id for claim_id in record.get("claim_ids", []) if claim_id not in dropped_ids
         ]
         values = measurement_values(str(record.get("value") or ""))
-        quoted = {
-            value
+        quoted = "\n".join(
+            (evidence_store.get(evidence_id) or {}).get("quote", "")
             for evidence_id in record.get("evidence_ids", [])
-            for value in measurement_values((evidence_store.get(evidence_id) or {}).get("quote", ""))
-        }
-        missing = sorted(values - quoted, key=float)
+        )
+        missing = sorted(unsupported_values(values, quoted), key=float)
         if missing:
             record["value"] = None
             line = "수치가 인용 근거 원문에서 확인되지 않아 제외"

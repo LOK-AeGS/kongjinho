@@ -14,7 +14,7 @@ from graph.rules import PROHIBITED_COMPARISON as SHARED_PROHIBITED_COMPARISON, V
 from agents.report.references import source_identity
 from agents.report.state import SECTION_ORDER, SectionDraft, SectionId, ValidationIssue
 from graph.groundedness import MIN_CITATION_RATIO, factual_body_lines
-from graph.metrics import MEASUREMENT, extract_measurements, measurement_values
+from graph.metrics import MEASUREMENT, extract_measurements, measurement_values, unsupported_values
 
 
 REQUIRED_HEADINGS = (
@@ -188,12 +188,16 @@ def validate_section(draft: SectionDraft, context: dict) -> list[ValidationIssue
         " ".join(str(record.get(field) or "") for field in ("value", "findings"))
         for record in structured_records
     )
-    # 자동 주석의 canonical 조건은 검증 코드가 소유하는 확정 문구다.
-    source_text += "\n" + "\n".join(
-        rule.canonical_condition or "" for rule in METRIC_RULES
+    # 자동으로 붙인 표준 조건 문구는 근거가 확인된 경우에만 붙으므로(annotate_metrics) 대조 대상에서 뺀다.
+    checked_text = draft["markdown"]
+    for rule in METRIC_RULES:
+        if rule.canonical_condition:
+            checked_text = checked_text.replace(rule.canonical_condition, "")
+    missing_numbers = unsupported_values(measurement_values(checked_text), source_text)
+    ungrounded = sorted(
+        value for value in extract_measurements(checked_text)
+        if any(number in missing_numbers for number in measurement_values(value))
     )
-    grounded = extract_measurements(source_text)
-    ungrounded = sorted(extract_measurements(draft["markdown"]) - grounded)
     if ungrounded:
         issues.append(issue("numeric_grounding", f"근거/claim에 없는 측정값: {', '.join(ungrounded)}", section_id))
 
@@ -274,7 +278,7 @@ def _citation_binding_issues(section_id: SectionId, markdown: str, context: dict
             f"{record.get('value') or ''} {record.get('findings') or ''}"
             for record in records if cited & set(record.get("evidence_ids", []))
         ]
-        missing = sorted(values - measurement_values("\n".join(corpus)), key=float)
+        missing = sorted(unsupported_values(values, "\n".join(corpus)), key=float)
         if missing:
             issues.append(issue(
                 "numeric_citation_mismatch",

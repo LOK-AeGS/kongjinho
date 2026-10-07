@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -9,12 +10,14 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from .config import MAX_REVISION_ROUNDS, TOP_K_PER_QUERY
+from .corpus import normalize_text
 from .evidence import make_claim_id, merge_evidence, to_parent_evidence, validate_reference
 from .models import TechnicalExtraction
 from .retrieval import CRITERIA, coverage_by_technology, merge_candidates, missing_criteria, select_query
 from .state import TechnicalLocalState
 from .trl import determine_trl, validate_metric_records, validate_trl_record
 from .web import web_query
+from graph.metrics import measurement_values, number_pattern, unsupported_values
 
 
 @dataclass(frozen=True)
@@ -44,10 +47,78 @@ def _compact_candidate(candidate: dict) -> dict:
     }
 
 
-def _bind_refs(refs: list[dict], candidate_map: dict[str, dict], claim_id: str, evidence_level: str = "unknown") -> tuple[list[str], dict[str, dict], list[str]]:
+def _sentence_with(value: str, text: str, limit: int = 320) -> str | None:
+    """후보 원문에서 수치를 담은 문장을 원문 그대로 꺼낸다. 길면 수치 주변만 자른다."""
+    clean = normalize_text(text)
+    match = number_pattern(value).search(clean.replace("\\", ""))
+    if match is None:
+        return None
+    # '\\' 제거 전후로 위치가 어긋나지 않게 원문에서 다시 찾는다.
+    match = number_pattern(value).search(clean) or match
+    start = max(clean.rfind(". ", 0, match.start()) + 2, 0)
+    end = clean.find(". ", match.end())
+    end = len(clean) if end < 0 else end + 1
+    if end - start > limit:
+        start = max(start, match.start() - limit // 2)
+        end = min(end, start + limit)
+    return clean[start:end].strip() or None
+
+
+_STOP_TERMS = {"the", "and", "with", "for", "from", "than", "over", "that", "this", "which", "into"}
+
+
+def _terms(text: str) -> set[str]:
+    """언어가 섞인 주장·원문에서 비교할 영문·영숫자 핵심어(3자 이상)."""
+    return {
+        term.lower().strip(".-")
+        for term in re.findall(r"[A-Za-z][A-Za-z0-9.\-]{2,}", text or "")
+        if term.lower().strip(".-") not in _STOP_TERMS
+    }
+
+
+def _bind_numbers(
+    text: str,
+    bound: list[dict],
+    candidate_map: dict[str, dict],
+    claim_id: str,
+    evidence_level: str,
+) -> tuple[dict[str, dict], list[str]]:
+    """주장의 수치가 인용문에 없으면 같은 문서의 검색 후보에서 그 수치가 있는 문장으로 인용을 보강한다.
+
+    live 1~5차: 기술 조사 수치 21건 중 13건이 인용문에 없었다(인용한 청크·같은 쪽·다른 쪽에는 있음).
+    보강은 검색된 후보의 원문 구간만 쓰고, 같은 문서로 한정해 엉뚱한 문맥의 같은 숫자를 붙이지 않는다.
+    찾지 못한 수치는 위반으로 돌려 에이전트 수정 루프의 피드백이 되게 한다.
+    """
+    values = measurement_values(text)
+    missing = unsupported_values(values, "\n".join(item["quote"] for item in bound))
+    if not missing:
+        return {}, []
+    docs = {item.get("doc_id") for item in bound if item.get("doc_id")}
+    cited = [candidate_map[item["candidate_id"]] for item in bound if item.get("candidate_id") in candidate_map]
+    same_doc = [candidate for candidate in candidate_map.values() if candidate.get("doc_id") in docs and candidate not in cited]
+    added: dict[str, dict] = {}
+    violations: list[str] = []
+    claim_terms = _terms(text)
+    for value in sorted(missing, key=float):
+        for candidate in cited + same_doc:
+            quote = _sentence_with(value, candidate.get("text", ""))
+            # 인용하지 않은 후보는 주장과 핵심어가 겹칠 때만 쓴다
+            # (같은 문서라도 DeepSeek-V2 41쪽 "35.7% female"처럼 문맥이 다른 같은 숫자가 있다).
+            if quote and (candidate in cited or claim_terms & _terms(quote)):
+                evidence = to_parent_evidence(candidate, quote, claim_id)
+                evidence["evidence_level"] = evidence_level
+                added[evidence["id"]] = evidence
+                break
+        else:
+            violations.append(f"인용문에 없는 수치 {value}: 같은 문서의 검색 후보에서도 확인되지 않음 ({claim_id})")
+    return added, violations
+
+
+def _bind_refs(refs: list[dict], candidate_map: dict[str, dict], claim_id: str, evidence_level: str = "unknown", text: str = "") -> tuple[list[str], dict[str, dict], list[str]]:
     evidence_ids: list[str] = []
     store: dict[str, dict] = {}
     violations: list[str] = []
+    bound: list[dict] = []
     for reference in refs:
         candidate, error = validate_reference(reference, candidate_map)
         if error:
@@ -57,7 +128,17 @@ def _bind_refs(refs: list[dict], candidate_map: dict[str, dict], claim_id: str, 
         evidence["evidence_level"] = evidence_level
         evidence_ids.append(evidence["id"])
         store[evidence["id"]] = evidence
+        bound.append({"candidate_id": candidate["chunk_id"], "doc_id": candidate.get("doc_id"), "quote": evidence["quote"]})
+    if text and bound:
+        added, numeric_violations = _bind_numbers(text, bound, candidate_map, claim_id, evidence_level)
+        evidence_ids.extend(added)
+        store.update(added)
+        violations.extend(numeric_violations)
     return _unique(evidence_ids), store, violations
+
+
+def _has_numeric_violation(errors: list[str]) -> bool:
+    return any(error.startswith("인용문에 없는 수치") for error in errors)
 
 
 def _bind_extraction(raw: TechnicalExtraction, candidates: list[dict]) -> tuple[dict, dict[str, dict], list[str]]:
@@ -72,7 +153,7 @@ def _bind_extraction(raw: TechnicalExtraction, candidates: list[dict]) -> tuple[
     for item in raw.records:
         value = item.model_dump()
         provisional = make_claim_id(value["technology"], value["findings"], [])
-        ids, delta, errors = _bind_refs(value.pop("evidence_refs"), candidate_map, provisional)
+        ids, delta, errors = _bind_refs(value.pop("evidence_refs"), candidate_map, provisional, text=value["findings"])
         claim_id = make_claim_id(value["technology"], value["findings"], ids)
         for evidence in delta.values():
             evidence["claim_id"] = claim_id
@@ -84,27 +165,32 @@ def _bind_extraction(raw: TechnicalExtraction, candidates: list[dict]) -> tuple[
     for item in raw.claims:
         value = item.model_dump()
         provisional = make_claim_id(value["technology"], value["text"], [])
-        ids, delta, errors = _bind_refs(value.pop("evidence_refs"), candidate_map, provisional)
+        ids, delta, errors = _bind_refs(value.pop("evidence_refs"), candidate_map, provisional, text=value["text"])
+        violations.extend(errors)
+        if _has_numeric_violation(errors):
+            # 근거로 확인되지 않는 수치를 담은 주장은 싣지 않는다(위반은 수정 루프 피드백과 gap으로 남는다).
+            continue
         claim_id = make_claim_id(value["technology"], value["text"], ids)
         for evidence in delta.values():
             evidence["claim_id"] = claim_id
         value.update({"claim_id": claim_id, "evidence_ids": ids})
         claims.append(value)
         store = merge_evidence(store, delta)
-        violations.extend(errors)
 
     for item in raw.metrics:
         value = item.model_dump()
         metric_text = " | ".join(str(value.get(key) or "") for key in ("metric", "value", "baseline"))
         provisional = make_claim_id(value["technology"], metric_text, [])
-        ids, delta, errors = _bind_refs(value.pop("evidence_refs"), candidate_map, provisional)
+        ids, delta, errors = _bind_refs(value.pop("evidence_refs"), candidate_map, provisional, text=metric_text)
+        violations.extend(errors)
+        if _has_numeric_violation(errors):
+            continue
         claim_id = make_claim_id(value["technology"], metric_text, ids)
         for evidence in delta.values():
             evidence["claim_id"] = claim_id
         value.update({"claim_id": claim_id, "evidence_ids": ids})
         metrics.append(value)
         store = merge_evidence(store, delta)
-        violations.extend(errors)
 
     for item in raw.readiness_observations:
         value = item.model_dump()

@@ -1,0 +1,11 @@
+{
+  "_note": "고정 Pool A 논문의 핵심 수치 위치(테스트 정답지 전용, 런타임에서 쓰지 않음). sentence는 PDF 해당 쪽 원문의 일부다.",
+  "facts": [
+    {"doc_id": "arxiv:2405.04434v5", "page": 4, "value": "93.3", "sentence": "reduces the KV cache by 93.3%"},
+    {"doc_id": "arxiv:2405.04434v5", "page": 4, "value": "42.5", "sentence": "saves 42.5% of training costs"},
+    {"doc_id": "arxiv:2405.04434v5", "page": 16, "value": "5.76", "sentence": "which is 5.76 times the maximum generation throughput"},
+    {"doc_id": "arxiv:2606.12556v2", "page": 2, "value": "1.80", "sentence": "ITME achieves a 1.80× throughput improvement over NVMe-oF-based disaggregated storage baselines"},
+    {"doc_id": "arxiv:2606.12556v2", "page": 9, "value": "1.81", "sentence": "ITME reaches a 1.81× speedup by turn 5"},
+    {"doc_id": "arxiv:2606.12556v2", "page": 10, "value": "35.7", "sentence": "ITME achieves up to a 35.7% throughput improvement over the CPU-offload baseline"}
+  ]
+}
