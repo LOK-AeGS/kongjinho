@@ -447,6 +447,7 @@ def select_relations(
         item for item in _linked_rows(context, rows)
         if item[0].get("kind") in accepted
         and _line_ok(item[0].get("explanation") or item[0].get("reason") or "", item[2], context)
+        and not _flagged_by_quality(item[0].get("explanation") or item[0].get("reason") or "", item[2], context)
     ]
     ranked = sorted(
         linked,

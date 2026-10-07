@@ -30,8 +30,13 @@ def measurement_values(text: str) -> set[str]:
 
 
 def number_pattern(value: str) -> re.Pattern:
-    """'5.76'이 원문에 '5.76', '5 . 76', '5.76×', '5.76 times', '35.7\\%' 어떤 표기로 있어도 찾는다."""
-    body = r"\s*".join(re.escape(character) for character in value)
+    """'5.76'이 원문에 '5.76', '5 . 76', '5.76×', '5.76 times', '35.7\\%' 어떤 표기로 있어도 찾는다.
+
+    공백은 소수점 주변에서만 허용한다. 숫자 사이까지 허용하면 그림 축 눈금 '1.8 1.6'을 1.81로 읽어,
+    1.81이 없는 축 조각을 인용한 주장이 근거 있음으로 통과했다(live).
+    """
+    integer, _, fraction = value.partition(".")
+    body = re.escape(integer) + (rf"\s*\.\s*{re.escape(fraction)}" if fraction else "")
     return re.compile(rf"(?<![\d.]){body}(?![\d])")
 
 

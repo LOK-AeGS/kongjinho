@@ -184,3 +184,12 @@ def test_table_cell_drops_metric_whose_condition_is_not_in_evidence():
     }
     assert _safe_cell("suitable (93.3%)", ["e1"], context) == "suitable"
     assert _safe_cell("supported", ["e1"], context) == "supported"
+
+
+def test_number_match_does_not_glue_axis_ticks():
+    # live: 그림 축 눈금 '1.8 1.6 1.4'를 1.81로 읽어 1.81이 없는 조각을 인용한 주장이 통과했다.
+    from graph.metrics import unsupported_values
+
+    assert unsupported_values({"1.81"}, "1.8 1.6 1.4 1.2 Speedup over Recompute TTFT") == {"1.81"}
+    assert unsupported_values({"5.76"}, "boosts the maximum generation throughput to 5 . 76 times") == set()
+    assert unsupported_values({"35.7"}, "up to a 35.7\\% throughput improvement") == set()
