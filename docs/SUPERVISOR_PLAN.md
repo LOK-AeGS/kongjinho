@@ -1,5 +1,7 @@
 # Supervisor 패턴 전환 설계 (구현 명세)
 
+> 구현 전에 쓴 설계 명세다(2026-10-07). 구현하면서 달라진 점(LLM 선택 + guard, Judge 모델, 품질 재작업 대상 등)은 [README](../README.md)와 코드가 기준이다.
+
 - 브랜치: `feat/supervisor-pattern` (base: `feat/report-page-budget`)
 - 목적: 과제 "Multi-Agent Orchestration"의 Supervisor 필수 항목, State Schema 7개 항목, 품질 평가 노드를 코드로 충족
 - 원칙: **기존 에이전트 내부 코드(agents/technical, market, domain, stakeholder_eval, synthesis)는 수정하지 않는다.**

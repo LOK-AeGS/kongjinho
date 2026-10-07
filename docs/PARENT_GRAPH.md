@@ -1,5 +1,7 @@
 # 부모 그래프
 
+> RAG 과제 단계의 고정 DAG 기록이다. 현재 그래프는 Supervisor 패턴이며 [README Architecture](../README.md#architecture)와 `graph/build.py`가 기준이다.
+
 설계서 v0.8 §8.1 전체 아키텍처를 지금 있는 노드로 연결한 것입니다.
 
 ```

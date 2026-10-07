@@ -1,10 +1,9 @@
 # KV cache Multi-Agent State 설계
 
-> 이 문서는 최초 PipelineState 설계 기록입니다. 현재 팀 공통 State는 `graph/state.py`의 `AppState`입니다.
+> 이 문서는 최초 PipelineState 설계 기록입니다. 현재 State는 `graph/state.py`의 `SupervisorState`(제어 메타) ⊃ `AppState`(관점 결과 계약)입니다.
 > 아래 내용과 v0.3 EvaluationState는 더 이상 코드에 없고, 기록으로만 남깁니다.
-> 이해관계자 노드는 selected_tech/domain을 입력받아 stakeholder_eval/evidence_store/errors를 반환합니다.
-> evidence_store는 dict + idempotent merge이며, not_found와 검색 로그는 stakeholder_eval.search_outcomes에 보존합니다.
-> 아래 stakeholder_findings 방식은 legacy_stakeholder_agent에만 해당합니다.
+> 현재 이해관계자 노드(`agents/stakeholder`)는 stakeholder_findings/evidence_store/search_log_by_perspective/quality_by_perspective를 반환합니다.
+> evidence_store는 dict + idempotent merge입니다. stakeholder_eval 반환은 이전 노드(`agents/stakeholder_eval.py`) 기준입니다.
 
 앞서 작성한 전체 아키텍처와 6개 에이전트 다이어그램에 대응한다.
 기술 선정은 사람이 수행하며, 공유 문서 인덱스 준비 이후 initial_state()를 호출한다.
