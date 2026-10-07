@@ -305,6 +305,7 @@ class Decision(TypedDict):
     step: int
     next: list[str]
     reason: str
+    source: Literal["rule", "llm", "fallback"]
     ts: str
 
 
@@ -427,7 +428,7 @@ class AppState(TypedDict):
 
 class SupervisorState(AppState, total=False):
     # 제어 vs 페이로드 분리: 라우팅은 node_status·rework·step_count·next만 읽는다. 관점 결과(*_findings)는 supervisor가 충분도 계산에만 읽고 수정하지 않는다.
-    # 관측성 위치: 결정 전체 로그는 State 밖 outputs/graph/<run>/decisions.jsonl({trace_id, step, node, decision, reason, ts}). State엔 last_decision 1건만. LangSmith에는 run metadata로 trace_id.
+    # 관측성 위치: 결정 전체 로그는 State 밖 outputs/graph/<run>/decisions.jsonl({trace_id, step, node, decision, reason, source, ts}). State엔 last_decision 1건만. LangSmith에는 run metadata로 trace_id.
     # 지속성 비용: 최종 보고서 Markdown·PDF는 파일로 쓰고 State엔 artifacts의 URI만. 원문 본문은 기존 fetch_cache, 결정 로그는 JSONL. last_decision은 덮어쓰기로 체크포인트마다 커지지 않음.
     # 상관: trace_id = LangGraph checkpoint thread_id = LangSmith metadata/tags = decisions.jsonl 키.
     # 재개/복구: node_status(attempts·completed_step·last_error)와 rework만 있으면 supervisor가 다음 행동을 재계산 가능. MemorySaver 체크포인터를 기본 연결.

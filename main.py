@@ -125,12 +125,17 @@ def build_nodes(
         nodes["market"], modes["market"] = replay_node("market", fixture), "fixture 재생"
 
     if "stakeholder" in live:
-        from agents.stakeholder_eval import make_node as stakeholder_node
+        from agents.stakeholder import make_node as stakeholder_node
+        from agents.stakeholder.backend import OpenAIBackend
 
-        stakeholder_model = os.getenv("STAKEHOLDER_MODEL", "gpt-5-mini")
+        stakeholder_model = os.getenv("STAKEHOLDER_MODEL") or "gpt-5-mini"
+        backend = OpenAIBackend(
+            model=stakeholder_model,
+            cache_dir=Path("data/fetch_cache/stakeholder"),
+        )
         nodes["stakeholder"], modes["stakeholder"] = (
-            stakeholder_node(model=stakeholder_model),
-            f"실제 (agents.stakeholder_eval, {stakeholder_model})",
+            stakeholder_node(backend),
+            f"실제 (원문 검증형 stakeholder, {stakeholder_model})",
         )
     else:
         nodes["stakeholder"], modes["stakeholder"] = replay_node("stakeholder", fixture), "fixture 재생"
@@ -244,6 +249,7 @@ def run_graph(
     *,
     decision_logger=None,
     policy=None,
+    supervisor_proposer=None,
     on_decision=None,
 ) -> tuple[dict, list[dict]]:
     """그래프를 실행하고 (최종 State, 실행 기록)을 돌려준다. 같은 step 의 노드는 병렬 실행이다.
@@ -256,6 +262,7 @@ def run_graph(
         **nodes,
         checkpointer=MemorySaver(),
         policy=policy,
+        proposer=supervisor_proposer,
         decision_logger=decision_logger,
         on_decision=on_decision,
     )
@@ -320,9 +327,10 @@ def render_summary(
               "| step | 노드 | 소요 시간 | 갱신한 키 | 오류 |", "|---|---|---|---|---|"]
     lines += [f"| {t['step']} | {t['node']} | {t.get('seconds') if t.get('seconds') is not None else '-'}초 | "
               f"{', '.join(t['updated'])} | {t['error'] or ''} |" for t in trace]
-    lines += ["", "## Supervisor 결정", "", "| step | 다음 노드 | 사유 |", "|---|---|---|"]
+    lines += ["", "## Supervisor 결정", "", "| step | 다음 노드 | 선택 출처 | 사유 |", "|---|---|---|---|"]
     lines += [
-        f"| {item['step']} | {' + '.join(item.get('decision') or []) or 'END'} | {item.get('reason', '')} |"
+        f"| {item['step']} | {' + '.join(item.get('decision') or []) or 'END'} | "
+        f"{item.get('source', 'rule')} | {item.get('reason', '')} |"
         for item in (decisions or [])
     ]
     lines += ["", "## 노드별 실행 방식과 결과", "", "| 노드 | 실행 방식 | 상태 |", "|---|---|---|"]
@@ -357,6 +365,12 @@ def main() -> int:
     parser.add_argument("--as-of", default=None, help="조사 기준일 YYYY-MM-DD (기본: 팀 고정 입력의 기준일 2026-09-22)")
     parser.add_argument("--rounds", type=int, default=1, choices=(1, 2), help="시장·도메인의 최대 검색 라운드 (기술 조사는 자체 고정값 2)")
     parser.add_argument("--max-steps", type=int, default=20, help="supervisor 최대 실행 횟수")
+    parser.add_argument(
+        "--supervisor",
+        choices=("rule", "llm"),
+        default=None,
+        help="Supervisor 선택 방식 (기본: live+OPENAI_API_KEY면 llm, 아니면 rule)",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/graph"))
     parser.add_argument("--no-pdf", action="store_true", help="보고서 PDF 를 만들지 않음 (reportlab 없이 실행할 때)")
     parser.add_argument("--debug", action="store_true", help="노드가 끝날 때마다 주장·공백·위반 샘플까지 출력")
@@ -369,9 +383,13 @@ def main() -> int:
     if unknown:
         parser.error(f"--live 에 쓸 수 없는 노드: {', '.join(sorted(unknown))} (가능: {', '.join(LIVE_CAPABLE)})")
     load_env()
-    if os.getenv("LANGSMITH_API_KEY"):
+    if live and os.getenv("LANGSMITH_API_KEY"):
         os.environ.setdefault("LANGSMITH_TRACING", "true")
         os.environ.setdefault("LANGSMITH_PROJECT", "kv-cache-supervisor")
+    elif not live:
+        # fixture-only 실행은 API뿐 아니라 관측성 전송도 하지 않는 완전 오프라인 모드다.
+        os.environ["LANGSMITH_TRACING"] = "false"
+        os.environ["LANGCHAIN_TRACING_V2"] = "false"
     if live:
         if not os.getenv("OPENAI_API_KEY"):
             parser.error("OPENAI_API_KEY 가 없습니다. .env 에 넣으세요.")
@@ -379,6 +397,17 @@ def main() -> int:
             parser.error("기술 조사·시장·도메인 실제 실행에는 TAVILY_API_KEY 가 필요합니다.")
         live_order = {name: index for index, name in enumerate(LIVE_CAPABLE)}
         print(f"실제 실행 노드: {', '.join(sorted(live, key=live_order.get))} (API 비용이 발생합니다)")
+
+    supervisor_mode = args.supervisor or (
+        "llm" if live and os.getenv("OPENAI_API_KEY") else "rule"
+    )
+    supervisor_proposer = None
+    if supervisor_mode == "llm":
+        if not os.getenv("OPENAI_API_KEY"):
+            parser.error("--supervisor llm에는 OPENAI_API_KEY가 필요합니다.")
+        from graph.supervisor import make_llm_proposer
+
+        supervisor_proposer = make_llm_proposer()
 
     fixture = load_fixture(args.fixture)
     initial = initial_state(as_of=args.as_of, rounds=args.rounds, max_steps=args.max_steps)
@@ -403,7 +432,11 @@ def main() -> int:
         if record["node"] == "supervisor":
             decision = update.get("last_decision") or {}
             target = " + ".join(decision.get("next") or []) or "END"
-            print(f"  [{decision.get('step')}] supervisor → {target} ({decision.get('reason', '')})", flush=True)
+            print(
+                f"  [{decision.get('step')}] supervisor[{decision.get('source', 'rule')}] "
+                f"→ {target} ({decision.get('reason', '')})",
+                flush=True,
+            )
         else:
             print(f"  [{record['step']}] {mark} {record['node']:<12} {took:>7}  {step_brief(record['node'], update)}", flush=True)
         if record["error"]:
@@ -416,7 +449,13 @@ def main() -> int:
 
     print(f"실행 시작 (결과 폴더: {folder.resolve()})", flush=True)
     decision_path = folder / "decisions.jsonl"
-    final, trace = run_graph(nodes, initial, on_step, decision_logger=DecisionLogger(decision_path))
+    final, trace = run_graph(
+        nodes,
+        initial,
+        on_step,
+        decision_logger=DecisionLogger(decision_path),
+        supervisor_proposer=supervisor_proposer,
+    )
     replayed = [a for a in AGENTS if modes[a].startswith(("임시", "fixture"))]
     note = f"{', '.join(replayed)} 는 합성 fixture 결과이며 실제 조사가 아닙니다." if replayed else None
     decisions = [json.loads(line) for line in decision_path.read_text(encoding="utf-8").splitlines() if line.strip()]

@@ -9,7 +9,13 @@ from agents.quality.node import quality_agent
 from graph.build import WORKERS, build_graph
 from graph.decision_log import DecisionLogger
 from graph.stubs import load_fixture
-from graph.supervisor import SupervisorPolicy, assess_sufficiency, decide
+from graph.supervisor import (
+    SupervisorPolicy,
+    assess_sufficiency,
+    decide,
+    options,
+    state_summary,
+)
 from graph.workers import as_worker
 from main import build_nodes, initial_state, run_graph
 
@@ -52,6 +58,175 @@ def test_max_steps_forces_end():
     final, _ = run_graph(nodes, initial_state(max_steps=1))
     assert final["last_decision"]["next"] == []
     assert "max_steps" in final["last_decision"]["reason"]
+
+
+def test_supervisor_guard_rejects_action_and_targets_outside_allowed():
+    state = initial_state()
+
+    def bad_action(_summary, _allowed):
+        return {"action": "report", "targets": [], "reason": "바로 보고서를 쓴다"}
+
+    update = decide(state, proposer=bad_action)
+    assert update["next"] == ["technical"]
+    assert update["last_decision"]["source"] == "fallback"
+    assert "허용 밖 제안" in update["last_decision"]["reason"]
+
+    def bad_targets(_summary, _allowed):
+        return {"action": "dispatch", "targets": ["domain"], "reason": "의존성을 건너뛴다"}
+
+    update = decide(state, proposer=bad_targets)
+    assert update["next"] == ["technical"]
+    assert update["last_decision"]["source"] == "fallback"
+
+
+def test_supervisor_proposer_exception_falls_back_to_rule():
+    def broken(_summary, _allowed):
+        raise RuntimeError("offline fake failure")
+
+    update = decide(initial_state(), proposer=broken)
+    assert update["next"] == ["technical"]
+    assert update["last_decision"]["source"] == "fallback"
+    assert "proposer 실패(RuntimeError)" in update["last_decision"]["reason"]
+
+
+def test_supervisor_accepts_valid_proposal_with_llm_source():
+    def valid(_summary, allowed):
+        return {**allowed[0], "reason": "State상 technical 선행 결과가 아직 없다."}
+
+    update = decide(initial_state(), proposer=valid)
+    assert update["next"] == ["technical"]
+    assert update["last_decision"]["source"] == "llm"
+    assert update["last_decision"]["reason"] == "State상 technical 선행 결과가 아직 없다."
+
+
+def test_supervisor_state_summary_distinguishes_execution_and_sufficiency_states():
+    state = initial_state()
+    state.update({
+        "technical_findings": {
+            "status": "complete", "records": [], "claims": [], "gaps": [],
+        },
+        "market_findings": {
+            "status": "partial",
+            "records": [{"basis": "unknown", "evidence_ids": ["market:e1"]}],
+            "claims": [],
+            "gaps": [],
+        },
+        "evidence_store": {"market:e1": {}},
+        "node_status": {
+            "technical": {
+                "status": "done", "attempts": 1, "completed_step": 1,
+                "sufficiency": None,
+            },
+            "market": {
+                "status": "done", "attempts": 1, "completed_step": 1,
+                "sufficiency": None,
+            },
+            "stakeholder": {
+                "status": "running", "attempts": 1, "completed_step": None,
+                "sufficiency": None,
+            },
+        },
+    })
+    summary = state_summary(state)
+    perspectives = summary["perspectives"]
+    assert perspectives["technical"]["state"] == "sufficient"
+    assert perspectives["technical"]["sufficiency_reason"] == "status=complete"
+    assert perspectives["market"]["state"] == "insufficient"
+    assert "근거 1건(<3)" in perspectives["market"]["sufficiency_reason"]
+    assert perspectives["stakeholder"] == {
+        "state": "running", "attempts": 1, "rework_left": 1,
+    }
+    assert perspectives["domain"] == {
+        "state": "pending", "attempts": 0, "rework_left": 1,
+    }
+    assert summary["rule_default"] == {
+        "action": "dispatch",
+        "targets": ["domain"],
+        "reason": "미실행 관점 병렬 조사: domain",
+    }
+    assert all(item["meaning"] for item in summary["allowed"])
+
+
+def test_allowed_set_exposes_rework_subsets_and_accept_choice():
+    sufficient = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    insufficient = {
+        "status": "partial",
+        "records": [{"basis": "unknown", "evidence_ids": []}],
+        "claims": [],
+        "gaps": [],
+    }
+    state = initial_state()
+    state.update({
+        "technical_findings": sufficient,
+        "market_findings": insufficient,
+        "stakeholder_findings": sufficient,
+        "domain_findings": insufficient,
+        "node_status": {
+            name: {"attempts": 1, "completed_step": 1, "sufficiency": None}
+            for name in ("technical", "market", "stakeholder", "domain")
+        },
+    })
+    allowed = options(state)
+    choices = {(item["action"], tuple(item["targets"])) for item in allowed}
+    assert ("rework", ("market",)) in choices
+    assert ("rework", ("domain",)) in choices
+    assert ("rework", ("market", "domain")) in choices
+    assert ("accept_insufficient", ("market", "domain")) in choices
+
+
+def test_quality_failure_allowed_set_has_upstream_report_and_finish_choices():
+    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    state = initial_state()
+    state.update({
+        **{f"{name}_findings": complete for name in ("technical", "market", "stakeholder", "domain")},
+        "node_status": {
+            **{
+                name: {"attempts": 1, "completed_step": 1, "sufficiency": "sufficient"}
+                for name in ("technical", "market", "stakeholder", "domain")
+            },
+            "synthesis": {"attempts": 1, "completed_step": 2},
+            "report": {"attempts": 1, "completed_step": 3},
+        },
+        "synthesis": {"status": "complete"},
+        "report_version": 1,
+        "eval_result": {
+            "passed": False,
+            "evaluated_report_version": 1,
+            "failed_criteria": ["groundedness"],
+            "feedback": ["근거 수정"],
+            "rework_targets": ["domain"],
+        },
+    })
+    choices = {(item["action"], tuple(item["targets"])) for item in options(state)}
+    assert choices == {
+        ("quality_rework", ("domain",)),
+        ("rewrite_report", ("report",)),
+        ("finish", ()),
+    }
+
+
+def test_adversarial_rework_proposer_still_terminates_within_max_steps():
+    def always_rework(_summary, allowed):
+        selected = next(
+            (item for item in allowed if item["action"] in {"rework", "quality_rework"}),
+            allowed[0],
+        )
+        return {**selected, "reason": "가능한 동안 항상 재작업을 고른다."}
+
+    max_steps = 20
+    nodes, _ = build_nodes(set(), load_fixture())
+    final, _ = run_graph(
+        nodes,
+        initial_state(max_steps=max_steps),
+        supervisor_proposer=always_rework,
+    )
+    assert final["last_decision"]["next"] == []
+    assert final["step_count"] <= max_steps
+    assert all(
+        status["attempts"] <= 2
+        for name, status in final["node_status"].items()
+        if name in {"technical", "market", "stakeholder", "domain"}
+    )
 
 
 def test_failed_quality_rewrites_report_until_version_limit():
@@ -136,6 +311,7 @@ def test_decision_log_contains_trace_and_reason(tmp_path):
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert rows[0]["trace_id"] == state["trace_id"]
     assert rows[0]["reason"]
+    assert rows[0]["source"] == "rule"
     assert rows[-1]["decision"] == []
 
 

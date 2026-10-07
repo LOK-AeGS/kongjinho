@@ -17,6 +17,7 @@ class DecisionLogger:
         step: int,
         decision: list[str],
         reason: str,
+        source: str = "rule",
         ts: str | None = None,
     ) -> None:
         if self.path is None:
@@ -28,6 +29,7 @@ class DecisionLogger:
             "node": "supervisor",
             "decision": decision,
             "reason": reason,
+            "source": source,
             "ts": ts or datetime.now(timezone.utc).isoformat(),
         }
         with self.path.open("a", encoding="utf-8") as stream:

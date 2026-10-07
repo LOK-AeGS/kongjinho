@@ -20,11 +20,20 @@ def build_graph(
     quality_eval,
     checkpointer=None,
     policy: SupervisorPolicy | None = None,
+    proposer=None,
     decision_logger=None,
     on_decision=None,
 ):
     graph = StateGraph(SupervisorState)
-    graph.add_node("supervisor", make_supervisor(policy=policy, logger=decision_logger, on_decision=on_decision))
+    graph.add_node(
+        "supervisor",
+        make_supervisor(
+            policy=policy,
+            proposer=proposer,
+            logger=decision_logger,
+            on_decision=on_decision,
+        ),
+    )
     for name, node in {
         "technical": technical,
         "market": market,

@@ -168,11 +168,13 @@ MRR만 보면 dense 단독이 하이브리드보다 앞섭니다(0.875 대 0.833
 여섯 에이전트는 서로를 import하지 않습니다. 각자 `make_node()` 하나만 밖으로 내보내고, 그 안에서
 내부 형식을 부모 State 형식으로 변환합니다.
 
+Supervisor는 State에서 의존성·충분도·재작업 예산·보고서 버전 상한을 적용해 **허용 결정 집합**을 먼저 계산합니다. rule 모드는 기본 결정을 쓰고, LLM 모드는 기본 `gpt-4.1`이 그 집합 안에서만 선택합니다. action이나 targets가 집합 밖이면 guard가 규칙 결정으로 fallback하므로 안전성과 종료 조건은 코드가 보장합니다.
+
 | # | 에이전트 | 하는 일 | 주요 출력 키 |
 |---|---|---|---|
 | ① | **기술 조사** `agents/technical` | Pool A 고정 PDF RAG + Tavily로 기술 성숙도를 조사하고, 코드가 TRL 1~9 Gate를 계산 | `technical_findings`, `evidence_store` |
 | ② | **시장 평가** `agents/market` | 시장 규모·성장성, 상용화·채택, 생태계 지지를 웹 검색 + Pool B 런타임 코퍼스로 조사 | `market_findings`, `evidence_store`, `search_log_by_perspective` |
-| ③ | **이해관계자 평가** `agents/stakeholder_eval.py` | 기술 2개 × 그룹 4개(경쟁 진영/운영자·서빙 엔지니어/공급사/투자자)의 실제 발언을 찾아 지지·반대·중립으로 분류 | `stakeholder_findings`, `evidence_store` |
+| ③ | **이해관계자 평가** `agents/stakeholder/` | 기술 2개 × 그룹 3개의 반응을 조사하고, 검색 URL의 원문 quote·locator·hash·날짜를 코드로 검증 | `stakeholder_findings`, `evidence_store` |
 | ④ | **도메인 평가** `agents/domain` | 데이터센터 요구사항 6축 × 기술 2개 = 12개 판정을, 웹 검색 + 하이브리드 RAG 근거로 생성 | `domain_findings`, `evidence_store`, `quality_by_perspective`, `run_meta` |
 | ⑤ | **평가 종합** `agents/synthesis` | 네 관점 결과를 처음으로 한자리에 모아 비교 매트릭스·상충(SX1~SX7)·보완 관계를 만듦. 새 검색을 하지 않고 관점별 판정을 고쳐 쓰지 않음 | `synthesis` |
 | ⑥ | **보고서 생성** `agents/report` | 확정 State를 섹션별 최소 payload로 나눠 LLM이 서술하고, 인용 연결·REFERENCE·PDF는 코드가 담당 | `report_sections`, `references`, `quality_by_perspective`, `retries`, `run_meta` |
@@ -250,7 +252,8 @@ Capstone_Ai_RAG/
 ├── agents/                     에이전트별 구현 (서로 import 하지 않음)
 │   ├── technical/              ① 기술 조사 — Pool A RAG + Tavily + TRL Gate
 │   ├── market/                 ② 시장 평가 — 웹 검색 + Pool B (rag/, quality/)
-│   ├── stakeholder_eval.py     ③ 이해관계자 평가 — 단일 파일, OpenAI web_search
+│   ├── stakeholder/            ③ 이해관계자 평가 — web_search 발견 + 원문 검증
+│   ├── stakeholder_eval.py     폐기 예정 간소화 구현(비교 기록용)
 │   ├── domain/                 ④ 도메인 평가 — 웹 검색 + 하이브리드 RAG (tools/)
 │   ├── synthesis/              ⑤ 평가 종합 — matrix/relations/writer/review
 │   └── report/                 ⑥ 보고서 생성 — writer/validators/references/pdf
@@ -316,6 +319,7 @@ python main.py --live all --debug       # 여섯 노드 전부 실제 실행 + �
 | 옵션 | 내용 |
 |---|---|
 | `--live` | 실제로 실행할 노드(쉼표 구분): `all` 또는 `technical`, `market`, `stakeholder`, `domain`, `synthesis`, `report` |
+| `--supervisor` | `rule` 또는 `llm`. 미지정 시 live 노드와 OpenAI 키가 있으면 LLM, 아니면 rule |
 | `--debug` | 노드가 끝날 때마다 주장·공백·요약 문장·위반 샘플까지 출력 |
 | `--rounds` | 시장·도메인의 최대 검색 라운드 1 또는 2 (기본 1) |
 | `--as-of` | 조사 기준일 (기본 2026-09-22) |
@@ -348,7 +352,7 @@ python -m scripts.run_report --fixture --deterministic   # 보고서 (API 없이
 ```
 
 이해관계자 에이전트는 단독 스크립트 없이 `main.py --live stakeholder` 또는
-`from agents.stakeholder_eval import make_node`로 실행합니다.
+`from agents.stakeholder import make_node`로 실행합니다. 검색 결과의 URL을 직접 fetch하고 원문과 인용을 대조한 근거만 State에 병합합니다.
 
 ### 4. 테스트 (API 키 없이 실행, 비용 없음)
 
@@ -425,8 +429,8 @@ git commit을 기록합니다. 검색 질의는 `data/search_cache/`에, 수집 
   결정적 코드 3종에서 단일 프롬프트로 통합했는데, 같은 파이프라인이라도 프롬프트 문구에 따라
   위반 탐지가 "완전히 놓침 → 과잉 반응(10건 오탐) → 적절히 발견(3건)"으로 크게 흔들렸습니다
   (경위는 [`docs/DOMAIN_AGENT.md`](docs/DOMAIN_AGENT.md)).
-- **이해관계자 에이전트는 원문 재검증을 하지 않습니다.** 코드 가독성을 위해 인용문 대조 검증을
-  뺐으므로, 중요한 판단에는 `evidence_store`의 URL을 직접 확인해야 합니다.
+- **이해관계자 원문 검증은 의미 전체를 증명하지 않습니다.** quote·locator·hash·날짜·수치 존재는
+  코드가 확인하지만 발언자 신원, 번역 정확성, 인과 해석은 사람 또는 별도 Judge 검토가 필요합니다.
 - **평가 종합의 상충 규칙에 오탐이 남아 있습니다.** SX7은 실제 데이터에서 거의 항상 걸리고,
   SX6은 문서 단위로 잘못 걸립니다([ISSUE.md](ISSUE.md) 6-1, 6-2).
 - **Golden Set이 16문항**이라 한 문항이 검색 지표의 0.06을 좌우합니다.
@@ -438,7 +442,7 @@ git commit을 기록합니다. 검색 질의는 `data/search_cache/`에, 수집 
 ### Supervisor State 설계 근거
 
 - 제어 vs 페이로드 분리: 라우팅은 `node_status`·`rework`·`step_count`·`next`만 읽는다. 관점 결과(`*_findings`)는 supervisor가 충분도 계산에만 읽고 수정하지 않는다.
-- 관측성 위치: 결정 전체 로그는 State 밖 `outputs/graph/<run>/decisions.jsonl`(`{trace_id, step, node, decision, reason, ts}`). State엔 `last_decision` 1건만. LangSmith에는 run metadata로 `trace_id`.
+- 관측성 위치: 결정 전체 로그는 State 밖 `outputs/graph/<run>/decisions.jsonl`(`{trace_id, step, node, decision, reason, source, ts}`). State엔 `last_decision` 1건만. LangSmith에는 run metadata로 `trace_id`.
 - 지속성 비용: 최종 보고서 Markdown·PDF는 파일로 쓰고 State엔 `artifacts`의 URI만. 원문 본문은 기존 fetch_cache, 결정 로그는 JSONL. `last_decision`은 덮어쓰기로 체크포인트마다 커지지 않음.
 - 상관: `trace_id` = LangGraph checkpoint `thread_id` = LangSmith metadata/tags = decisions.jsonl 키.
 - 재개/복구: `node_status`(`attempts`·`completed_step`·`last_error`)와 `rework`만 있으면 supervisor가 다음 행동을 재계산 가능. `MemorySaver` 체크포인터를 기본 연결.

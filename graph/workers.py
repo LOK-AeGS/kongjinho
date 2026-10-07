@@ -20,6 +20,19 @@ def as_worker(name: str, node_fn, *, artifact_dir: Path | None = None):
             view["request"] = request
             if name == "report":
                 view["report_feedback"] = list(directive.get("feedback") or [])
+            if name == "stakeholder":
+                focus = list(directive.get("focus") or [])
+                gaps = list((view.get("stakeholder_findings") or {}).get("gaps") or [])
+                matched = [
+                    gap for gap in gaps
+                    if "/".join(
+                        str(gap.get(key) or "") for key in ("technology", "criterion")
+                    ).strip("/") in focus
+                ]
+                view["rework_hint"] = {
+                    "focus_queries": focus,
+                    "gaps": matched or gaps,
+                }
         try:
             output = dict(node_fn(view) or {})
         except Exception as exc:
