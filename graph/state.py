@@ -433,7 +433,7 @@ class SupervisorState(AppState, total=False):
     # 상관: trace_id = LangGraph checkpoint thread_id = LangSmith metadata/tags = decisions.jsonl 키.
     # 재개/복구: supervisor 결정은 State만으로 재계산되는 함수, 재개용 상태는 node_status(attempts·completed_step·last_error)와 rework. MemorySaver(thread_id=trace_id)는 실행 중 메모리 체크포인트라 프로세스 재시작 복구는 하지 않음.
     # 동시 처리: 병렬 worker가 함께 쓰는 키는 reducer: evidence_store(멱등 병합), node_status·artifacts·quality_by_perspective·search_log_by_perspective·run_meta(dict 병합). 그 외 키는 노드별 소유.
-    # 종료 보장: supervisor 실행이 max_steps에 닿으면 강제 END(사유 기록), MAX_REWORK_PER_AGENT=1, MAX_REPORT_VERSIONS=2(상한 전 품질 미달은 반드시 재작업·재작성), 모든 분기가 유한 카운터를 소모.
+    # 종료 보장: supervisor 실행이 max_steps에 닿으면 강제 END(사유 기록), MAX_REWORK_PER_AGENT=1, MAX_REPORT_VERSIONS=2(상한 전 품질 미달은 반드시 재작업·재작성), MAX_FAILED_ATTEMPTS=2(하위 단계 예외 반복 시 종료), 모든 분기가 유한 카운터를 소모.
     trace_id: str
     step_count: int
     max_steps: int

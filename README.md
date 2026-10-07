@@ -83,7 +83,7 @@ RAG 과제 단계의 상세 설명(검색 실험, 에이전트별 판정 규칙 
 - **상관** : `trace_id` = checkpoint `thread_id` = LangSmith metadata/tag = decisions.jsonl 키
 - **재개/복구** : supervisor 결정은 State만으로 다시 계산되는 함수이고, 재개에 필요한 상태(`node_status`의 attempts·completed_step·last_error, created_step으로 1회 소비되는 `rework`)를 State에 둔다. `MemorySaver`(thread_id = trace_id)로 실행 중 체크포인트를 남기며, 메모리 저장이라 프로세스 재시작 뒤 복구는 하지 않는다. 워커 예외는 `failed`로 기록되고 그래프는 계속된다
 - **동시 처리** : 병렬 워커가 함께 쓰는 키는 reducer — `evidence_store`(ID 기준 멱등 병합), `node_status`·`artifacts`·`quality_by_perspective`·`search_log_by_perspective`·`run_meta`(dict 병합). 나머지는 노드별 소유
-- **종료 보장** : supervisor 실행 횟수가 `max_steps`에 닿으면 강제 종료, 관점당 재작업 1회, 보고서 최대 2버전. 상한 전의 품질 미달은 반드시 관점 재작업 또는 보고서 재작성으로 돌아가고, 상한에 닿으면 추가 재작업 없이 종료한다. LLM 제안은 이 상한 안의 선택지로만 제한된다
+- **종료 보장** : supervisor 실행 횟수가 `max_steps`에 닿으면 강제 종료, 관점당 재작업 1회, 보고서 최대 2버전. 상한 전의 품질 미달은 반드시 관점 재작업 또는 보고서 재작성으로 돌아가고, 상한에 닿으면 추가 재작업 없이 종료한다. 종합·보고서·품질 평가가 예외로 2회 실패하면 마지막 오류를 사유로 남기고 종료한다. LLM 제안은 이 상한 안의 선택지로만 제한된다
 
 ## Architecture
 

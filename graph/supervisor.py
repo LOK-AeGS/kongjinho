@@ -15,6 +15,8 @@ from graph.decision_log import DecisionLogger
 PERSPECTIVES = ("technical", "market", "stakeholder", "domain")
 MAX_REWORK_PER_AGENT = 1
 MAX_REPORT_VERSIONS = 2
+# 종합·보고서·품질 평가가 예외로 실패했을 때 같은 노드를 부르는 최대 횟수(첫 시도 포함).
+MAX_FAILED_ATTEMPTS = 2
 DEFAULT_SUPERVISOR_MODEL = "gpt-4.1"
 
 
@@ -34,6 +36,7 @@ class SupervisorPolicy:
     })
     min_coverage: float = 0.5
     rework_search_rounds: int = 2
+    max_failed_attempts: int = MAX_FAILED_ATTEMPTS
 
 
 def assess_sufficiency(
@@ -169,6 +172,15 @@ def _build_plan(state: dict, policy: SupervisorPolicy) -> dict:
         ]
         default = next(item for item in allowed if item["action"] == "rework" and item["targets"] == candidates)
         return {"allowed": allowed, "default": default, "assessments": assessments, "accepted": accepted}
+
+    # 하위 단계가 예외로 실패를 반복하면 max_steps까지 같은 노드를 다시 부르지 않고 종료한다
+    # (live: OpenAI 403으로 quality_eval이 14번 재호출됐다). 상태·마지막 오류는 node_status에 남는다.
+    for name in ("synthesis", "report", "quality_eval"):
+        status = (state.get("node_status") or {}).get(name) or {}
+        if status.get("status") == "failed" and _attempts(state, name) >= policy.max_failed_attempts:
+            reason = f"{name} 실패 {_attempts(state, name)}회로 종료: {str(status.get('last_error') or '')[:120]}"
+            default = _choice("finish", [], reason)
+            return {"allowed": [default], "default": default, "assessments": assessments, "accepted": accepted}
 
     suffix = f"; 재작업 상한으로 부족 상태 수용: {', '.join(accepted)}" if accepted else ""
     synthesis_missing = not state.get("synthesis") or _attempts(state, "synthesis") == 0

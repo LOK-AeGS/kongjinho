@@ -720,3 +720,17 @@ def test_unsupported_sentence_on_fixed_technical_evidence_goes_to_report_rewrite
         {"sentence": "- ITME 처리량은 63% 증가했다. 〔근거: domain:ev:y〕", "evidence_ids": ["domain:ev:y"]},
     ]}}
     assert _entailment_rework_targets(llm, {}) == ["domain"]
+
+
+def test_repeated_quality_failure_stops_before_max_steps():
+    # live: OpenAI 403으로 quality_eval이 실패할 때마다 다시 디스패치돼 max_steps까지 14번 호출됐다.
+    nodes, _ = build_nodes(set(), load_fixture())
+
+    def broken(_state):
+        raise RuntimeError("403 model_not_found")
+
+    nodes["quality_eval"] = as_worker("quality_eval", broken)
+    final, _ = run_graph(nodes, initial_state(max_steps=20))
+    assert final["node_status"]["quality_eval"]["attempts"] == 2
+    assert "quality_eval 실패 2회로 종료" in final["last_decision"]["reason"]
+    assert final["step_count"] < 20
