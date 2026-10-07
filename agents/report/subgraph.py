@@ -15,6 +15,7 @@ from agents.report.budget import (
     balanced_pick,
     body_length,
     clip,
+    clip_items,
     default_budgets,
     estimate_pages,
     omitted_note,
@@ -386,7 +387,7 @@ class DeterministicSectionWriter:
             citation = f" 〔근거: {', '.join(ids)}〕" if ids else ""
             details: list[str] = []
             if claim.get("conditions"):
-                details.append("조건: " + clip("; ".join(claim["conditions"]), 120))
+                details.append("조건: " + clip_items(claim["conditions"], 120))
             if claim.get("uncertainty"):
                 details.append("불확실성: " + clip(claim["uncertainty"], 120))
             suffix = f" ({' / '.join(details)})" if details else ""
@@ -416,12 +417,19 @@ class DeterministicSectionWriter:
         ids = list(record.get("evidence_ids", []))
         value = record.get("value") or record.get("assessment") or "판단 보류"
         citation = f" 〔근거: {', '.join(ids)}〕" if ids else ""
-        limitations = clip("; ".join(str(item) for item in record.get("limitations", [])), 120)
+        items = [str(item) for item in record.get("limitations", []) if str(item).strip()]
+        if "trl" in str(record.get("criterion") or "").casefold() and len(items) > 1:
+            # TRL 한계는 [운영 근거 부재 문장, 미충족 Gate 이름…] 형식이라 첫 문장만 싣고 Gate는 개수로 요약한다.
+            limitations = f"{clip(items[0], 120)}; 미충족 Gate {len(items) - 1}개"
+        else:
+            limitations = clip_items(items, 120)
         suffix = f" / {limitations}" if limitations else ""
-        line = (
-            f"- {record.get('technology', '기술')}: {record.get('criterion', '')} "
-            f"{value} — {clip(record.get('findings', ''), 200)}{suffix}{citation}"
-        )
+        technology = str(record.get("technology") or "기술")
+        technology = technology.upper() if technology in {"sw", "hw"} else technology
+        criterion = str(record.get("criterion") or "")
+        # 값에 기준명이 이미 들어 있으면("TRL 4–5") 기준명을 다시 쓰지 않는다.
+        label = f"{value}" if criterion.casefold() in str(value).casefold() else f"{criterion} {value}".strip()
+        line = f"- {technology}: {label} — {clip(record.get('findings', ''), 200)}{suffix}{citation}"
         return line, ids
 
     def _perspective(self, section_id: SectionId, context: dict, limit: int) -> SectionDraft:

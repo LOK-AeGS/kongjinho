@@ -171,10 +171,41 @@ def round_robin_pick(items: Iterable[T], limit: int, key) -> list[T]:
     return [item for index, item in enumerate(items) if index in chosen]
 
 
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?。])\s+|(?<=다\.)|(?<=[;；])\s*")
+
+
 def clip(text: str, limit: int = 260) -> str:
-    """한 항목이 섹션 예산을 혼자 차지하지 않도록 자른다. 잘랐으면 말줄임표를 붙인다."""
+    """한 항목이 섹션 예산을 혼자 차지하지 않도록 줄인다.
+
+    단어 중간에서 자르지 않고 문장(또는 ';' 구분) 경계까지만 담는다. 첫 문장부터 한도를 넘을 때만
+    공백 경계에서 자르고 말줄임표를 붙인다.
+    """
     text = " ".join(str(text).split())
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+    if len(text) <= limit:
+        return text
+    kept = ""
+    for part in (piece.strip() for piece in _SENTENCE_BREAK.split(text) if piece.strip()):
+        candidate = f"{kept} {part}".strip()
+        if len(candidate) > limit:
+            break
+        kept = candidate
+    if kept:
+        return kept.rstrip(";； ")
+    cut = text[:limit].rsplit(" ", 1)[0]
+    return (cut or text[:limit]).rstrip() + "…"
+
+
+def clip_items(items, limit: int = 120, unit: str = "개") -> str:
+    """목록을 항목 단위로 담고, 넘치는 항목은 '외 N개'로 표시한다(항목 중간에서 자르지 않음)."""
+    values = [" ".join(str(item).split()) for item in items if str(item).strip()]
+    kept: list[str] = []
+    for value in values:
+        if kept and len("; ".join(kept + [value])) > limit:
+            break
+        kept.append(value)
+    rest = len(values) - len(kept)
+    text = "; ".join(kept)
+    return f"{text} 외 {rest}{unit}" if rest else text
 
 
 def omitted_note(total: int, kept: int, unit: str = "건") -> str:
