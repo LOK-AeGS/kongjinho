@@ -9,8 +9,10 @@ from __future__ import annotations
 import re
 
 from agents.report.budget import OVER_BUDGET_TOLERANCE, SectionBudget, body_length
+from agents.report.metrics import METRIC_RULES, metric_violations
 from agents.report.references import source_identity
 from agents.report.state import SECTION_ORDER, SectionDraft, SectionId, ValidationIssue
+from graph.metrics import MEASUREMENT, extract_measurements
 
 
 REQUIRED_HEADINGS = (
@@ -45,10 +47,7 @@ PROHIBITED_COMPARISON = (
     "최선의 기술",
 )
 
-_MEASUREMENT = re.compile(
-    r"(?<![\w.-])\d+(?:\.\d+)?\s*(?:%|×|x(?=\s|$)|배|GB/s|GB|TB|MB|ms|μs|초|달러|원)",
-    re.IGNORECASE,
-)
+_MEASUREMENT = MEASUREMENT
 _CITATION = re.compile(r"〔근거:\s*([^〕]+)〕")
 
 
@@ -61,10 +60,6 @@ def issue(
         "section_id": section_id,
         "blocking": blocking,
     }
-
-
-def extract_measurements(text: str) -> set[str]:
-    return {re.sub(r"\s+", "", value).lower() for value in _MEASUREMENT.findall(text or "")}
 
 
 def extract_citations(text: str) -> list[str]:
@@ -129,21 +124,8 @@ def _sentences(text: str) -> list[str]:
 def _metric_issues(section_id: SectionId, markdown: str) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     for sentence in _sentences(markdown):
-        folded = sentence.casefold().replace(" ", "")
-        if "93.3" in sentence:
-            if "deepseek67b" not in folded or "mla만으로" in folded or "mla단독" in folded:
-                issues.append(issue("metric_93_3_context", "93.3%에는 DeepSeek 67B 대비 전체 비교 조건이 필요함", section_id))
-        if "5.76" in sentence and not re.search(r"8\s*[×x]\s*h800|8개\s*h800", sentence, re.IGNORECASE):
-            issues.append(issue("metric_5_76_context", "5.76×에는 8×H800 조건이 필요함", section_id))
-        if "35.7" in sentence and "최대" not in sentence:
-            issues.append(issue("metric_35_7_context", "35.7%는 최대값으로 표시해야 함", section_id))
-        if "1.81" in sentence:
-            required = ("ttft", "turn5", "recomputation")
-            if not all(token in folded for token in required):
-                issues.append(issue("metric_1_81_context", "1.81×에는 turn 5, TTFT, recomputation baseline 조건이 필요함", section_id))
-        if "42.5" in sentence:
-            if "mla" in folded or not any(token in folded for token in ("훈련", "training")):
-                issues.append(issue("metric_42_5_attribution", "42.5%를 MLA 효과로 귀속할 수 없음", section_id))
+        for rule in metric_violations(sentence):
+            issues.append(issue(rule.code, rule.message, section_id))
     return issues
 
 
@@ -201,6 +183,21 @@ def validate_section(draft: SectionDraft, context: dict) -> list[ValidationIssue
             for eid in draft["evidence_ids"]
             if eid in store
         ]
+    )
+    cited_ids = set(draft["evidence_ids"])
+    structured_records = [
+        record
+        for result in context.get("findings", {}).values()
+        for record in (result or {}).get("records", [])
+        if cited_ids.intersection(record.get("evidence_ids", []))
+    ]
+    source_text += "\n" + "\n".join(
+        " ".join(str(record.get(field) or "") for field in ("value", "findings"))
+        for record in structured_records
+    )
+    # 자동 주석의 canonical 조건은 검증 코드가 소유하는 확정 문구다.
+    source_text += "\n" + "\n".join(
+        rule.canonical_condition or "" for rule in METRIC_RULES
     )
     grounded = extract_measurements(source_text)
     ungrounded = sorted(extract_measurements(draft["markdown"]) - grounded)

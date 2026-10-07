@@ -84,17 +84,23 @@ class OfflineGraphTest(unittest.TestCase):
         self.assertGreaterEqual(self.final["report_version"], 1)
         self.assertIsNotNone(self.final["eval_result"])
 
-    def test_report_violation_drives_bounded_quality_loop(self):
-        self.assertFalse(self.final["eval_result"]["passed"])
-        self.assertIn("groundedness", self.final["eval_result"]["failed_criteria"])
-        self.assertEqual(self.final["report_version"], 2)
-        self.assertEqual(self.final["node_status"]["report"]["attempts"], 2)
-        self.assertIn("품질 루프 상한", self.final["last_decision"]["reason"])
+    def test_offline_run_passes_quality_and_ends_after_first_report(self):
+        """수치 조건 자동 부착 후 fixture 보고서는 품질 평가를 통과해 첫 보고서로 끝난다.
+        불합격 시 보고서 재작성·상한 종료는 tests/graph/test_supervisor.py 가 가짜 품질 노드로 검사한다."""
+        self.assertTrue(self.final["eval_result"]["passed"])
+        self.assertEqual(self.final["report_version"], 1)
+        self.assertIn("품질 평가 통과", self.final["last_decision"]["reason"])
 
-    def test_report_catches_deliberate_fixture_error(self):
-        """fixture 에 일부러 넣은 '35.7%' 조건 누락이 보고서 검사에서 잡힌다 (에이전트 간 검사 연결 확인)."""
+    def test_deliberate_fixture_error_is_corrected_by_metric_annotation(self):
+        """fixture 에 일부러 넣은 '35.7%' 조건 누락은 보고서 단계에서 표준 조건으로 보정된다."""
         report = self.final["quality_by_perspective"]["report"]
-        self.assertTrue(any("35.7" in v for v in report["violations"]))
+        self.assertFalse(any("35.7" in v for v in report["violations"]))
+        markdown = Path(self.final["artifacts"]["report_with_ids_md"]).read_text(encoding="utf-8") \
+            if self.final.get("artifacts", {}).get("report_with_ids_md") \
+            else self.final["report_sections"].get("final_markdown_with_ids", "")
+        lines = [line for line in markdown.splitlines() if "35.7" in line]
+        self.assertTrue(lines)
+        self.assertTrue(all("최대" in line for line in lines))
 
     def test_modes_describe_every_node(self):
         self.assertEqual(set(self.modes), {"technical", "market", "stakeholder", "domain", "synthesis", "report", "quality_eval"})

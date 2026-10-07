@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from agents.report.state import ReportAgentDeps  # noqa: E402
 from agents.report.node import report_agent  # noqa: E402
 from agents.report.subgraph import (  # noqa: E402
+    DETERMINISTIC_STRUCTURED_SECTIONS,
     DeterministicSectionWriter,
     _writer_context,
     normalize_state,
@@ -68,7 +69,8 @@ class RecordingWriter(DeterministicSectionWriter):
         self.writes.append(section_id)
         draft = super().write(section_id, context)
         if section_id == "technology_overview":
-            draft["markdown"] = draft["markdown"].replace("최대 35.7%", "35.7%")
+            # 조건 자동 부착(annotate_metrics)으로 고칠 수 없는 귀속 오류를 넣어 부분 수정 경로를 검사한다.
+            draft["markdown"] += "\n- MLA 단독 효과로 학습 비용이 42.5% 줄었다."
         return draft
 
     def repair(self, section_id, draft, issues, context):
@@ -214,6 +216,24 @@ class ReportAgentTests(unittest.TestCase):
         report = run_offline(fixture("evidence_gap"))["report"]
         self.assertIn("실운용 채택 규모 미확인", report["markdown"])
         self.assertNotIn("실운용 채택 규모가 존재하지 않는다", report["markdown"])
+
+    def test_missing_metric_condition_is_annotated_without_repair(self):
+        class DroppedConditionWriter(RecordingWriter):
+            def write(self, section_id, context):
+                self.writes.append(section_id)
+                draft = DeterministicSectionWriter.write(self, section_id, context)
+                if section_id == "technology_overview":
+                    draft["markdown"] = draft["markdown"].replace("최대 35.7%", "35.7%")
+                return draft
+
+        writer = DroppedConditionWriter()
+        result = run_report(
+            fixture("numeric_violation"),
+            ReportAgentDeps(writer=writer, writer_receives_full_context=True),
+        )
+        self.assertEqual(writer.repairs, [])
+        self.assertFalse(any(item["code"] == "metric_35_7_context" for item in result["issues"]))
+        self.assertIn("CPU-offload 대비 최대값", result["report"]["markdown"])
 
     def test_only_invalid_section_is_repaired(self):
         writer = RecordingWriter()
@@ -408,7 +428,10 @@ class ReportAgentTests(unittest.TestCase):
 
         self.assertEqual(result["generation"]["mode"], "llm")
         self.assertEqual(result["generation"]["model"], "test-model")
-        self.assertEqual(len(llm.structured.messages), 14)
+        # 본문 13개 + SUMMARY 1개 중 표 섹션 3개(매트릭스·조건표·TRL)는 결정적 writer가 쓴다.
+        self.assertEqual(
+            len(llm.structured.messages), 14 - len(DETERMINISTIC_STRUCTURED_SECTIONS)
+        )
         self.assertTrue(
             all("섹션 규칙" in messages[1][1] for messages in llm.structured.messages)
         )

@@ -6,7 +6,7 @@ import re
 from collections import Counter, defaultdict
 
 from agents.report.references import source_identity
-from agents.report.validators import _MEASUREMENT
+from graph.metrics import MEASUREMENT
 
 
 CITATION = re.compile(r"〔근거:\s*([^〕]+)〕")
@@ -83,7 +83,7 @@ def groundedness(
     factual = factual_body_lines(markdown)
     cited = [line for line in factual if citation_ids(line)]
     uncited_measurements = [
-        line for line in factual if _MEASUREMENT.search(line) and not citation_ids(line)
+        line for line in factual if MEASUREMENT.search(line) and not citation_ids(line)
     ]
     all_ids = citation_ids(_body(markdown))
     unknown = sorted(set(all_ids) - set(evidence_store))
@@ -97,8 +97,13 @@ def groundedness(
     return {"passed": passed, "score": ratio if not unknown else 0.0, "details": details}
 
 
+# "원본 확인 권장"처럼 검증 절차를 권하는 표현은 기술 추천이 아니다(live 1차 오탐).
+VERIFICATION_ADVICE = re.compile(r"(확인|검토|검증|재현)\s*(을|를)?\s*권장")
+
+
 def neutrality(markdown: str) -> dict:
-    found = sorted({word for word in PROHIBITED if word in _body(markdown)})
+    body = VERIFICATION_ADVICE.sub("", _body(markdown))
+    found = sorted({word for word in PROHIBITED if word in body})
     return {
         "passed": not found,
         "score": 1.0 if not found else 0.0,
@@ -134,9 +139,10 @@ def bias_control(markdown: str, evidence_store: dict, findings: dict[str, dict |
     ratio = high / low if low else (float("inf") if high else 1.0)
     details = [f"최대 출처 집중도 {concentration:.2f}", f"SW/HW claim 인용 수 {counts.get('sw', 0)}/{counts.get('hw', 0)}"]
     section_failures = []
-    for title in SECTIONS.values():
+    for perspective, title in SECTIONS.items():
+        body = _section(markdown, title)
         cited_lines = [
-            line.strip() for line in _section(markdown, title).splitlines()
+            line.strip() for line in body.splitlines()
             if line.strip().startswith(("- ", "* ", "|")) and citation_ids(line)
         ]
         if len(cited_lines) < 3:
@@ -160,7 +166,13 @@ def bias_control(markdown: str, evidence_store: dict, findings: dict[str, dict |
             tech for evidence_id in section_ids for tech in technologies.get(evidence_id, ())
         }
         if section_tech in ({"sw"}, {"hw"}):
-            section_failures.append(f"{title}: 한 기술만 다룸")
+            other = ({"sw", "hw"} - section_tech).pop()
+            # 다른 기술의 근거가 없다는 사실이 공백으로 명시돼 있으면 편향이 아니라 근거 부재다
+            # (live 1차: ITME는 공개 이해관계자 반응이 없어 4.3이 SW만 다뤘고 gaps에 기록돼 있었다).
+            if _absence_documented(body, (findings.get(perspective) or {}), other):
+                details.append(f"경고: {title}: 한 기술만 다룸({other.upper()} 근거 부재가 공백으로 명시됨)")
+            else:
+                section_failures.append(f"{title}: 한 기술만 다룸")
     details.extend(section_failures)
     for tech in ("sw", "hw"):
         counter = any(
@@ -175,6 +187,16 @@ def bias_control(markdown: str, evidence_store: dict, findings: dict[str, dict |
     balance_score = min(1.0, 2.5 / ratio) if ratio not in {0, float("inf")} else (1.0 if ratio == 0 else 0.0)
     section_score = 0.0 if section_failures else 1.0
     return {"passed": passed, "score": min(source_score, balance_score, section_score), "details": details}
+
+
+ABSENCE_MARKERS = ("확인하지 못", "찾지 못", "판단 보류", "근거 부족", "미확인", "not_found", "not_assessed", "silent")
+
+
+def _absence_documented(section_body: str, findings: dict, technology: str) -> bool:
+    """해당 기술의 근거 부재가 관점 결과 gaps나 섹션 본문에 명시됐는지 본다."""
+    if any(gap.get("technology") in {technology, "both"} for gap in findings.get("gaps") or []):
+        return True
+    return any(marker in section_body for marker in ABSENCE_MARKERS)
 
 
 def _section(markdown: str, title: str) -> str:

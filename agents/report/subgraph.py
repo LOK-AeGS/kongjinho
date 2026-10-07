@@ -22,6 +22,7 @@ from agents.report.budget import (
     shrink,
 )
 from agents.report.prompts import build_section_prompt
+from agents.report.metrics import annotate_metrics
 from agents.report.references import collect_references, number_citations, reference_numbers
 from agents.report.state import (
     BODY_SECTION_ORDER,
@@ -70,6 +71,10 @@ _TECHNOLOGY_INPUT_FIELDS = (
     "approach",
     "selection_reason",
 )
+
+# 표·TRL은 구조화된 상위 값을 그대로 보존해야 한다. LLM 산문화로 행 인용이 유실되지 않게
+# 생성 모드와 무관하게 결정적 writer가 렌더링한다.
+DETERMINISTIC_STRUCTURED_SECTIONS = frozenset({"comparison_matrix", "conditions", "trl"})
 
 
 def _as_list(value) -> list:
@@ -844,6 +849,12 @@ def _prepare_writer_draft(
     return _ensure_limitations_status(section_id, draft, context), issue
 
 
+def _annotate_draft(draft: SectionDraft) -> SectionDraft:
+    updated = deepcopy(draft)
+    updated["markdown"] = annotate_metrics(updated["markdown"])
+    return updated
+
+
 def _assemble(sections: dict[SectionId, SectionDraft]) -> str:
     parts = [sections["summary"]["markdown"], sections["background"]["markdown"], sections["technology_selection"]["markdown"], sections["technology_overview"]["markdown"]]
     parts.append("# 4. 관점별 평가")
@@ -925,7 +936,10 @@ def finalize_report(
     else:
         summary = summary_override
 
-    sections: dict[SectionId, SectionDraft] = {"summary": summary, **deepcopy(body_sections)}
+    sections: dict[SectionId, SectionDraft] = {
+        section_id: _annotate_draft(draft)
+        for section_id, draft in {"summary": summary, **deepcopy(body_sections)}.items()
+    }
     sections = _link_citations(sections, context)
     used_evidence_ids = _unique(
         evidence_id
@@ -1107,21 +1121,30 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
     body_sections: dict[SectionId, SectionDraft] = {}
 
     # 사진의 본문 작성 단계: SUMMARY와 REFERENCE는 아직 만들지 않는다.
+    structured_writer = DeterministicSectionWriter()
     for section_id in BODY_SECTION_ORDER:
         fallback_context = _writer_context(section_id, context, include_normalized=True)
+        section_writer = (
+            structured_writer
+            if section_id in DETERMINISTIC_STRUCTURED_SECTIONS
+            else writer
+        )
         writer_context = _writer_context(
             section_id,
             context,
-            include_normalized=_include_normalized(writer, deps),
+            include_normalized=(
+                True if section_id in DETERMINISTIC_STRUCTURED_SECTIONS
+                else _include_normalized(writer, deps)
+            ),
         )
         try:
-            draft = writer.write(section_id, writer_context)
+            draft = section_writer.write(section_id, writer_context)
             draft, sanitize_issue = _prepare_writer_draft(
                 section_id,
                 draft,
                 writer_context,
                 context,
-                sanitize=not isinstance(writer, DeterministicSectionWriter),
+                sanitize=not isinstance(section_writer, DeterministicSectionWriter),
             )
             body_sections[section_id] = draft
             if sanitize_issue and sanitize_issue not in input_issues:
@@ -1177,17 +1200,25 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
             writer_context = _writer_context(
                 section_id,
                 context,
-                include_normalized=_include_normalized(writer, deps),
+                include_normalized=(
+                    True if section_id in DETERMINISTIC_STRUCTURED_SECTIONS
+                    else _include_normalized(writer, deps)
+                ),
             )
             fallback_context = _writer_context(section_id, context, include_normalized=True)
             try:
-                updated = writer.repair(section_id, draft, section_issues, writer_context)
+                section_writer = (
+                    structured_writer
+                    if section_id in DETERMINISTIC_STRUCTURED_SECTIONS
+                    else writer
+                )
+                updated = section_writer.repair(section_id, draft, section_issues, writer_context)
                 updated, sanitize_issue = _prepare_writer_draft(
                     section_id,
                     updated,
                     writer_context,
                     context,
-                    sanitize=not isinstance(writer, DeterministicSectionWriter),
+                    sanitize=not isinstance(section_writer, DeterministicSectionWriter),
                 )
                 if sanitize_issue and sanitize_issue not in input_issues:
                     input_issues.append(sanitize_issue)
@@ -1229,6 +1260,7 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
             ),
         )
         candidate = _ensure_limitations_status(section_id, candidate, context)
+        candidate = _annotate_draft(candidate)
         if blocking(validate_section(candidate, context)):
             continue
         if section_id == "summary":

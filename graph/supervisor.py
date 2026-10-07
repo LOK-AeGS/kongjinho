@@ -306,6 +306,9 @@ def state_summary(
             else:
                 entry["state"] = verdict
             entry["sufficiency_reason"] = reason
+            entry["evidence_count"] = _cited_evidence_count(
+                state.get(f"{name}_findings"), state.get("evidence_store") or {}
+            )
         perspectives[name] = entry
     allowed = [
         {
@@ -322,6 +325,10 @@ def state_summary(
         "rework_budget_per_agent": policy.max_rework_per_agent,
         "report_version": int(state.get("report_version", 0)),
         "max_report_versions": policy.max_report_versions,
+        "next_report_is": (
+            "first" if int(state.get("report_version", 0)) == 0
+            else f"version {int(state.get('report_version', 0)) + 1}"
+        ),
         "eval": {
             "failed_criteria": list((state.get("eval_result") or {}).get("failed_criteria") or []),
             "rework_targets": list((state.get("eval_result") or {}).get("rework_targets") or []),
@@ -333,6 +340,17 @@ def state_summary(
         },
         "allowed": allowed,
     }
+
+
+def _cited_evidence_count(findings: dict | None, evidence_store: dict) -> int:
+    """assess_sufficiency와 같은 기준(records·claims가 인용한 실재 근거)으로 센다."""
+    findings = findings or {}
+    return len({
+        evidence_id
+        for item in (findings.get("records") or []) + (findings.get("claims") or [])
+        for evidence_id in item.get("evidence_ids", [])
+        if evidence_id in evidence_store
+    })
 
 
 def make_llm_proposer(model: str | None = None):
@@ -359,7 +377,9 @@ def make_llm_proposer(model: str | None = None):
         "재작업 예산이 남아 있고 근거가 부족하면 재작업을 우선한다. 근거가 충분하다고 판정되거나 부족 상태가 명시적으로 "
         "수용되기 전에는 보고서를 작성하지 않는다. reason은 summary에 실제로 있는 state·attempts·rework_left·근거 수·"
         "failed_criteria만 인용해 한국어 1~2문장으로 쓴다. sufficient 관점을 근거 부족이라고 말하지 않는다. "
-        "pending 관점의 첫 dispatch는 재작업이 아니라 최초 조사라고 표현한다. summary에 없는 사실을 추정하지 않는다."
+        "pending 관점의 첫 dispatch는 재작업이 아니라 최초 조사라고 표현한다. summary에 없는 사실을 추정하지 않는다. "
+        "근거 수(evidence_count)·report_version 같은 숫자는 summary 값을 그대로 옮긴다. "
+        "보고서를 다시 쓸 때는 next_report_is 값을 따르고 '최초'라고 쓰지 않는다."
     )
 
     def propose(summary: dict, allowed: list[dict]) -> dict:

@@ -18,6 +18,7 @@ from agents.domain.subgraph import (
     DomainLocalState,
     _build_subgraph,
 )
+from graph.metrics import measurement_values
 
 _EMPTY_SELF_CHECK = {
     "status": "failed",
@@ -174,6 +175,79 @@ def _to_team_gaps(missing_axes: list[str], code_gaps: list[str]) -> list[dict]:
     return gaps
 
 
+def _bind_numeric_claims(claims: list[dict], records: list[dict], evidence_store: dict) -> tuple[list[dict], list[dict], list[dict], list[str], int]:
+    """AppState로 내보내기 직전에 수치가 실제 인용 quote에 있는지 강제한다."""
+    criteria_by_claim = {
+        claim_id: record.get("criterion") or "-"
+        for record in records
+        for claim_id in record.get("claim_ids", [])
+    }
+    numeric_gaps: list[dict] = []
+    limitations: list[str] = []
+    kept_claims = []
+    dropped_ids: set[str] = set()
+    for claim in claims:
+        values = measurement_values(claim.get("text", ""))
+        quoted = {
+            value
+            for evidence_id in claim.get("evidence_ids", [])
+            for value in measurement_values((evidence_store.get(evidence_id) or {}).get("quote", ""))
+        }
+        missing = sorted(values - quoted, key=float)
+        if not missing:
+            kept_claims.append(claim)
+            continue
+        dropped_ids.add(claim["claim_id"])
+        technology_ids = claim.get("technology_ids") or []
+        technology = technology_ids[0] if len(technology_ids) == 1 else "both"
+        criterion = claim.get("criterion") or claim.get("topic") or criteria_by_claim.get(claim["claim_id"], "-")
+        numeric_gaps.append({
+            "technology": technology,
+            "perspective": PERSPECTIVE,
+            "criterion": criterion,
+            "reason": "수치가 인용 근거 원문에서 확인되지 않아 제외",
+            "missing_evidence": missing,
+        })
+        limitations.append(
+            f"{technology}/{criterion}: 수치가 인용 근거 원문에서 확인되지 않아 제외 ({', '.join(missing)})"
+        )
+
+    cleaned_records = []
+    for original in records:
+        record = {**original, "limitations": list(original.get("limitations") or [])}
+        record["claim_ids"] = [
+            claim_id for claim_id in record.get("claim_ids", []) if claim_id not in dropped_ids
+        ]
+        values = measurement_values(str(record.get("value") or ""))
+        quoted = {
+            value
+            for evidence_id in record.get("evidence_ids", [])
+            for value in measurement_values((evidence_store.get(evidence_id) or {}).get("quote", ""))
+        }
+        missing = sorted(values - quoted, key=float)
+        if missing:
+            record["value"] = None
+            line = "수치가 인용 근거 원문에서 확인되지 않아 제외"
+            if line not in record["limitations"]:
+                record["limitations"].append(line)
+            gap = {
+                "technology": record.get("technology_id") or "both",
+                "perspective": PERSPECTIVE,
+                "criterion": record.get("criterion") or "-",
+                "reason": line,
+                "missing_evidence": missing,
+            }
+            if gap not in numeric_gaps:
+                numeric_gaps.append(gap)
+            limitation = (
+                f"{gap['technology']}/{gap['criterion']}: {line} ({', '.join(missing)})"
+            )
+            if limitation not in limitations:
+                limitations.append(limitation)
+        cleaned_records.append(record)
+    return kept_claims, cleaned_records, numeric_gaps, limitations, len(dropped_ids)
+
+
 def make_node(deps: DomainAgentDeps):
     """graph.build.build_graph(domain=...) 에 주입할 노드 함수를 만든다."""
     subgraph = _build_subgraph(deps)
@@ -231,6 +305,11 @@ def make_node(deps: DomainAgentDeps):
 def _output(*, claims, records, evidence_store, search_log, pages_used, self_check,
             search_rounds, gaps, errors, status) -> dict:
     """AppState 업데이트. 관점 전용 키만 반환해 병렬 분기에서 충돌하지 않게 한다."""
+    claims, records, numeric_gaps, numeric_limitations, dropped_numeric_claims = _bind_numeric_claims(
+        claims, records, evidence_store
+    )
+    if dropped_numeric_claims or numeric_gaps:
+        status = "partial" if status != "failed" else status
     claim_of_evidence: dict[str, str] = {}
     for claim in claims:
         for evidence_id in claim["evidence_ids"]:
@@ -241,8 +320,8 @@ def _output(*, claims, records, evidence_store, search_log, pages_used, self_che
         "status": status,
         "records": [_to_team_record(r) for r in records],
         "claims": [_to_team_claim(c) for c in claims],
-        "gaps": _to_team_gaps(self_check.get("missing_axes", []), gaps),
-        "limitations": [],
+        "gaps": _to_team_gaps(self_check.get("missing_axes", []), gaps) + numeric_gaps,
+        "limitations": numeric_limitations,
         "input_evidence_ids": [],
     }
 
@@ -269,6 +348,7 @@ def _output(*, claims, records, evidence_store, search_log, pages_used, self_che
                 "pages_used": pages_used,
                 "search_rounds_used": search_rounds,
                 "prompt_version": PROMPT_VERSION,
+                "dropped_numeric_claims": dropped_numeric_claims,
             }
         },
     }
