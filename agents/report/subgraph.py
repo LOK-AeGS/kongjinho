@@ -801,10 +801,17 @@ def section_payload(
             "records": [] if section_id in {"background", "technology_overview"} else records,
             "gaps": [_writer_gap(gap) for gap in list(source.get("gaps") or [])[:limit]],
         }
-        payload["omitted"] = {
-            "claims": {"total": total_claims, "kept": len(claims)},
-            "records": {"total": total_records, "kept": len(records)},
+        # 실제로 잘라낸 항목만 넘긴다. total == kept까지 넘기면 LLM이 "12건 중 12건만 실었다"를 썼다(live 4차).
+        omitted = {
+            name: {"total": total, "kept": kept}
+            for name, total, kept in (
+                ("claims", total_claims, len(claims)),
+                ("records", total_records, len(records)),
+            )
+            if total > kept
         }
+        if omitted:
+            payload["omitted"] = omitted
     elif section_id in {"summary", "comparison_matrix", "conditions", "conflicts", "shared_and_complement", "open_questions", "limitations"}:
         payload["synthesis"] = _synthesis_view(section_id, context, limit)
         payload["upstream_statuses"] = context["upstream_statuses"]
