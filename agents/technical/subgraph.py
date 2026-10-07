@@ -256,6 +256,17 @@ def build_technical_graph(deps: TechnicalAgentDeps):
                     errors.append(f"{technology} Tavily 검색 실패 ({reason})")
                     logs.append({"provider": "tavily", "technology": technology, "round": attempt, "status": "error", "error": reason})
 
+        # Supervisor 의 재작업 요청이 있으면 부족했던 부분을 겨냥한 웹 질의를 최초 라운드에 한 번씩 더 보낸다.
+        for focus in (state["request"].get("focus_queries") or []) if attempt == 1 else []:
+            for technology in ("sw", "hw"):
+                name = state["selected_tech"][technology]["name"]
+                try:
+                    web_candidates, log = deps.web_provider.search_and_extract(technology, f"{name} {focus}", state["request"]["as_of"])
+                    candidates = merge_candidates(candidates, web_candidates)
+                    logs.append({**log, "round": attempt, "focus": focus})
+                except Exception as exc:
+                    errors.append(f"{technology} 보완 검색 실패 ({type(exc).__name__})")
+
         coverage = coverage_by_technology(candidates)
         missing = missing_criteria(coverage)
         for technology in ("sw", "hw"):

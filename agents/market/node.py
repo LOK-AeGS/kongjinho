@@ -20,6 +20,14 @@ def summarize_technical(findings: dict | None) -> str:
     return "\n".join(lines)
 
 
+def rework_focus(state: dict) -> str:
+    """Supervisor 의 재작업 요청을 질의 계획이 볼 짧은 문장으로 바꾼다. 요청이 없으면 빈 문자열."""
+    hint = state.get("rework_hint") or {}
+    parts = [f"{g.get('criterion', '')}: {g.get('reason', '')}".strip(": ") for g in hint.get("gaps") or []]
+    parts += [str(q) for q in hint.get("focus_queries") or []]
+    return "; ".join(p for p in parts if p)[:600]
+
+
 def project_input(state: dict) -> dict:
     """부모 State에서 이 관점이 볼 것만 추린다.
 
@@ -35,6 +43,7 @@ def project_input(state: dict) -> dict:
         "as_of_date": req["as_of"],
         "max_search_rounds": req["max_search_rounds"],
         "technical_summary": summarize_technical(state.get("technical_findings")),
+        "rework_focus": rework_focus(state),
     }
 
 

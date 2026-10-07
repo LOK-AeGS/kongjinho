@@ -96,6 +96,8 @@ def plan(s: MarketLocal, deps: MarketAgentDeps) -> dict:
         human = f"대상 기술:\n{desc}\n도메인: {s['domain']}\n기준 연도: {year}"
         if s.get("technical_summary"):
             human += f"\n\n선행 기술 조사 요약:\n{s['technical_summary']}"
+        if s.get("rework_focus"):
+            human += f"\n\n이전 조사에서 근거가 부족했던 부분(이 부분을 보완하는 질의를 우선한다):\n{s['rework_focus']}"
         out: PlanOut = deps.llm.with_structured_output(PlanOut).invoke([("system", PLAN_SYSTEM), ("human", human)])
         bank = {f"{i.technology_id}:{i.aspect}": [q for q in i.queries if q.strip()] for i in out.items}
     except Exception as e:

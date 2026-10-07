@@ -14,6 +14,22 @@ from graph.stubs import cited_evidence, load_fixture, replay_node  # noqa: E402
 from main import build_nodes, initial_state as main_initial_state, node_status, run_graph, steps_view  # noqa: E402
 
 
+def assert_supervised_path(test, trace):
+    """supervisor 패턴의 경로 불변식: technical 이 먼저, 이어 ②③④ 병렬, 종합 → 보고서 → 품질 순서가 최소 한 번 완주."""
+    path = steps_view(trace)
+    test.assertEqual(path[0], "technical")
+    test.assertEqual(path[1], "market + stakeholder + domain")
+    test.assertLess(path.index("synthesis"), path.index("report"))
+    test.assertLess(path.index("report"), path.index("quality"))
+    names = [t["node"] for t in trace]
+    # 모든 워커 실행 뒤에는 반드시 supervisor 가 온다 (워커끼리 직접 이어지지 않는다)
+    steps = [t["step"] for t in trace]
+    for t in trace:
+        if t["node"] != "supervisor":
+            test.assertTrue(any(u["node"] == "supervisor" and u["step"] > t["step"] for u in trace) or t is trace[-1], t)
+    test.assertEqual(names[0], "supervisor")
+
+
 def initial_state(fixture=None):
     """main.py 와 같은 초기값: 팀 고정 입력 + Pool A manifest."""
     return main_initial_state(rounds=1)
@@ -28,10 +44,11 @@ class OfflineGraphTest(unittest.TestCase):
         nodes, cls.modes = build_nodes(set(), cls.fixture)
         cls.final, cls.trace = run_graph(nodes, initial_state(cls.fixture))
 
-    def test_follows_designed_order_with_parallel_fan_out(self):
-        """설계서 §8.1: ① → ②③④ 병렬(같은 step) → ⑤ → ⑥."""
-        self.assertEqual(steps_view(self.trace),
-                         ["technical", "market + stakeholder + domain", "synthesis", "report"])
+    def test_supervisor_routes_with_parallel_fan_out(self):
+        """supervisor 가 technical → ②③④ 병렬(같은 step) → ⑤ → ⑥ → 품질 평가 경로를 State 로 계산해 간다."""
+        assert_supervised_path(self, self.trace)
+        self.assertIn(self.final["final_status"], ("ok", "degraded"))
+        self.assertLessEqual(self.final["step_count"], self.final["max_steps"] + 3)
 
     def test_no_node_errors(self):
         self.assertEqual([t for t in self.trace if t["error"]], [])
@@ -41,20 +58,25 @@ class OfflineGraphTest(unittest.TestCase):
         seen = []
         nodes, _ = build_nodes(set(), self.fixture)
         run_graph(nodes, initial_state(), lambda record, update: seen.append((record["node"], sorted(update))))
-        self.assertEqual(sorted(n for n, _ in seen), sorted(["technical", "market", "stakeholder", "domain", "synthesis", "report"]))
+        names = {n for n, _ in seen}
+        self.assertTrue({"supervisor", "technical", "market", "stakeholder", "domain", "synthesis", "report", "quality"} <= names)
         self.assertIn("synthesis", dict(seen)["synthesis"])
 
     def test_trace_records_seconds(self):
         self.assertTrue(all(t["seconds"] is not None and t["seconds"] >= 0 for t in self.trace))
 
     def test_each_node_writes_only_its_keys(self):
+        control = {"node_status", "rework_requests"}  # 워커 래퍼가 쓰는 reducer 키
         owned = {
-            "technical": {"technical_findings", "evidence_store"},
-            "market": {"market_findings", "evidence_store"},
-            "stakeholder": {"stakeholder_findings", "evidence_store"},
-            "domain": {"domain_findings", "evidence_store"},
-            "synthesis": {"synthesis"},
-            "report": {"report_sections", "references", "quality_by_perspective", "retries", "run_meta"},
+            "technical": {"technical_findings", "evidence_store"} | control,
+            "market": {"market_findings", "evidence_store", "search_log_by_perspective"} | control,
+            "stakeholder": {"stakeholder_findings", "evidence_store", "search_log_by_perspective", "quality_by_perspective"} | control,
+            "domain": {"domain_findings", "evidence_store", "quality_by_perspective", "run_meta"} | control,
+            "synthesis": {"synthesis"} | control,
+            "report": {"report_sections", "references", "quality_by_perspective", "retries", "run_meta"} | control,
+            "quality": {"quality_verdict", "quality_iterations", "node_status"},
+            "supervisor": {"step_count", "next_action", "next_targets", "decision_log", "last_error", "final_status", "run_meta",
+                           "rework_requests", "node_status", "quality_verdict"},
         }
         for t in self.trace:
             self.assertTrue(set(t["updated"]) <= owned[t["node"]], t)
@@ -80,6 +102,7 @@ class OfflineGraphTest(unittest.TestCase):
 
     def test_modes_describe_every_node(self):
         self.assertEqual(set(self.modes), {"technical", "market", "stakeholder", "domain", "synthesis", "report"})
+        self.assertEqual(self.final["trace_id"], self.final["decision_log"][0].get("trace_id", self.final["trace_id"]))
 
 
 class RealNodeWiringTest(unittest.TestCase):
@@ -87,24 +110,22 @@ class RealNodeWiringTest(unittest.TestCase):
 
     def test_real_market_and_stakeholder_nodes_run_inside_graph(self):
         from agents.market import MarketAgentDeps, make_node as market_node
-        from agents.stakeholder_eval import StakeholderOpinionBatch, make_node as stakeholder_node
+        from agents.stakeholder import make_node as stakeholder_node
+        from tests.agents.stakeholder.test_stakeholder import FakeBackend
 
         class NoLLM:
             def with_structured_output(self, schema):
                 raise RuntimeError("오프라인: LLM 호출 없음")
-
-        empty_client = SimpleNamespace(responses=SimpleNamespace(
-            parse=lambda **_: SimpleNamespace(status="completed", output_parsed=StakeholderOpinionBatch(opinions=[]))))
 
         fixture = load_fixture()
         nodes, _ = build_nodes(set(), fixture)
         nodes["market"] = market_node(MarketAgentDeps(
             llm=NoLLM(), web_search=lambda q: [{"title": q, "url": "https://news.example.com/a", "content": q,
                                                 "organization": "example", "published_date": "2026-07", "source_type": "news"}]))
-        nodes["stakeholder"] = stakeholder_node(client=empty_client)
+        nodes["stakeholder"] = stakeholder_node(FakeBackend([]))
 
         final, trace = run_graph(nodes, initial_state(fixture))
-        self.assertEqual(steps_view(trace), ["technical", "market + stakeholder + domain", "synthesis", "report"])
+        assert_supervised_path(self, trace)
         self.assertEqual([t for t in trace if t["error"]], [])
         self.assertIsNotNone(final["market_findings"])
         self.assertIsNotNone(final["stakeholder_findings"])
@@ -132,7 +153,7 @@ class RealNodeWiringTest(unittest.TestCase):
         nodes, _ = build_nodes(set(), fixture)
         nodes["domain"] = domain_node(DomainAgentDeps(llm=NoLLM(), search_provider=NoSearch()))
         final, trace = run_graph(nodes, initial_state(fixture))
-        self.assertEqual(steps_view(trace), ["technical", "market + stakeholder + domain", "synthesis", "report"])
+        assert_supervised_path(self, trace)
         self.assertEqual([t for t in trace if t["error"]], [])
         self.assertEqual(final["domain_findings"]["status"], "failed")
         self.assertIn("domain", final["quality_by_perspective"])
@@ -174,7 +195,7 @@ class TechnicalNodeTest(unittest.TestCase):
         nodes, _ = build_nodes(set(), fixture)
         nodes["technical"] = technical_node(deps)
         final, trace = run_graph(nodes, initial_state())
-        self.assertEqual(steps_view(trace), ["technical", "market + stakeholder + domain", "synthesis", "report"])
+        assert_supervised_path(self, trace)
         self.assertEqual([t for t in trace if t["error"]], [])
         self.assertNotEqual(final["technical_findings"]["status"], "failed", final["technical_findings"]["limitations"])
         self.assertTrue(any(r["criterion"] == "trl" for r in final["technical_findings"]["records"]))

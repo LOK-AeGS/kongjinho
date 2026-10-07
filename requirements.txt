@@ -34,3 +34,13 @@ notebook>=7.4.5
 
 # 보고서 PDF 출력 (agents/report/pdf.py)
 reportlab>=4.4.9,<5
+
+# Supervisor: 체크포인터(중단·재개)와 트레이싱
+langgraph-checkpoint-sqlite>=3.0
+langsmith>=0.4
+
+# 테스트
+pytest>=8
+
+# 그래프 그림 (scripts/render_graph.py)
+matplotlib>=3.8

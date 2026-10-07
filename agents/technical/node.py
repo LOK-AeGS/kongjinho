@@ -35,6 +35,12 @@ def _fixed_parent_input(state: dict) -> tuple[dict, dict]:
     if supplied is not None and supplied != DEFAULT_SELECTED_TECH:
         raise ValueError("기술조사 입력 기술은 DeepSeek-V2 MLA와 ITME로 고정됩니다.")
     validate_fixed_input(request, selected)
+    hint = state.get("rework_hint") or {}
+    # 재작업 요청의 보완 질의. 고정 입력 검증 뒤에 붙이므로 고정 필드는 바뀌지 않는다.
+    focus = [str(q) for q in hint.get("focus_queries") or []]
+    focus += [f"{g.get('criterion', '')} {g.get('reason', '')}".strip() for g in hint.get("gaps") or []]
+    if focus:
+        request["focus_queries"] = [q for q in dict.fromkeys(focus) if q][:2]
     return request, selected
 
 

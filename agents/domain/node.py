@@ -51,6 +51,14 @@ def project_input(state: dict) -> dict:
     }
 
 
+def hint_gaps(state: dict) -> list[str]:
+    """Supervisor 가 보낸 재작업 요청을 첫 질의 계획의 보완 힌트(gaps)로 바꾼다. 힌트가 없으면 빈 목록."""
+    hint = state.get("rework_hint") or {}
+    gaps = [f"{g.get('criterion', '')}: {g.get('reason', '')}".strip(": ") for g in hint.get("gaps") or []]
+    gaps += [f"추가로 확인할 것: {q}" for q in hint.get("focus_queries") or []]
+    return [g for g in gaps if g][:8]
+
+
 def summarize_technical(findings: dict | None) -> str:
     """선행 결과를 압축한다. 산문을 그대로 넘기면 내용이 희석된다.
 
@@ -193,7 +201,7 @@ def make_node(deps: DomainAgentDeps):
             "self_check": {},
             "search_rounds_used": 0,
             "evidence_sufficient": False,
-            "gaps": [],
+            "gaps": hint_gaps(state),
             "errors": [],
         }
         try:
