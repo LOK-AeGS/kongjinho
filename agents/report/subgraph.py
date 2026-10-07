@@ -24,6 +24,7 @@ from agents.report.budget import (
 )
 from agents.report.prompts import build_section_prompt
 from agents.report.metrics import annotate_metrics, unsupported_metric_rules
+from graph.metrics import MEASUREMENT
 from agents.report.references import collect_references, number_citations, reference_numbers
 from agents.report.state import (
     BODY_SECTION_ORDER,
@@ -300,6 +301,15 @@ def _violates_report_rules(text: str, evidence_ids=None, context: dict | None = 
         return True
     evidence_text = _evidence_text(evidence_ids, context) if context else ""
     return bool(unsupported_metric_rules(text, evidence_text))
+
+
+def _safe_cell(value, evidence_ids, context: dict) -> str:
+    """표 셀의 수치가 근거로 조건을 확인할 수 없으면 수치만 빼고 판정은 남긴다(live 5차: 'suitable (93.3%)')."""
+    text = "" if value is None else str(value)
+    if not _violates_report_rules(text, evidence_ids, context):
+        return text
+    stripped = MEASUREMENT.sub("", text)
+    return re.sub(r"\(\s*\)", "", re.sub(r"\s{2,}", " ", stripped)).strip()
 
 
 def rule_excluded_count(context: dict) -> int:
@@ -629,9 +639,9 @@ class DeterministicSectionWriter:
             hw = pair.get("hw") or {}
             sw_text = str(sw.get("assessment") or "자료 미확인")
             hw_text = str(hw.get("assessment") or "자료 미확인")
-            if sw.get("value"):
+            if sw.get("value") and not _violates_report_rules(str(sw["value"]), row_evidence, context):
                 sw_text += f" ({sw['value']})"
-            if hw.get("value"):
+            if hw.get("value") and not _violates_report_rules(str(hw["value"]), row_evidence, context):
                 hw_text += f" ({hw['value']})"
             lines.append(
                 f"| {perspective} | {criterion} | {sw_text} | {hw_text}{citation} |"
@@ -662,7 +672,9 @@ class DeterministicSectionWriter:
         for row, ids, row_evidence in rows:
             citation = f" 〔근거: {', '.join(row_evidence)}〕" if row_evidence else ""
             label = row.get("criterion") or row.get("label") or row.get("item") or "조건"
-            lines.append(f"| {label} | {row.get('sw', row.get('sw_assessment', ''))} | {row.get('hw', row.get('hw_assessment', ''))}{citation} |")
+            sw_cell = _safe_cell(row.get("sw", row.get("sw_assessment", "")), row_evidence, context)
+            hw_cell = _safe_cell(row.get("hw", row.get("hw_assessment", "")), row_evidence, context)
+            lines.append(f"| {label} | {sw_cell} | {hw_cell}{citation} |")
             claim_ids.extend(ids)
             evidence_ids.extend(row_evidence)
         if len(lines) == 2:

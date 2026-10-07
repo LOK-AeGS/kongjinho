@@ -151,3 +151,16 @@ def test_coverage_counts_cited_line_that_also_mentions_unconfirmed_limits():
     }
     markdown = "# SUMMARY\n\n" + "\n\n".join(f"## {title}\n\n{body}" for title, body in sections.items())
     assert coverage(markdown)["passed"]
+
+
+def test_table_cell_drops_metric_whose_condition_is_not_in_evidence():
+    # live 5차: 비교 매트릭스 셀 'suitable (93.3%)'가 조건 없이 실려 보고서 검증 위반으로 남았다.
+    from agents.report.subgraph import _safe_cell
+
+    context = {
+        "evidence_store": {"e1": {"excerpt": "MLA compresses the KV cache."}},
+        "claims": {},
+        "findings": {},
+    }
+    assert _safe_cell("suitable (93.3%)", ["e1"], context) == "suitable"
+    assert _safe_cell("supported", ["e1"], context) == "supported"

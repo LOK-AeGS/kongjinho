@@ -102,7 +102,11 @@ market·stakeholder·domain은 같은 superstep에 병렬로 디스패치될 수
 │   ├── supervisor.py       # 허용 결정 계산 + LLM 선택 + guard
 │   ├── workers.py          # 워커 래퍼 (재작업 지시 주입, 예외 격리, 산출물 파일화)
 │   ├── build.py            # 그래프 토폴로지
-│   └── decision_log.py     # decisions.jsonl
+│   ├── decision_log.py     # decisions.jsonl
+│   ├── rules.py            # 공유 보고서 규칙 표 (금지어·핵심 수치 조건)
+│   ├── groundedness.py     # 공유 근거 연결 기준 (사실 문장 분류·인용률 하한)
+│   ├── metrics.py          # 공유 수치 추출
+│   └── stubs.py            # 오프라인 fixture 재생 노드
 ├── data/                   # 문서 풀 (Pool A 고정 PDF, 캐시)
 ├── scripts/                # 에이전트 단독 실행, judge 실험
 ├── tests/                  # 오프라인 테스트 (API 키 불필요)
