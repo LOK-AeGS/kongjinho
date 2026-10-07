@@ -18,7 +18,7 @@ from agents.report.subgraph import (  # noqa: E402
     normalize_state,
     run_report,
 )
-from agents.report.validators import validate_section  # noqa: E402
+from agents.report.validators import extract_citations, validate_section  # noqa: E402
 from agents.report.writer import LLMSectionOutput, LLMSectionWriter  # noqa: E402
 
 
@@ -76,6 +76,48 @@ class RecordingWriter(DeterministicSectionWriter):
         return super().repair(section_id, draft, issues, context)
 
 
+class HallucinatingWriter:
+    """LLM이 payload 밖의 문서 ID·상태값·번호를 반환한 경우를 재현한다."""
+
+    receives_full_context = True
+
+    def __init__(self):
+        self.base = DeterministicSectionWriter()
+
+    def write(self, section_id, context):
+        draft = self.base.write(section_id, context)
+        if section_id == "limitations":
+            draft["markdown"] = "# 6. 한계점\n\n- 공개 정보에 한정한다."
+        draft["markdown"] += (
+            "\n- 잘못된 인용. "
+            "〔근거: arxiv:2606.12556v2, not_found, imbalance, 1〕"
+        )
+        draft["evidence_ids"] += ["1", "not_found"]
+        draft["claim_ids"] += ["12"]
+        return draft
+
+    def repair(self, section_id, draft, issues, context):
+        return self.write(section_id, context)
+
+
+class PersistentUngroundedWriter:
+    """부분 수정 뒤에도 입력에 없는 측정값을 반복하는 LLM을 재현한다."""
+
+    receives_full_context = True
+
+    def __init__(self):
+        self.base = DeterministicSectionWriter()
+
+    def write(self, section_id, context):
+        draft = self.base.write(section_id, context)
+        if section_id == "background":
+            draft["markdown"] += "\n- 공개 근거에 없는 처리량 77.7% 향상."
+        return draft
+
+    def repair(self, section_id, draft, issues, context):
+        return self.write(section_id, context)
+
+
 class ReportAgentTests(unittest.TestCase):
     def test_required_sections(self):
         report = run_offline(fixture())["report"]
@@ -128,8 +170,16 @@ class ReportAgentTests(unittest.TestCase):
             state,
             ReportAgentDeps(writer=UngroundedWriter(), writer_receives_full_context=True),
         )
-        self.assertTrue(any(item["code"] == "numeric_grounding" for item in result["issues"]))
-        self.assertEqual(result["report"]["quality_status"], "needs_review")
+        self.assertFalse(any(
+            item["code"] == "numeric_grounding" and item["blocking"]
+            for item in result["issues"]
+        ))
+        self.assertTrue(any(
+            item["code"] == "llm_section_replaced_by_deterministic"
+            and "numeric_grounding" in item["message"]
+            for item in result["issues"]
+        ))
+        self.assertEqual(result["report"]["quality_status"], "passed")
         self.assertEqual(result["report"]["completion"]["revision_rounds_used"], 2)
 
     def test_key_metric_conditions(self):
@@ -194,6 +244,68 @@ class ReportAgentTests(unittest.TestCase):
         self.assertEqual(set(context), {"payload", "prompt"})
         self.assertNotIn("evidence_store", context)
         self.assertIn("market:claim:001", str(context["payload"]))
+
+    def test_llm_draft_unknown_ids_are_removed_and_limitations_are_completed(self):
+        state = fixture("partial_upstream")
+        payload = _writer_context(
+            "market", normalize_state(state), include_normalized=False
+        )["payload"]
+        self.assertNotIn("source_ids", str(payload["technologies"]))
+
+        result = run_report(
+            state,
+            ReportAgentDeps(
+                writer=HallucinatingWriter(), writer_receives_full_context=True
+            ),
+        )
+        known = set(normalize_state(state)["evidence_store"])
+        self.assertLessEqual(
+            set(extract_citations(result["report"]["markdown"])), known
+        )
+        removed = [
+            item for item in result["issues"]
+            if item["code"] == "removed_unknown_citation"
+        ]
+        self.assertTrue(removed)
+        self.assertTrue(all(not item["blocking"] for item in removed))
+        self.assertIn("arxiv:2606.12556v2", removed[0]["message"])
+        limitations = next(
+            section["markdown"] for section in result["report"]["sections"]
+            if section["title"] == "6. 한계점"
+        )
+        self.assertIn(
+            "stakeholder upstream 상태는 partial이며 관련 공백을 최종 판단에 반영해야 한다.",
+            limitations,
+        )
+        self.assertFalse(any(
+            item["code"] == "upstream_status_hidden" for item in result["issues"]
+        ))
+
+    def test_persistent_llm_numeric_violation_uses_deterministic_section(self):
+        result = run_report(
+            fixture(),
+            ReportAgentDeps(
+                writer=PersistentUngroundedWriter(),
+                writer_receives_full_context=True,
+            ),
+        )
+        background = next(
+            section for section in result["report"]["sections"]
+            if section["section_id"] == "background"
+        )
+        self.assertNotIn("77.7%", background["markdown"])
+        self.assertFalse(any(
+            item["blocking"] and item["section_id"] == "background"
+            and item["code"] == "numeric_grounding"
+            for item in result["issues"]
+        ))
+        replacements = [
+            item for item in result["issues"]
+            if item["code"] == "llm_section_replaced_by_deterministic"
+        ]
+        self.assertEqual(len(replacements), 1)
+        self.assertEqual(replacements[0]["section_id"], "background")
+        self.assertIn("numeric_grounding", replacements[0]["message"])
 
     def test_node_returns_only_confirmed_app_state_keys(self):
         update = node_offline(fixture())

@@ -96,6 +96,7 @@ def _directive(reason: str, focus: list[str], state: dict, name: str, policy: Su
         "round": max(1, _attempts(state, name)),
         "max_search_rounds": policy.rework_search_rounds,
         "feedback": list(feedback or [])[:8],
+        "created_step": int(state.get("step_count", 0)) + 1,
     }
 
 
@@ -108,12 +109,12 @@ def decide(state: dict, policy: SupervisorPolicy | None = None) -> dict:
     statuses = dict(state.get("node_status") or {})
     status_updates: dict[str, dict] = {}
     rework = dict(state.get("rework") or {})
-    new_directives: set[str] = set()
     accepted: list[str] = []
 
     def finish(next_nodes: list[str], reason: str) -> dict:
         for name in next_nodes:
-            if name not in new_directives:
+            directive = rework.get(name)
+            if directive and int(directive.get("created_step", -1)) <= _completed_step(state, name):
                 rework.pop(name, None)
             previous = dict(statuses.get(name) or {})
             status_updates[name] = {
@@ -148,7 +149,6 @@ def decide(state: dict, policy: SupervisorPolicy | None = None) -> dict:
     if verdict == "insufficient":
         if _can_rework(state, "technical", policy):
             rework["technical"] = _directive(reason, focus, state, "technical", policy)
-            new_directives.add("technical")
             return finish(["technical"], f"technical 근거 부족으로 재작업: {reason}")
         technical_status["sufficiency"] = "accepted_insufficient"
         accepted.append(f"technical({reason})")
@@ -167,7 +167,6 @@ def decide(state: dict, policy: SupervisorPolicy | None = None) -> dict:
         if verdict == "insufficient":
             if _can_rework(state, name, policy):
                 rework[name] = _directive(reason, focus, state, name, policy)
-                new_directives.add(name)
                 dispatch.append(name)
             else:
                 perspective_status["sufficiency"] = "accepted_insufficient"
@@ -192,6 +191,8 @@ def decide(state: dict, policy: SupervisorPolicy | None = None) -> dict:
     report_missing = _attempts(state, "report") == 0
     if report_missing or _completed_step(state, "synthesis") > _completed_step(state, "report"):
         why = "report 미실행" if report_missing else "synthesis가 갱신되어 report가 stale"
+        if not report_missing and int(state.get("report_version", 0)) >= policy.max_report_versions:
+            return finish([], "품질 루프 상한 도달, needs_review로 종료")
         return finish(["report"], why)
 
     verdict = state.get("eval_result")
@@ -199,18 +200,19 @@ def decide(state: dict, policy: SupervisorPolicy | None = None) -> dict:
         return finish(["quality_eval"], "현재 report_version의 품질 평가가 필요함")
     if verdict.get("passed"):
         return finish([], "품질 평가 통과")
+    if int(state.get("report_version", 0)) >= policy.max_report_versions:
+        return finish([], "품질 루프 상한 도달, needs_review로 종료")
 
+    feedback = verdict.get("feedback") or []
+    rework["report"] = _directive(
+        "품질 평가 불합격", feedback, state, "report", policy, feedback
+    )
     targets = [name for name in verdict.get("rework_targets") or [] if name in PERSPECTIVES and _can_rework(state, name, policy)]
     if targets:
-        feedback = verdict.get("feedback") or []
         for name in targets:
             rework[name] = _directive("품질 평가에서 관점 근거 재작업 필요", feedback, state, name, policy, feedback)
-            new_directives.add(name)
         return finish(targets, "품질 평가 지적으로 관점 재작업: " + ", ".join(targets))
     if int(state.get("report_version", 0)) < policy.max_report_versions:
-        feedback = verdict.get("feedback") or []
-        rework["report"] = _directive("품질 평가 불합격", feedback, state, "report", policy, feedback)
-        new_directives.add("report")
         return finish(["report"], "품질 평가 지적을 반영해 report 재작성")
     return finish([], "품질 루프 상한 도달, needs_review로 종료")
 

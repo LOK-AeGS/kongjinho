@@ -298,6 +298,7 @@ class ReworkDirective(TypedDict):
     round: int
     max_search_rounds: int
     feedback: list[str]
+    created_step: int
 
 
 class Decision(TypedDict):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import re
 from typing import Iterable
 
 from agents.report.budget import (
@@ -60,6 +61,15 @@ SECTION_TITLES: dict[SectionId, str] = {
     "limitations": "6. 한계점",
     "reference": "REFERENCE",
 }
+
+_INLINE_CITATION = re.compile(r"〔근거:\s*([^〕]+)〕")
+_TECHNOLOGY_INPUT_FIELDS = (
+    "name",
+    "short_name",
+    "technology",
+    "approach",
+    "selection_reason",
+)
 
 
 def _as_list(value) -> list:
@@ -660,7 +670,15 @@ def section_payload(
         "required_heading": _heading(section_id),
         "as_of_date": context["as_of_date"],
         "domain": context["domain"],
-        "technologies": context["technologies"],
+        # source_ids는 문서 ID라 evidence ID로 오인될 수 있어 LLM 입력에서 제외한다.
+        "technologies": {
+            side: {
+                key: value
+                for key, value in (technology or {}).items()
+                if key in _TECHNOLOGY_INPUT_FIELDS
+            }
+            for side, technology in context["technologies"].items()
+        },
         "budget": {"max_chars": budget.max_chars, "max_items": limit},
     }
     if context["quality_feedback"]:
@@ -750,6 +768,82 @@ def _generation_metadata(writer, deps: ReportAgentDeps) -> dict:
     }
 
 
+def _required_upstream_status_lines(context: NormalizedInput) -> list[str]:
+    return [
+        f"- {name} upstream 상태는 {status}이며 관련 공백을 최종 판단에 반영해야 한다."
+        for name, status in context["upstream_statuses"].items()
+        if status in {"partial", "failed"}
+    ]
+
+
+def _ensure_limitations_status(
+    section_id: SectionId, draft: SectionDraft, context: NormalizedInput
+) -> SectionDraft:
+    if section_id != "limitations":
+        return draft
+    updated = deepcopy(draft)
+    missing = [
+        line
+        for line in _required_upstream_status_lines(context)
+        if line not in updated["markdown"]
+    ]
+    if missing:
+        updated["markdown"] = updated["markdown"].rstrip() + "\n" + "\n".join(missing)
+    return updated
+
+
+def _sanitize_writer_draft(
+    section_id: SectionId,
+    draft: SectionDraft,
+    writer_context: dict,
+    context: NormalizedInput,
+) -> tuple[SectionDraft, dict | None]:
+    """LLM 초안이 입력에 없던 ID를 인용 경로로 밀어 넣지 못하게 한다."""
+    updated = deepcopy(draft)
+    allowed_evidence = set((writer_context.get("payload") or {}).get("evidence") or {})
+    allowed_claims = set(context["claims"])
+    removed: set[str] = set()
+
+    def replace(match: re.Match) -> str:
+        ids = [item.strip() for item in match.group(1).split(",") if item.strip()]
+        kept = [item for item in ids if item in allowed_evidence]
+        removed.update(item for item in ids if item not in allowed_evidence)
+        return f"〔근거: {', '.join(kept)}〕" if kept else ""
+
+    updated["markdown"] = _INLINE_CITATION.sub(replace, str(updated.get("markdown") or ""))
+    evidence_ids = [str(item) for item in updated.get("evidence_ids") or []]
+    claim_ids = [str(item) for item in updated.get("claim_ids") or []]
+    removed.update(item for item in evidence_ids if item not in allowed_evidence)
+    removed.update(item for item in claim_ids if item not in allowed_claims)
+    updated["evidence_ids"] = _unique(
+        item for item in evidence_ids if item in allowed_evidence
+    )
+    updated["claim_ids"] = _unique(item for item in claim_ids if item in allowed_claims)
+    if not removed:
+        return updated, None
+    removed_ids = ", ".join(sorted(removed))
+    return updated, {
+        "code": "removed_unknown_citation",
+        "message": f"{section_id}에서 입력에 없는 인용 ID 제거: {removed_ids}",
+        "section_id": section_id,
+        "blocking": False,
+    }
+
+
+def _prepare_writer_draft(
+    section_id: SectionId,
+    draft: SectionDraft,
+    writer_context: dict,
+    context: NormalizedInput,
+    *,
+    sanitize: bool,
+) -> tuple[SectionDraft, dict | None]:
+    issue = None
+    if sanitize:
+        draft, issue = _sanitize_writer_draft(section_id, draft, writer_context, context)
+    return _ensure_limitations_status(section_id, draft, context), issue
+
+
 def _assemble(sections: dict[SectionId, SectionDraft]) -> str:
     parts = [sections["summary"]["markdown"], sections["background"]["markdown"], sections["technology_selection"]["markdown"], sections["technology_overview"]["markdown"]]
     parts.append("# 4. 관점별 평가")
@@ -806,6 +900,18 @@ def finalize_report(
     if summary_override is None:
         try:
             summary = writer.write("summary", summary_context)
+            summary, sanitize_issue = _prepare_writer_draft(
+                "summary",
+                summary,
+                summary_context,
+                context,
+                sanitize=not isinstance(writer, DeterministicSectionWriter),
+            )
+            if sanitize_issue:
+                if sanitize_issue not in issues:
+                    issues.append(sanitize_issue)
+                if sanitize_issue not in input_issues:
+                    input_issues.append(sanitize_issue)
         except Exception as exc:
             summary = DeterministicSectionWriter().write("summary", fallback_context)
             issues.append({
@@ -1009,10 +1115,23 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
             include_normalized=_include_normalized(writer, deps),
         )
         try:
-            body_sections[section_id] = writer.write(section_id, writer_context)
+            draft = writer.write(section_id, writer_context)
+            draft, sanitize_issue = _prepare_writer_draft(
+                section_id,
+                draft,
+                writer_context,
+                context,
+                sanitize=not isinstance(writer, DeterministicSectionWriter),
+            )
+            body_sections[section_id] = draft
+            if sanitize_issue and sanitize_issue not in input_issues:
+                input_issues.append(sanitize_issue)
         except Exception as exc:
             body_sections[section_id] = DeterministicSectionWriter().write(
                 section_id, fallback_context
+            )
+            body_sections[section_id] = _ensure_limitations_status(
+                section_id, body_sections[section_id], context
             )
             input_issues.append({
                 "code": "writer_error",
@@ -1063,10 +1182,20 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
             fallback_context = _writer_context(section_id, context, include_normalized=True)
             try:
                 updated = writer.repair(section_id, draft, section_issues, writer_context)
+                updated, sanitize_issue = _prepare_writer_draft(
+                    section_id,
+                    updated,
+                    writer_context,
+                    context,
+                    sanitize=not isinstance(writer, DeterministicSectionWriter),
+                )
+                if sanitize_issue and sanitize_issue not in input_issues:
+                    input_issues.append(sanitize_issue)
             except Exception:
                 updated = DeterministicSectionWriter().repair(
                     section_id, draft, section_issues, fallback_context
                 )
+                updated = _ensure_limitations_status(section_id, updated, context)
             if section_id == "summary":
                 summary_override = updated
             else:
@@ -1077,6 +1206,58 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
             repaired = True
         if not repaired:
             break
+
+    # LLM은 문장을 쓰되 grounding의 마지막 보장은 코드가 맡는다. 수정 한도를 쓴 뒤에도
+    # 차단 오류가 남은 섹션은 같은 예산의 결정적 렌더가 자체 검증을 통과할 때만 교체한다.
+    fallback_budgets = default_budgets()
+    fallback = DeterministicSectionWriter(fallback_budgets)
+    blocking_by_section: dict[SectionId, list[str]] = {}
+    for item in blocking(final["issues"]):
+        section_id = item.get("section_id")
+        if section_id in {"summary", *BODY_SECTION_ORDER}:
+            blocking_by_section.setdefault(section_id, []).append(item["code"])
+    replacement_summary = final["sections"]["summary"]
+    replaced = False
+    for section_id, codes in blocking_by_section.items():
+        candidate = fallback.write(
+            section_id,
+            _writer_context(
+                section_id,
+                context,
+                include_normalized=True,
+                budgets=fallback_budgets,
+            ),
+        )
+        candidate = _ensure_limitations_status(section_id, candidate, context)
+        if blocking(validate_section(candidate, context)):
+            continue
+        if section_id == "summary":
+            replacement_summary = candidate
+        else:
+            body_sections[section_id] = candidate
+        replacement_issue = {
+            "code": "llm_section_replaced_by_deterministic",
+            "message": (
+                f"{section_id}의 LLM 초안을 결정적 렌더로 교체: "
+                + ", ".join(_unique(codes))
+            ),
+            "section_id": section_id,
+            "blocking": False,
+        }
+        if replacement_issue not in input_issues:
+            input_issues.append(replacement_issue)
+        replaced = True
+    if replaced:
+        final = finalize_report(
+            body_sections=body_sections,
+            context=context,
+            writer=writer,
+            deps=deps,
+            input_issues=input_issues,
+            revisions_used=revisions_used,
+            summary_override=replacement_summary,
+            budgets=fallback_budgets,
+        )
 
     final, rendered, page_guard = _enforce_page_limit(
         final,

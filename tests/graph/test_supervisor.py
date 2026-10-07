@@ -77,6 +77,43 @@ def test_failed_quality_rewrites_report_until_version_limit():
     assert "품질 루프 상한" in final["last_decision"]["reason"]
 
 
+def test_quality_failure_at_report_cap_does_not_dispatch_perspective_rework():
+    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    status = {
+        name: {"status": "done", "attempts": 1, "completed_step": 1}
+        for name in ("technical", "market", "stakeholder", "domain")
+    }
+    status.update({
+        "synthesis": {"status": "done", "attempts": 1, "completed_step": 2},
+        "report": {"status": "done", "attempts": 2, "completed_step": 3},
+        "quality_eval": {"status": "done", "attempts": 2, "completed_step": 4},
+    })
+    state = {
+        "step_count": 4,
+        "max_steps": 20,
+        "node_status": status,
+        "technical_findings": complete,
+        "market_findings": complete,
+        "stakeholder_findings": complete,
+        "domain_findings": complete,
+        "evidence_store": {},
+        "synthesis": {"status": "complete"},
+        "report_version": 2,
+        "eval_result": {
+            "passed": False,
+            "evaluated_report_version": 2,
+            "feedback": ["groundedness: domain 근거 연결 수정"],
+            "rework_targets": ["domain"],
+        },
+        "rework": {},
+    }
+    update = decide(state)
+    assert update["next"] == []
+    assert update["last_decision"]["reason"] == "품질 루프 상한 도달, needs_review로 종료"
+    assert "domain" not in update["rework"]
+    assert "report" not in update["rework"]
+
+
 def test_worker_exception_is_failed_and_graph_continues():
     nodes, _ = build_nodes(set(), load_fixture())
 
@@ -341,9 +378,100 @@ def test_stale_report_dispatch_clears_old_rework_directive():
             "round": 1,
             "max_search_rounds": 2,
             "feedback": ["오래된 피드백"],
+            "created_step": 5,
         }},
     }
     update = decide(state)
     assert update["next"] == ["report"]
     assert "stale" in update["last_decision"]["reason"]
+    assert "report" not in update["rework"]
+
+
+def test_perspective_rework_preserves_report_feedback_until_stale_report_runs():
+    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    status = {
+        name: {"status": "done", "attempts": 1, "completed_step": 1}
+        for name in ("market", "stakeholder", "domain")
+    }
+    status.update({
+        "technical": {"status": "done", "attempts": 1, "completed_step": 2},
+        "synthesis": {"status": "done", "attempts": 1, "completed_step": 4},
+        "report": {"status": "done", "attempts": 1, "completed_step": 5},
+        "quality_eval": {"status": "done", "attempts": 1, "completed_step": 6},
+    })
+    state = {
+        "step_count": 6,
+        "max_steps": 20,
+        "node_status": status,
+        "technical_findings": complete,
+        "market_findings": complete,
+        "stakeholder_findings": complete,
+        "domain_findings": complete,
+        "evidence_store": {},
+        "synthesis": {"status": "complete"},
+        "report_version": 1,
+        "eval_result": {
+            "passed": False,
+            "evaluated_report_version": 1,
+            "feedback": ["groundedness: 잘못 연결된 근거를 수정"],
+            "rework_targets": ["technical"],
+        },
+        "rework": {},
+    }
+
+    technical_update = decide(state)
+    assert technical_update["next"] == ["technical"]
+    assert technical_update["rework"]["report"]["feedback"] == state["eval_result"]["feedback"]
+
+    state.update(technical_update)
+    state["node_status"] = {**status, **technical_update["node_status"]}
+    state["node_status"]["technical"] = {
+        **status["technical"], "attempts": 2, "completed_step": 7,
+    }
+    synthesis_update = decide(state)
+    assert synthesis_update["next"] == ["synthesis"]
+
+    state.update(synthesis_update)
+    state["node_status"] = {**state["node_status"], **synthesis_update["node_status"]}
+    state["node_status"]["synthesis"] = {
+        **status["synthesis"], "attempts": 2, "completed_step": 8,
+    }
+    report_update = decide(state)
+    assert report_update["next"] == ["report"]
+    assert report_update["rework"]["report"]["feedback"] == state["eval_result"]["feedback"]
+    assert report_update["rework"]["report"]["created_step"] == 7
+
+
+def test_consumed_directive_is_removed_on_next_dispatch():
+    complete = {"status": "complete", "records": [], "claims": [], "gaps": []}
+    status = {
+        name: {"status": "done", "attempts": 1, "completed_step": 1}
+        for name in ("technical", "market", "stakeholder", "domain")
+    }
+    status.update({
+        "synthesis": {"status": "done", "attempts": 2, "completed_step": 9},
+        "report": {"status": "done", "attempts": 1, "completed_step": 7},
+    })
+    state = {
+        "step_count": 10,
+        "max_steps": 20,
+        "node_status": status,
+        "technical_findings": complete,
+        "market_findings": complete,
+        "stakeholder_findings": complete,
+        "domain_findings": complete,
+        "evidence_store": {},
+        "synthesis": {"status": "complete"},
+        "report_version": 1,
+        "rework": {"report": {
+            "reason": "이미 반영된 품질 피드백",
+            "focus": ["수정"],
+            "round": 1,
+            "max_search_rounds": 2,
+            "feedback": ["이미 반영됨"],
+            "created_step": 7,
+        }},
+    }
+    update = decide(state)
+    assert update["next"] == ["report"]
     assert "report" not in update["rework"]
