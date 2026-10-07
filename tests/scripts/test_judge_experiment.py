@@ -189,4 +189,4 @@ def test_make_judge_omits_temperature_for_reasoning_models(monkeypatch):
     assert calls[0] == {"model": "gpt-4.1-mini", "temperature": 0}
     assert calls[1] == {"model": "gpt-5-mini"}
     assert calls[2] == {"model": "o3-mini"}
-    assert calls[3] == {"model": "gpt-4.1", "temperature": 0}
+    assert calls[3] == {"model": "gpt-4o", "temperature": 0}

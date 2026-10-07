@@ -117,9 +117,10 @@ def make_judge(model: str | None = None):
     class EntailmentVerdict(BaseModel):
         items: list[EntailmentItemVerdict]
 
-    # v2 실험: gpt-4.1은 탐지·일관성 100%, score diff 0.00, 약 5.8초·$0.025/call이었다.
+    # v2 실험: gpt-4.1·gpt-4o 모두 탐지·일관성 100%(score diff 0.00 / 0.20, 약 5.8초 / 5.4초).
+    # 보고서 생성 모델을 gpt-4.1로 올리면서 생성자와 평가자를 분리하려고 gpt-4o를 기본값으로 둔다.
     # v1 whole-report judge가 bias/coverage를 놓쳐 두 기준은 code-only로 유지한다.
-    chosen = model or os.getenv("QUALITY_JUDGE_MODEL") or "gpt-4.1"
+    chosen = model or os.getenv("QUALITY_JUDGE_MODEL") or "gpt-4o"
     model_args = {"model": chosen}
     if not (chosen.startswith("gpt-5") or chosen.startswith("o")):
         model_args["temperature"] = 0

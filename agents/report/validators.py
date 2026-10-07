@@ -10,6 +10,7 @@ import re
 
 from agents.report.budget import OVER_BUDGET_TOLERANCE, SectionBudget, body_length
 from agents.report.metrics import METRIC_RULES, metric_violations
+from graph.rules import PROHIBITED_COMPARISON as SHARED_PROHIBITED_COMPARISON
 from agents.report.references import source_identity
 from agents.report.state import SECTION_ORDER, SectionDraft, SectionId, ValidationIssue
 from graph.metrics import MEASUREMENT, extract_measurements, measurement_values
@@ -35,17 +36,8 @@ REQUIRED_HEADINGS = (
     "# REFERENCE",
 )
 
-PROHIBITED_COMPARISON = (
-    "승자",
-    "추천",
-    "압도",
-    "월등",
-    "우위",
-    "열위",
-    "더 낫다",
-    "최고의 기술",
-    "최선의 기술",
-)
+# 우열·추천 표현 목록은 품질 평가와 함께 graph/rules.py 한 곳에서 관리한다.
+PROHIBITED_COMPARISON = SHARED_PROHIBITED_COMPARISON
 
 _MEASUREMENT = MEASUREMENT
 _CITATION = re.compile(r"〔근거:\s*([^〕]+)〕")

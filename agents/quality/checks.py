@@ -7,13 +7,12 @@ from collections import Counter, defaultdict
 
 from agents.report.references import source_identity
 from graph.metrics import MEASUREMENT
+from graph.rules import PROHIBITED_COMPARISON, VERIFICATION_ADVICE_PATTERN
 
 
 CITATION = re.compile(r"〔근거:\s*([^〕]+)〕")
-PROHIBITED = (
-    "승자", "추천", "권장", "압도", "월등", "우위", "열위", "더 낫", "우수하",
-    "최고의", "최선의", "선택해야", "바람직하",
-)
+# 보고서 검증과 같은 목록(graph/rules.py).
+PROHIBITED = PROHIBITED_COMPARISON
 META_PHRASES = (
     "확인되지 않았다", "미확인", "분량 제한", "판단 보류", "not_assessed",
     "silent", "unknown", "근거 0건", "찾지 못", "None |", "평가 범위:",
@@ -98,7 +97,7 @@ def groundedness(
 
 
 # "원본 확인 권장"처럼 검증 절차를 권하는 표현은 기술 추천이 아니다(live 1차 오탐).
-VERIFICATION_ADVICE = re.compile(r"(확인|검토|검증|재현)\s*(을|를)?\s*권장")
+VERIFICATION_ADVICE = re.compile(VERIFICATION_ADVICE_PATTERN)
 
 
 def neutrality(markdown: str) -> dict:

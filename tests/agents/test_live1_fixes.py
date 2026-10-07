@@ -12,12 +12,26 @@ from graph.supervisor import state_summary  # noqa: E402
 from main import initial_state  # noqa: E402
 
 
-def test_annotate_metrics_appends_canonical_conditions_in_text_and_table_cells():
+def test_annotate_metrics_appends_condition_only_when_cited_evidence_has_it():
     text = "- MLA는 KV 캐시를 93.3% 줄였다.\n| SW | suitable (5.76×) |"
-    annotated = annotate_metrics(text)
+    evidence = "DeepSeek-V2 reduces KV cache by 93.3% vs DeepSeek 67B; 5.76x on 8 H800 GPUs."
+    annotated = annotate_metrics(text, lambda line: evidence)
     assert "DeepSeek 67B" in annotated.splitlines()[0]
     assert "8×H800" in annotated.splitlines()[1]
     assert not any(metric_violations(line) for line in annotated.splitlines())
+
+
+def test_annotate_metrics_does_not_invent_conditions_absent_from_evidence():
+    # 근거에 없는 조건을 붙이면 Groundedness를 해친다(이전 동작: 무조건 부착).
+    text = "- ITME는 처리량을 35.7% 높였다."
+    assert annotate_metrics(text, lambda line: "ITME achieves 1.80x over NVMe-oF.") == text
+    assert annotate_metrics(text) == text
+
+
+def test_annotate_metrics_skips_sentences_about_the_missing_condition():
+    # live 3차: "비교 기준이 누락되어 …" 문장 끝에 그 기준을 붙여 뜻이 모순됐다.
+    text = "- 5.76배 수치는 비교 기준이 누락되어 상충이 발생했다."
+    assert annotate_metrics(text, lambda line: "8 H800 GPUs") == text
 
 
 def test_annotate_metrics_keeps_lines_that_already_have_conditions():

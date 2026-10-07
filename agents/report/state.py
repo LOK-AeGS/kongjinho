@@ -135,7 +135,9 @@ class ReportAgentDeps:
     writer: SectionWriter | None = None
     # 이미 만든 LangChain chat model을 주입할 수 있다. 없으면 model 설정으로 초기화한다.
     llm: object | None = None
-    model: str = "gpt-4o-mini"
+    # 2026-10-07 비교(같은 State로 1회씩): gpt-4o-mini 지어낸 인용 6건·64초, gpt-5.1 2건·86초·9쪽,
+    # gpt-4.1 2건·34초·7쪽 → gpt-4.1. 품질 Judge는 생성 모델과 달라야 해서 gpt-4o를 쓴다.
+    model: str = "gpt-4.1"
     model_provider: str = "openai"
     temperature: float = 0.0
     on_section_written: Callable[[SectionId], None] | None = None

@@ -36,7 +36,7 @@ RAG 과제 단계의 상세 설명(검색 실험, 에이전트별 판정 규칙 
   - 근거 부재는 "없다"가 아니라 "공개 근거에서 확인하지 못했다"로 기록
 - **보고서 품질 평가 (Hybrid, 3안)** — 실험으로 역할을 나눴다([docs/QUALITY_EVAL.md](docs/QUALITY_EVAL.md))
 
-  | 평가 항목 | 코드 검사 | LLM Judge (gpt-4.1) |
+  | 평가 항목 | 코드 검사 | LLM Judge (gpt-4o) |
   |---|---|---|
   | Groundedness | 사실 문장 인용률 ≥ 0.8, 무인용 수치 0건, 보고서 수치·인용 검증 위반 0건 | 수치 문장 ↔ 인용 근거 원문 대조(뒷받침 여부) |
   | 중립성 | 우열·추천 금지어 | 금지어 없는 암묵적 추천 탐지 |
@@ -50,8 +50,8 @@ RAG 과제 단계의 상세 설명(검색 실험, 에이전트별 판정 규칙 
 
 - **Framework** : LangGraph 1.2 (StateGraph, conditional edges, MemorySaver), LangChain 1.4, LangSmith tracing
 - **LLM/Supervisor** : gpt-4.1 (규칙이 계산한 허용 행동 안에서만 선택, 위반 시 규칙 기본값으로 대체)
-- **LLM/Generator** : 에이전트별 — 기술 조사 gpt-4.1, 시장 gpt-4.1-mini(+gpt-4.1 재검증), 이해관계자 gpt-5-mini, 도메인 gpt-4o, 평가 종합 gpt-4.1, 보고서 gpt-4o-mini
-- **LLM/Judge** : gpt-4.1 (보고서 생성 모델 gpt-4o-mini와 분리, 5종 결함 변형 × 4개 모델 실험으로 선정)
+- **LLM/Generator** : 에이전트별 — 기술 조사 gpt-4.1, 시장 gpt-4.1-mini(+gpt-4.1 재검증), 이해관계자 gpt-5-mini, 도메인 gpt-4o, 평가 종합 gpt-4.1, 보고서 gpt-4.1 (gpt-4o-mini·gpt-5.1과 비교해 지어낸 인용·속도·분량 기준으로 선정)
+- **LLM/Judge** : gpt-4o (5종 결함 변형 × 4개 모델 실험에서 gpt-4.1과 함께 탐지·일관성 100%. 보고서 생성 모델 gpt-4.1과 분리하려고 gpt-4o 선택)
 - **Retrieval** : BM25 + FAISS(Dense) + RRF — Hit@5 0.875, MRR 0.833 (Golden Set 16문항, 청크 213개)
 - **Embedding** : BAAI/bge-m3 (오픈소스, 8192 토큰, 교차언어 검색)
 

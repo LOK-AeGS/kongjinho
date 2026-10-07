@@ -23,7 +23,7 @@ from agents.report.budget import (
     shrink,
 )
 from agents.report.prompts import build_section_prompt
-from agents.report.metrics import annotate_metrics, metric_violations
+from agents.report.metrics import annotate_metrics, unsupported_metric_rules
 from agents.report.references import collect_references, number_citations, reference_numbers
 from agents.report.state import (
     BODY_SECTION_ORDER,
@@ -258,7 +258,7 @@ def _usable_claims(context: dict, perspective: str) -> list[dict]:
             continue
         if claim.get("basis") in {"direct", "direct_evidence"} and not evidence_ids:
             continue
-        if _violates_report_rules(claim.get("statement", "")):
+        if _violates_report_rules(claim.get("statement", ""), evidence_ids, context):
             continue
         result.append(claim)
     return result
@@ -266,7 +266,7 @@ def _usable_claims(context: dict, perspective: str) -> list[dict]:
 
 def _line_ok(text: str, evidence_ids: list[str], context: dict) -> bool:
     """판정 기록·관계 행도 보고서 규칙(우열 표현, 고칠 수 없는 수치 귀속, 인용 근거 밖 수치)을 지켜야 싣는다."""
-    if _violates_report_rules(text):
+    if _violates_report_rules(text, evidence_ids, context):
         return False
     if not evidence_ids:
         return True
@@ -274,15 +274,52 @@ def _line_ok(text: str, evidence_ids: list[str], context: dict) -> bool:
     return not _citation_binding_issues("comparison_matrix", line, context)
 
 
-def _violates_report_rules(text: str) -> bool:
+def _evidence_text(evidence_ids, context: dict) -> str:
+    """조건 보정 가능 여부를 볼 근거 원문: 인용 근거 발췌 + 그 근거를 인용한 claim의 조건."""
+    cited = set(evidence_ids or [])
+    store = context["evidence_store"]
+    parts = [store[eid].get("excerpt", "") for eid in cited if eid in store]
+    parts += [
+        " ".join(claim.get("conditions", []))
+        for claim in context["claims"].values()
+        if cited & set(claim.get("evidence_ids", []))
+    ]
+    return "\n".join(parts)
+
+
+def _violates_report_rules(text: str, evidence_ids=None, context: dict | None = None) -> bool:
     """상위 주장 자체가 보고서 규칙을 어기면 결정적 렌더에서 뺀다.
 
-    우열 표현(예: "성능 우위")이나 조건 부착으로 고칠 수 없는 수치 귀속(42.5%를 MLA 효과로)은
-    LLM 수정·결정적 대체로도 사라지지 않아 live 3차에서 needs_review로 남았다.
+    - 우열·추천 표현(graph/rules.py)
+    - 조건이 빠진 핵심 수치 중 근거 원문으로 보정할 수 없는 것(예: 42.5%를 MLA 효과로 귀속,
+      근거에 없는 측정 조건). 근거에 있는 조건은 annotate_metrics가 문장 안에 붙인다.
+    LLM 수정·결정적 대체로도 사라지지 않아 live 3차에서 needs_review로 남은 위반이다.
     """
     if any(expression in text for expression in PROHIBITED_COMPARISON):
         return True
-    return any(rule.canonical_condition is None for rule in metric_violations(text))
+    evidence_text = _evidence_text(evidence_ids, context) if context else ""
+    return bool(unsupported_metric_rules(text, evidence_text))
+
+
+def rule_excluded_count(context: dict) -> int:
+    """보고서 규칙 위반으로 싣지 않은 상위 claim·판정 기록·관계 행 수(한계점에 공개한다)."""
+    count = 0
+    store = context["evidence_store"]
+    for claim in context["claims"].values():
+        ids = claim.get("evidence_ids", [])
+        if all(eid in store for eid in ids) and _violates_report_rules(claim.get("statement", ""), ids, context):
+            count += 1
+    for result in context["findings"].values():
+        for record in (result or {}).get("records", []):
+            ids = record.get("evidence_ids", [])
+            text = f"{record.get('value') or ''} {record.get('findings') or ''}"
+            if all(eid in store for eid in ids) and not _line_ok(text, ids, context):
+                count += 1
+    rows = context["synthesis"].get("cross_findings") or context["synthesis"].get("relations") or []
+    for row, _, evidence_ids in _linked_rows(context, rows):
+        if not _line_ok(row.get("explanation") or row.get("reason") or "", evidence_ids, context):
+            count += 1
+    return count
 
 
 def select_claims(context: dict, perspective: str, limit: int) -> tuple[list[dict], int]:
@@ -560,9 +597,7 @@ class DeterministicSectionWriter:
         if section_id == "limitations":
             # upstream 상태 노출은 검증 필수 항목이라 예산과 무관하게 남긴다.
             required = ["- 모든 평가는 공개 정보로 확인 가능한 범위에 한정된다."]
-            for name, status in context["upstream_statuses"].items():
-                if status in {"partial", "failed"}:
-                    required.append(f"- {name} upstream 상태는 {status}이며 관련 공백을 최종 판단에 반영해야 한다.")
+            required.extend(_required_upstream_status_lines(context))
             if context.get("not_found_present"):
                 required.append("- not_found는 기록된 검색 범위에서 자료를 확인하지 못한 상태이며 실제 부재를 뜻하지 않는다.")
             optional = [f"- {clip(value, 200)}" for value in context["synthesis"].get("limitations", [])]
@@ -813,11 +848,19 @@ def _generation_metadata(writer, deps: ReportAgentDeps) -> dict:
 
 
 def _required_upstream_status_lines(context: NormalizedInput) -> list[str]:
-    return [
+    """한계점에 반드시 있어야 하는 줄: upstream 부분 실패 상태와 규칙 위반으로 제외한 항목 수."""
+    lines = [
         f"- {name} upstream 상태는 {status}이며 관련 공백을 최종 판단에 반영해야 한다."
         for name, status in context["upstream_statuses"].items()
         if status in {"partial", "failed"}
     ]
+    excluded = rule_excluded_count(context)
+    if excluded:
+        # 분량 생략과 마찬가지로 규칙 위반 제외도 숨기지 않는다(전체 목록은 final_state.json).
+        lines.append(
+            f"- 우열 표현이나 근거로 확인되지 않는 수치 조건을 담은 상위 결과 {excluded}건은 보고서에 싣지 않았다(전체 목록은 final_state.json)."
+        )
+    return lines
 
 
 def _ensure_limitations_status(
@@ -888,9 +931,13 @@ def _prepare_writer_draft(
     return _ensure_limitations_status(section_id, draft, context), issue
 
 
-def _annotate_draft(draft: SectionDraft) -> SectionDraft:
+def _annotate_draft(draft: SectionDraft, context: NormalizedInput) -> SectionDraft:
+    """핵심 수치에 표준 조건을 붙이되, 그 줄이 인용한 근거 원문에 조건이 있을 때만 붙인다."""
     updated = deepcopy(draft)
-    updated["markdown"] = annotate_metrics(updated["markdown"])
+    updated["markdown"] = annotate_metrics(
+        updated["markdown"],
+        lambda line: _evidence_text(extract_citations(line), context),
+    )
     return updated
 
 
@@ -976,7 +1023,7 @@ def finalize_report(
         summary = summary_override
 
     sections: dict[SectionId, SectionDraft] = {
-        section_id: _annotate_draft(draft)
+        section_id: _annotate_draft(draft, context)
         for section_id, draft in {"summary": summary, **deepcopy(body_sections)}.items()
     }
     sections = _link_citations(sections, context)
@@ -1299,7 +1346,7 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
             ),
         )
         candidate = _ensure_limitations_status(section_id, candidate, context)
-        candidate = _annotate_draft(candidate)
+        candidate = _annotate_draft(candidate, context)
         if blocking(validate_section(candidate, context)):
             continue
         if section_id == "summary":

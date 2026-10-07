@@ -91,16 +91,16 @@ class OfflineGraphTest(unittest.TestCase):
         self.assertEqual(self.final["report_version"], 1)
         self.assertIn("품질 평가 통과", self.final["last_decision"]["reason"])
 
-    def test_deliberate_fixture_error_is_corrected_by_metric_annotation(self):
-        """fixture 에 일부러 넣은 '35.7%' 조건 누락은 보고서 단계에서 표준 조건으로 보정된다."""
+    def test_deliberate_fixture_error_is_excluded_and_disclosed(self):
+        """fixture 에 일부러 넣은 '35.7%' 주장은 인용 근거 원문에 수치·조건이 없어 보고서에서 빠지고,
+        빠졌다는 사실이 한계점에 공개된다(근거 없는 조건을 덧붙이지 않는다)."""
         report = self.final["quality_by_perspective"]["report"]
         self.assertFalse(any("35.7" in v for v in report["violations"]))
-        markdown = Path(self.final["artifacts"]["report_with_ids_md"]).read_text(encoding="utf-8") \
-            if self.final.get("artifacts", {}).get("report_with_ids_md") \
-            else self.final["report_sections"].get("final_markdown_with_ids", "")
-        lines = [line for line in markdown.splitlines() if "35.7" in line]
-        self.assertTrue(lines)
-        self.assertTrue(all("최대" in line for line in lines))
+        path = (self.final.get("artifacts") or {}).get("report_with_ids_md")
+        markdown = Path(path).read_text(encoding="utf-8") if path else \
+            self.final["report_sections"].get("final_markdown_with_ids", "")
+        self.assertNotIn("ITME는 처리량을 35.7% 높였다", markdown)
+        self.assertIn("보고서에 싣지 않았다", markdown)
 
     def test_modes_describe_every_node(self):
         self.assertEqual(set(self.modes), {"technical", "market", "stakeholder", "domain", "synthesis", "report", "quality_eval"})
