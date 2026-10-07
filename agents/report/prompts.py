@@ -60,6 +60,11 @@ def build_section_prompt(section_id: str, payload: dict) -> str:
             f"섹션 규칙: {SECTION_RULES[section_id]}",
             budget_rule(payload.get("budget")),
             f"반드시 사용할 첫 제목: {payload['required_heading']}",
+            (
+                "이전 품질 평가 지적(반드시 반영): "
+                + "; ".join(str(item) for item in payload.get("quality_feedback", []))
+                if payload.get("quality_feedback") else ""
+            ),
             "간결한 보고서 문체로 작성하고 입력에 없는 연결 논리를 보충하지 않는다.",
             "입력(JSON):\n" + json.dumps(payload, ensure_ascii=False, sort_keys=True),
         )

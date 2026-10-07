@@ -27,14 +27,17 @@ from datetime import datetime
 from pathlib import Path
 
 from graph.build import build_graph
-from graph.state import create_initial_state
+from graph.decision_log import DecisionLogger
+from graph.state import create_supervisor_state
 from graph.stubs import DEFAULT_FIXTURE, load_fixture, replay_node
+from graph.workers import as_worker
 
-AGENTS = ("technical", "market", "stakeholder", "domain", "synthesis", "report")
-LIVE_CAPABLE = AGENTS
+AGENTS = ("technical", "market", "stakeholder", "domain", "synthesis", "report", "quality_eval")
+LIVE_CAPABLE = ("technical", "market", "stakeholder", "domain", "synthesis", "report", "quality")
+TRACE_ORDER = ("supervisor", *AGENTS)
 
 
-def initial_state(*, as_of: str | None = None, rounds: int = 1) -> dict:
+def initial_state(*, as_of: str | None = None, rounds: int = 1, max_steps: int = 20) -> dict:
     """팀 고정 입력으로 AppState 초기값을 만든다.
 
     기술 조사 에이전트는 selected_tech 가 자기 고정값과 정확히 같아야 실행되므로(agents/technical/config.py),
@@ -45,7 +48,12 @@ def initial_state(*, as_of: str | None = None, rounds: int = 1) -> dict:
 
     request = {**DEFAULT_REQUEST, "as_of": as_of or DEFAULT_REQUEST["as_of"], "max_search_rounds": rounds}
     manifest = [doc.to_parent_meta(default_source_dir()) for doc in load_manifest()]
-    return create_initial_state(request=request, selected_tech=copy.deepcopy(DEFAULT_SELECTED_TECH), corpus_manifest=manifest)
+    return create_supervisor_state(
+        request=request,
+        selected_tech=copy.deepcopy(DEFAULT_SELECTED_TECH),
+        corpus_manifest=manifest,
+        max_steps=max_steps,
+    )
 
 
 def load_env(path: Path = Path(".env")) -> None:
@@ -58,7 +66,13 @@ def load_env(path: Path = Path(".env")) -> None:
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def build_nodes(live: set[str], fixture: dict, pdf_path: Path | None = None) -> tuple[dict, dict]:
+def build_nodes(
+    live: set[str],
+    fixture: dict,
+    pdf_path: Path | None = None,
+    *,
+    artifact_dir: Path | None = None,
+) -> tuple[dict, dict]:
     """노드 함수와 노드별 실행 방식 설명을 만든다. pdf_path 를 주면 보고서 노드가 PDF 도 저장한다."""
     nodes, modes = {}, {}
 
@@ -140,6 +154,22 @@ def build_nodes(live: set[str], fixture: dict, pdf_path: Path | None = None) -> 
         deps = ReportAgentDeps(generation_mode="deterministic", pdf_output_path=pdf_path)
         nodes["report"], modes["report"] = report_node(deps), "실제 노드, deterministic (LLM 없음)"
 
+    from agents.quality import make_node as quality_node
+
+    if "quality" in live:
+        from agents.quality.judge import make_judge
+
+        judge = make_judge()
+        nodes["quality_eval"], modes["quality_eval"] = quality_node(judge), f"hybrid ({judge.model})"
+    else:
+        nodes["quality_eval"], modes["quality_eval"] = quality_node(), "code_only (LLM 없음)"
+
+    output_dir = artifact_dir or (pdf_path.parent if pdf_path else None)
+    nodes = {
+        name: as_worker(name, node, artifact_dir=output_dir if name == "report" else None)
+        for name, node in nodes.items()
+    }
+
     return nodes, modes
 
 
@@ -176,6 +206,12 @@ def step_brief(node: str, update: dict) -> str:
     if node == "report":
         q = (update.get("quality_by_perspective") or {}).get("report") or {}
         return f"status={q.get('status')}, 섹션 {len(update.get('report_sections') or {})}개, 참고문헌 {len(update.get('references') or {})}건, 위반 {len(q.get('violations') or [])}건"
+    if node == "quality_eval":
+        verdict = update.get("eval_result") or {}
+        return f"passed={verdict.get('passed')}, mode={verdict.get('mode')}, 실패 기준={', '.join(verdict.get('failed_criteria') or []) or '없음'}"
+    if node == "supervisor":
+        decision = update.get("last_decision") or {}
+        return f"next={'+'.join(decision.get('next') or []) or 'END'}, {decision.get('reason', '')}"
     return ", ".join(sorted(update)) or "(반환값 없음)"
 
 
@@ -195,17 +231,44 @@ def step_detail(node: str, update: dict) -> list[str]:
     if node == "report":
         q = (update.get("quality_by_perspective") or {}).get("report") or {}
         lines += [f"      위반: {v[:110]}" for v in (q.get("violations") or [])[:5]]
+    if node == "quality_eval":
+        verdict = update.get("eval_result") or {}
+        lines += [f"      피드백: {value[:110]}" for value in (verdict.get("feedback") or [])[:5]]
     return lines
 
 
-def run_graph(nodes: dict, initial: dict, on_step=None) -> tuple[dict, list[dict]]:
+def run_graph(
+    nodes: dict,
+    initial: dict,
+    on_step=None,
+    *,
+    decision_logger=None,
+    policy=None,
+    on_decision=None,
+) -> tuple[dict, list[dict]]:
     """그래프를 실행하고 (최종 State, 실행 기록)을 돌려준다. 같은 step 의 노드는 병렬 실행이다.
 
     on_step(record, update) 를 주면 노드가 끝날 때마다 호출한다 (진행 표시·중간 결과 저장용).
     """
-    app = build_graph(**nodes)
+    from langgraph.checkpoint.memory import MemorySaver
+
+    app = build_graph(
+        **nodes,
+        checkpointer=MemorySaver(),
+        policy=policy,
+        decision_logger=decision_logger,
+        on_decision=on_decision,
+    )
     final, trace, started = initial, [], {}
-    for mode, event in app.stream(initial, stream_mode=["debug", "values"]):
+    trace_id = initial["trace_id"]
+    config = {
+        "configurable": {"thread_id": trace_id},
+        "run_name": "kv-cache-supervisor",
+        "metadata": {"trace_id": trace_id},
+        "tags": [f"trace:{trace_id}"],
+        "recursion_limit": 100,
+    }
+    for mode, event in app.stream(initial, config=config, stream_mode=["debug", "values"]):
         if mode == "values":
             final = event
         elif event.get("type") == "task":
@@ -228,6 +291,7 @@ def node_status(final: dict) -> dict[str, str]:
     status = {p: (final.get(f"{p}_findings") or {}).get("status", "없음") for p in ("technical", "market", "stakeholder", "domain")}
     status["synthesis"] = (final.get("synthesis") or {}).get("status", "없음")
     status["report"] = ((final.get("quality_by_perspective") or {}).get("report") or {}).get("status", "없음")
+    status["quality_eval"] = ((final.get("quality_by_perspective") or {}).get("quality_eval") or {}).get("status", "없음")
     return status
 
 
@@ -235,21 +299,32 @@ def steps_view(trace: list[dict]) -> list[str]:
     by_step: dict[int, list[str]] = {}
     for t in trace:
         by_step.setdefault(t["step"], []).append(t["node"])
-    return [" + ".join(sorted(names, key=AGENTS.index)) for _, names in sorted(by_step.items())]
+    return [" + ".join(sorted(names, key=TRACE_ORDER.index)) for _, names in sorted(by_step.items())]
 
 
-def render_summary(modes: dict, trace: list[dict], final: dict, fixture_note: str | None) -> str:
+def render_summary(
+    modes: dict,
+    trace: list[dict],
+    final: dict,
+    fixture_note: str | None,
+    decisions: list[dict] | None = None,
+) -> str:
     status = node_status(final)
     synthesis = final.get("synthesis") or {}
     counts = (synthesis.get("meta") or {}).get("counts", {})
     lines = ["# 부모 그래프 실행 결과", ""]
     if fixture_note:
         lines += [f"> ⚠️ fixture 재생 노드가 있습니다: {fixture_note}", ""]
-    lines += ["## 실행 경로", "", "설계(§8.1): `① 기술 조사 → ②③④ 병렬 → ⑤ 평가 종합 → ⑥ 보고서`", "",
+    lines += ["## 실행 경로", "", "Supervisor가 State의 실행·충분도·staleness·품질 상태로 다음 노드를 결정한다.", "",
               "실제: `START → " + " → ".join(steps_view(trace)) + " → END`", "",
               "| step | 노드 | 소요 시간 | 갱신한 키 | 오류 |", "|---|---|---|---|---|"]
     lines += [f"| {t['step']} | {t['node']} | {t.get('seconds') if t.get('seconds') is not None else '-'}초 | "
               f"{', '.join(t['updated'])} | {t['error'] or ''} |" for t in trace]
+    lines += ["", "## Supervisor 결정", "", "| step | 다음 노드 | 사유 |", "|---|---|---|"]
+    lines += [
+        f"| {item['step']} | {' + '.join(item.get('decision') or []) or 'END'} | {item.get('reason', '')} |"
+        for item in (decisions or [])
+    ]
     lines += ["", "## 노드별 실행 방식과 결과", "", "| 노드 | 실행 방식 | 상태 |", "|---|---|---|"]
     lines += [f"| {a} | {modes[a]} | {status[a]} |" for a in AGENTS]
     lines += ["", "## 공통 State", "",
@@ -259,7 +334,19 @@ def render_summary(modes: dict, trace: list[dict], final: dict, fixture_note: st
               f"요약 주장 {len(synthesis.get('summary_claims') or [])}개",
               f"- report_sections: {len(final.get('report_sections') or {})}개 섹션, references {len(final.get('references') or {})}건",
               f"- PDF: {((final.get('run_meta') or {}).get('report') or {}).get('pdf_path') or '만들지 않음'}",
-              "", "보고서는 같은 폴더의 `report.pdf`·`report.md`, 평가 종합 상세는 `final_state.json`의 `synthesis` 참고."]
+              "", "## 재작업 횟수", ""]
+    lines += [
+        f"- {name}: {max(0, int(value.get('attempts', 0)) - 1)}회"
+        for name, value in (final.get("node_status") or {}).items()
+        if name in AGENTS
+    ]
+    verdict = final.get("eval_result") or {}
+    lines += ["", "## 품질 평가", "", f"- 모드: {verdict.get('mode', '없음')}", f"- 전체 통과: {verdict.get('passed', False)}", "",
+              "| 기준 | 통과 | 점수 | 사유 |", "|---|---|---|---|"]
+    for name, result in (verdict.get("criteria") or {}).items():
+        reasons = "; ".join(result.get("reasons") or []).replace("|", "\\|")
+        lines.append(f"| {name} | {result.get('passed')} | {result.get('score')} | {reasons} |")
+    lines += ["", "보고서는 같은 폴더의 `report.pdf`·`report.md`, 평가 종합 상세는 `final_state.json`의 `synthesis` 참고."]
     return "\n".join(lines) + "\n"
 
 
@@ -269,6 +356,7 @@ def main() -> int:
     parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE, help="fixture 재생 노드가 쓸 AppState JSON")
     parser.add_argument("--as-of", default=None, help="조사 기준일 YYYY-MM-DD (기본: 팀 고정 입력의 기준일 2026-09-22)")
     parser.add_argument("--rounds", type=int, default=1, choices=(1, 2), help="시장·도메인의 최대 검색 라운드 (기술 조사는 자체 고정값 2)")
+    parser.add_argument("--max-steps", type=int, default=20, help="supervisor 최대 실행 횟수")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/graph"))
     parser.add_argument("--no-pdf", action="store_true", help="보고서 PDF 를 만들지 않음 (reportlab 없이 실행할 때)")
     parser.add_argument("--debug", action="store_true", help="노드가 끝날 때마다 주장·공백·위반 샘플까지 출력")
@@ -280,16 +368,20 @@ def main() -> int:
     unknown = live - set(LIVE_CAPABLE)
     if unknown:
         parser.error(f"--live 에 쓸 수 없는 노드: {', '.join(sorted(unknown))} (가능: {', '.join(LIVE_CAPABLE)})")
+    load_env()
+    if os.getenv("LANGSMITH_API_KEY"):
+        os.environ.setdefault("LANGSMITH_TRACING", "true")
+        os.environ.setdefault("LANGSMITH_PROJECT", "kv-cache-supervisor")
     if live:
-        load_env()
         if not os.getenv("OPENAI_API_KEY"):
             parser.error("OPENAI_API_KEY 가 없습니다. .env 에 넣으세요.")
         if live & {"technical", "market", "domain"} and not os.getenv("TAVILY_API_KEY"):
             parser.error("기술 조사·시장·도메인 실제 실행에는 TAVILY_API_KEY 가 필요합니다.")
-        print(f"실제 실행 노드: {', '.join(sorted(live, key=AGENTS.index))} (API 비용이 발생합니다)")
+        live_order = {name: index for index, name in enumerate(LIVE_CAPABLE)}
+        print(f"실제 실행 노드: {', '.join(sorted(live, key=live_order.get))} (API 비용이 발생합니다)")
 
     fixture = load_fixture(args.fixture)
-    initial = initial_state(as_of=args.as_of, rounds=args.rounds)
+    initial = initial_state(as_of=args.as_of, rounds=args.rounds, max_steps=args.max_steps)
     # 보고서 노드가 실행 중에 PDF 를 쓰므로 결과 폴더를 먼저 만든다.
     folder = args.output_dir / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     folder.mkdir(parents=True, exist_ok=True)
@@ -300,7 +392,7 @@ def main() -> int:
         except ImportError:
             parser.error("PDF 생성에는 reportlab 이 필요합니다: pip install 'reportlab>=4.4.9,<5' (또는 --no-pdf)")
 
-    nodes, modes = build_nodes(live, fixture, pdf_path)
+    nodes, modes = build_nodes(live, fixture, pdf_path, artifact_dir=folder)
     steps_dir = folder / "steps"
     steps_dir.mkdir()
 
@@ -308,7 +400,12 @@ def main() -> int:
         # 노드가 끝나는 즉시: 콘솔에 한 줄, steps/ 에 그 노드의 반환값 전체를 저장
         took = f"{record['seconds']:.1f}초" if record["seconds"] is not None else "-"
         mark = "✗" if record["error"] else "✓"
-        print(f"  [{record['step']}] {mark} {record['node']:<12} {took:>7}  {step_brief(record['node'], update)}", flush=True)
+        if record["node"] == "supervisor":
+            decision = update.get("last_decision") or {}
+            target = " + ".join(decision.get("next") or []) or "END"
+            print(f"  [{decision.get('step')}] supervisor → {target} ({decision.get('reason', '')})", flush=True)
+        else:
+            print(f"  [{record['step']}] {mark} {record['node']:<12} {took:>7}  {step_brief(record['node'], update)}", flush=True)
         if record["error"]:
             print(f"      오류: {record['error']}", flush=True)
         if args.debug:
@@ -318,13 +415,17 @@ def main() -> int:
         path.write_text(json.dumps({"trace": record, "update": update}, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
     print(f"실행 시작 (결과 폴더: {folder.resolve()})", flush=True)
-    final, trace = run_graph(nodes, initial, on_step)
+    decision_path = folder / "decisions.jsonl"
+    final, trace = run_graph(nodes, initial, on_step, decision_logger=DecisionLogger(decision_path))
     replayed = [a for a in AGENTS if modes[a].startswith(("임시", "fixture"))]
     note = f"{', '.join(replayed)} 는 합성 fixture 결과이며 실제 조사가 아닙니다." if replayed else None
-    (folder / "summary.md").write_text(render_summary(modes, trace, final, note), encoding="utf-8")
+    decisions = [json.loads(line) for line in decision_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    (folder / "summary.md").write_text(render_summary(modes, trace, final, note, decisions), encoding="utf-8")
     sections = final.get("report_sections") or {}
     # final_markdown 이 보고서 에이전트가 만든 완성본이다 (섹션을 다시 이어 붙이면 본문이 중복된다).
-    (folder / "report.md").write_text(sections.get("final_markdown") or "\n\n".join(sections.values()), encoding="utf-8")
+    report_path = Path((final.get("artifacts") or {}).get("report_md") or folder / "report.md")
+    if not report_path.exists():
+        report_path.write_text(sections.get("final_markdown") or "\n\n".join(sections.values()), encoding="utf-8")
     (folder / "final_state.json").write_text(json.dumps(final, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     (folder / "trace.json").write_text(json.dumps(trace, ensure_ascii=False, indent=2), encoding="utf-8")
     (folder / "graph.mmd").write_text(build_graph(**nodes).get_graph().draw_mermaid(), encoding="utf-8")

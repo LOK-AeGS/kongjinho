@@ -111,6 +111,7 @@ class NormalizedInput(TypedDict):
     upstream_statuses: dict[str, str]
     upstream_gaps: list[str]
     not_found_present: bool
+    quality_feedback: list[str]
 
 
 class SectionWriter(Protocol):

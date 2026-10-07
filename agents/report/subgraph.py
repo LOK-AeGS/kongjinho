@@ -208,6 +208,7 @@ def normalize_state(state: dict) -> NormalizedInput:
         "upstream_statuses": statuses,
         "upstream_gaps": list(dict.fromkeys(gaps)),
         "not_found_present": not_found,
+        "quality_feedback": list(state.get("report_feedback") or []),
     }
 
 
@@ -662,6 +663,8 @@ def section_payload(
         "technologies": context["technologies"],
         "budget": {"max_chars": budget.max_chars, "max_items": limit},
     }
+    if context["quality_feedback"]:
+        payload["quality_feedback"] = context["quality_feedback"]
     if perspective:
         source = context["findings"].get(perspective) or {}
         claims, total_claims = select_claims(context, perspective, limit)

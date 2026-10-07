@@ -89,12 +89,25 @@ class NodeContractTest(unittest.TestCase):
 
     def test_works_inside_parent_graph(self):
         from graph.build import build_graph
+        from graph.state import create_supervisor_state
+        from graph.workers import as_worker
         state = load()
         stub = lambda key: (lambda s: {key: state[key]})
-        app = build_graph(technical=stub("technical_findings"), market=stub("market_findings"),
-                          stakeholder=stub("stakeholder_findings"), domain=stub("domain_findings"),
-                          synthesis=make_node(), report=lambda s: {"report_sections": {}})
-        empty = {**state, **{f"{p}_findings": None for p in ("technical", "market", "stakeholder", "domain")}}
+        quality = lambda s: {"eval_result": {"passed": True, "evaluated_report_version": s["report_version"]}}
+        app = build_graph(
+            technical=as_worker("technical", stub("technical_findings")),
+            market=as_worker("market", stub("market_findings")),
+            stakeholder=as_worker("stakeholder", stub("stakeholder_findings")),
+            domain=as_worker("domain", stub("domain_findings")),
+            synthesis=as_worker("synthesis", make_node()),
+            report=as_worker("report", lambda s: {"report_sections": {}}),
+            quality_eval=as_worker("quality_eval", quality),
+        )
+        control = create_supervisor_state(
+            request=state["request"], selected_tech=state["selected_tech"],
+            corpus_manifest=state["corpus_manifest"],
+        )
+        empty = {**control, **state, **{f"{p}_findings": None for p in ("technical", "market", "stakeholder", "domain")}}
         out = app.invoke(empty)
         self.assertIsNotNone(out["synthesis"])
         self.assertGreater(len(out["synthesis"]["matrix"]), 0)

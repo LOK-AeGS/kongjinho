@@ -11,6 +11,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from graph.stubs import cited_evidence, load_fixture, replay_node  # noqa: E402
+from graph.workers import as_worker  # noqa: E402
 from main import build_nodes, initial_state as main_initial_state, node_status, run_graph, steps_view  # noqa: E402
 
 
@@ -28,10 +29,14 @@ class OfflineGraphTest(unittest.TestCase):
         nodes, cls.modes = build_nodes(set(), cls.fixture)
         cls.final, cls.trace = run_graph(nodes, initial_state(cls.fixture))
 
-    def test_follows_designed_order_with_parallel_fan_out(self):
-        """설계서 §8.1: ① → ②③④ 병렬(같은 step) → ⑤ → ⑥."""
-        self.assertEqual(steps_view(self.trace),
-                         ["technical", "market + stakeholder + domain", "synthesis", "report"])
+    def test_supervisor_routes_from_state_with_parallel_fan_out(self):
+        """첫 조사 의존성 뒤 세 관점을 같은 superstep에 병렬 디스패치한다."""
+        decisions = [t for t in self.trace if t["node"] == "supervisor"]
+        workers = [t for t in self.trace if t["node"] != "supervisor"]
+        self.assertEqual(workers[0]["node"], "technical")
+        parallel_step = {t["node"] for t in workers if t["step"] == workers[1]["step"]}
+        self.assertEqual(parallel_step, {"market", "stakeholder", "domain"})
+        self.assertGreaterEqual(len(decisions), 2)
 
     def test_no_node_errors(self):
         self.assertEqual([t for t in self.trace if t["error"]], [])
@@ -41,7 +46,9 @@ class OfflineGraphTest(unittest.TestCase):
         seen = []
         nodes, _ = build_nodes(set(), self.fixture)
         run_graph(nodes, initial_state(), lambda record, update: seen.append((record["node"], sorted(update))))
-        self.assertEqual(sorted(n for n, _ in seen), sorted(["technical", "market", "stakeholder", "domain", "synthesis", "report"]))
+        names = [name for name, _ in seen]
+        for expected in ("supervisor", "technical", "market", "stakeholder", "domain", "synthesis", "report", "quality_eval"):
+            self.assertIn(expected, names)
         self.assertIn("synthesis", dict(seen)["synthesis"])
 
     def test_trace_records_seconds(self):
@@ -49,12 +56,14 @@ class OfflineGraphTest(unittest.TestCase):
 
     def test_each_node_writes_only_its_keys(self):
         owned = {
-            "technical": {"technical_findings", "evidence_store"},
-            "market": {"market_findings", "evidence_store"},
-            "stakeholder": {"stakeholder_findings", "evidence_store"},
-            "domain": {"domain_findings", "evidence_store"},
-            "synthesis": {"synthesis"},
-            "report": {"report_sections", "references", "quality_by_perspective", "retries", "run_meta"},
+            "technical": {"technical_findings", "evidence_store", "node_status"},
+            "market": {"market_findings", "evidence_store", "node_status"},
+            "stakeholder": {"stakeholder_findings", "evidence_store", "node_status"},
+            "domain": {"domain_findings", "evidence_store", "node_status"},
+            "synthesis": {"synthesis", "node_status"},
+            "report": {"report_sections", "references", "quality_by_perspective", "retries", "run_meta", "node_status", "artifacts", "report_version"},
+            "quality_eval": {"eval_result", "quality_by_perspective", "node_status"},
+            "supervisor": {"step_count", "next", "rework", "last_decision", "node_status"},
         }
         for t in self.trace:
             self.assertTrue(set(t["updated"]) <= owned[t["node"]], t)
@@ -72,6 +81,15 @@ class OfflineGraphTest(unittest.TestCase):
         self.assertGreater(len(self.final["synthesis"]["matrix"]), 0)
         self.assertGreater(len(self.final["report_sections"]), 0)
         self.assertIn(status["report"], ("passed", "needs_review"))
+        self.assertGreaterEqual(self.final["report_version"], 1)
+        self.assertIsNotNone(self.final["eval_result"])
+
+    def test_report_violation_drives_bounded_quality_loop(self):
+        self.assertFalse(self.final["eval_result"]["passed"])
+        self.assertIn("groundedness", self.final["eval_result"]["failed_criteria"])
+        self.assertEqual(self.final["report_version"], 2)
+        self.assertEqual(self.final["node_status"]["report"]["attempts"], 2)
+        self.assertIn("품질 루프 상한", self.final["last_decision"]["reason"])
 
     def test_report_catches_deliberate_fixture_error(self):
         """fixture 에 일부러 넣은 '35.7%' 조건 누락이 보고서 검사에서 잡힌다 (에이전트 간 검사 연결 확인)."""
@@ -79,7 +97,7 @@ class OfflineGraphTest(unittest.TestCase):
         self.assertTrue(any("35.7" in v for v in report["violations"]))
 
     def test_modes_describe_every_node(self):
-        self.assertEqual(set(self.modes), {"technical", "market", "stakeholder", "domain", "synthesis", "report"})
+        self.assertEqual(set(self.modes), {"technical", "market", "stakeholder", "domain", "synthesis", "report", "quality_eval"})
 
 
 class RealNodeWiringTest(unittest.TestCase):
@@ -98,13 +116,12 @@ class RealNodeWiringTest(unittest.TestCase):
 
         fixture = load_fixture()
         nodes, _ = build_nodes(set(), fixture)
-        nodes["market"] = market_node(MarketAgentDeps(
+        nodes["market"] = as_worker("market", market_node(MarketAgentDeps(
             llm=NoLLM(), web_search=lambda q: [{"title": q, "url": "https://news.example.com/a", "content": q,
-                                                "organization": "example", "published_date": "2026-07", "source_type": "news"}]))
-        nodes["stakeholder"] = stakeholder_node(client=empty_client)
+                                                "organization": "example", "published_date": "2026-07", "source_type": "news"}])))
+        nodes["stakeholder"] = as_worker("stakeholder", stakeholder_node(client=empty_client))
 
         final, trace = run_graph(nodes, initial_state(fixture))
-        self.assertEqual(steps_view(trace), ["technical", "market + stakeholder + domain", "synthesis", "report"])
         self.assertEqual([t for t in trace if t["error"]], [])
         self.assertIsNotNone(final["market_findings"])
         self.assertIsNotNone(final["stakeholder_findings"])
@@ -130,9 +147,8 @@ class RealNodeWiringTest(unittest.TestCase):
 
         fixture = load_fixture()
         nodes, _ = build_nodes(set(), fixture)
-        nodes["domain"] = domain_node(DomainAgentDeps(llm=NoLLM(), search_provider=NoSearch()))
+        nodes["domain"] = as_worker("domain", domain_node(DomainAgentDeps(llm=NoLLM(), search_provider=NoSearch())))
         final, trace = run_graph(nodes, initial_state(fixture))
-        self.assertEqual(steps_view(trace), ["technical", "market + stakeholder + domain", "synthesis", "report"])
         self.assertEqual([t for t in trace if t["error"]], [])
         self.assertEqual(final["domain_findings"]["status"], "failed")
         self.assertIn("domain", final["quality_by_perspective"])
@@ -153,7 +169,8 @@ class PdfOutputTest(unittest.TestCase):
             final, _ = run_graph(nodes, initial_state(fixture))
             self.assertTrue(pdf.is_file() and pdf.stat().st_size > 0)
             self.assertEqual(Path(final["run_meta"]["report"]["pdf_path"]).resolve(), pdf.resolve())
-            self.assertIn("final_markdown", final["report_sections"])
+            self.assertEqual(Path(final["artifacts"]["report_md"]).resolve(), (Path(tmp) / "report.md").resolve())
+            self.assertNotIn("final_markdown", final["report_sections"])
 
 
 class TechnicalNodeTest(unittest.TestCase):
@@ -172,9 +189,8 @@ class TechnicalNodeTest(unittest.TestCase):
         deps, _ = fakes._deps()
         fixture = load_fixture()
         nodes, _ = build_nodes(set(), fixture)
-        nodes["technical"] = technical_node(deps)
+        nodes["technical"] = as_worker("technical", technical_node(deps))
         final, trace = run_graph(nodes, initial_state())
-        self.assertEqual(steps_view(trace), ["technical", "market + stakeholder + domain", "synthesis", "report"])
         self.assertEqual([t for t in trace if t["error"]], [])
         self.assertNotEqual(final["technical_findings"]["status"], "failed", final["technical_findings"]["limitations"])
         self.assertTrue(any(r["criterion"] == "trl" for r in final["technical_findings"]["records"]))

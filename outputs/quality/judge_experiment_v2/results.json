@@ -1,0 +1,1815 @@
+{
+  "config": {
+    "models": [
+      "gpt-4.1-mini",
+      "gpt-4.1",
+      "gpt-4o",
+      "gpt-5-mini"
+    ],
+    "repeats": 2
+  },
+  "prices_usd_per_1m_tokens_estimate": {
+    "gpt-4.1-mini": {
+      "input": 0.4,
+      "output": 1.6
+    },
+    "gpt-4.1": {
+      "input": 2.0,
+      "output": 8.0
+    },
+    "gpt-4o": {
+      "input": 2.5,
+      "output": 10.0
+    },
+    "gpt-5-mini": {
+      "input": 0.25,
+      "output": 2.0
+    }
+  },
+  "expected_failure": {
+    "clean": null,
+    "neutrality_implicit": "neutrality",
+    "groundedness_fabricated": "groundedness",
+    "bias_onesided": "bias_control",
+    "coverage_missing": "coverage"
+  },
+  "code_results": {
+    "clean": {
+      "groundedness": {
+        "passed": true,
+        "score": 0.9259259259259259,
+        "details": [
+          "사실 불릿·표 행 인용률 0.93 (50/54)"
+        ]
+      },
+      "neutrality": {
+        "passed": true,
+        "score": 1.0,
+        "details": []
+      },
+      "bias_control": {
+        "passed": true,
+        "score": 1.0,
+        "details": [
+          "최대 출처 집중도 0.32",
+          "SW/HW claim 인용 수 58/69",
+          "경고: 4.4 도메인 적용: 단일 출처 편중 0.64"
+        ]
+      },
+      "coverage": {
+        "passed": true,
+        "score": 1.0,
+        "details": [],
+        "missing_perspectives": []
+      }
+    },
+    "neutrality_implicit": {
+      "groundedness": {
+        "passed": true,
+        "score": 0.9285714285714286,
+        "details": [
+          "사실 불릿·표 행 인용률 0.93 (52/56)"
+        ]
+      },
+      "neutrality": {
+        "passed": true,
+        "score": 1.0,
+        "details": []
+      },
+      "bias_control": {
+        "passed": true,
+        "score": 1.0,
+        "details": [
+          "최대 출처 집중도 0.33",
+          "SW/HW claim 인용 수 60/69",
+          "경고: 4.4 도메인 적용: 단일 출처 편중 0.64"
+        ]
+      },
+      "coverage": {
+        "passed": true,
+        "score": 1.0,
+        "details": [],
+        "missing_perspectives": []
+      }
+    },
+    "groundedness_fabricated": {
+      "groundedness": {
+        "passed": false,
+        "score": 0.9107142857142857,
+        "details": [
+          "사실 불릿·표 행 인용률 0.91 (51/56)",
+          "측정값 무인용: - 신규 메모리 경로는 데이터센터 처리량을 87.4% 높였다."
+        ]
+      },
+      "neutrality": {
+        "passed": true,
+        "score": 1.0,
+        "details": []
+      },
+      "bias_control": {
+        "passed": true,
+        "score": 1.0,
+        "details": [
+          "최대 출처 집중도 0.33",
+          "SW/HW claim 인용 수 59/69",
+          "경고: 4.4 도메인 적용: 단일 출처 편중 0.67"
+        ]
+      },
+      "coverage": {
+        "passed": true,
+        "score": 1.0,
+        "details": [],
+        "missing_perspectives": []
+      }
+    },
+    "bias_onesided": {
+      "groundedness": {
+        "passed": true,
+        "score": 0.9285714285714286,
+        "details": [
+          "사실 불릿·표 행 인용률 0.93 (52/56)"
+        ]
+      },
+      "neutrality": {
+        "passed": true,
+        "score": 1.0,
+        "details": []
+      },
+      "bias_control": {
+        "passed": false,
+        "score": 0.0,
+        "details": [
+          "최대 출처 집중도 0.36",
+          "SW/HW claim 인용 수 61/68",
+          "경고: 4.4 도메인 적용: 단일 출처 편중 0.64",
+          "4.3 이해관계자: 단일 출처 편중 1.00",
+          "4.3 이해관계자: 한 기술만 다룸"
+        ]
+      },
+      "coverage": {
+        "passed": true,
+        "score": 1.0,
+        "details": [],
+        "missing_perspectives": []
+      }
+    },
+    "coverage_missing": {
+      "groundedness": {
+        "passed": true,
+        "score": 0.96,
+        "details": [
+          "사실 불릿·표 행 인용률 0.96 (48/50)"
+        ]
+      },
+      "neutrality": {
+        "passed": true,
+        "score": 1.0,
+        "details": []
+      },
+      "bias_control": {
+        "passed": true,
+        "score": 1.0,
+        "details": [
+          "최대 출처 집중도 0.33",
+          "SW/HW claim 인용 수 56/69",
+          "경고: 4.4 도메인 적용: 단일 출처 편중 0.64"
+        ]
+      },
+      "coverage": {
+        "passed": false,
+        "score": 0.75,
+        "details": [
+          "누락 관점: market"
+        ],
+        "missing_perspectives": [
+          "market"
+        ]
+      }
+    }
+  },
+  "judge_records": [
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "clean",
+      "repeat": 1,
+      "expected_failure": null,
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술에 대해 각각의 기술적 특성, 성능, 적용 환경, 시장성, 이해관계자 의견 등을 근거를 들어 상세히 설명하고 있으며, 두 기술 간의 상충점과 보완 관계도 명확히 제시하고 있다. 또한, 기술 성숙도(TRL)와 시장 생태계 지지 등에서 발생하는 상충점에 대해 설명하고 판단 보류 상태를 명시하여 중립성을 유지하고 있다. 보고서 내에서 특정 기술을 우선 도입하거나 추천하는 표현, 선호를 암시하는 문구가 전혀 없으며, 단지 기술 평가와 비교에 집중하고 있다. 따라서 기술 평가의 중립성 기준을 완벽히 충족한다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 3,
+          "passed": true,
+          "reasons": "4: The excerpt does not mention ITME or NVMe-oF throughput improvements, so the claim about ITME achieving up to 1.80x throughput improvement over NVMe-oF is not supported.",
+          "problem_sentences": [
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕"
+          ],
+          "unsupported_count": 1,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.4585,
+      "usage": {
+        "input_tokens": 9180,
+        "output_tokens": 592,
+        "total_tokens": 9772
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "clean",
+      "repeat": 2,
+      "expected_failure": null,
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술에 대해 각각의 기술적 특성, 성능, 시장성, 이해관계자 의견, 도메인 적용 가능성 등을 근거를 들어 상세히 설명하고 있으며, 두 기술 간의 상충점과 보완 관계도 명확히 제시하고 있다. 또한, 기술 성숙도(TRL)와 시장 생태계 지지 등에서 발생하는 상충점에 대해 설명하고 판단 보류 상태를 명시하여 중립성을 유지하고 있다. 보고서 내에서 특정 기술을 추천하거나 우월성을 주장하거나 도입을 권고하는 표현이 전혀 없으며, 단지 근거 기반의 평가와 비교를 수행하고 있다. 따라서 기술 평가 목적에 부합하는 중립적인 보고서로 판단된다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 3,
+          "passed": true,
+          "reasons": "4: The excerpt does not mention ITME or NVMe-oF throughput improvements, so the claim about ITME achieving up to 1.80x throughput improvement over NVMe-oF is not supported.",
+          "problem_sentences": [
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕"
+          ],
+          "unsupported_count": 1,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.0629,
+      "usage": {
+        "input_tokens": 9180,
+        "output_tokens": 592,
+        "total_tokens": 9772
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "neutrality_implicit",
+      "repeat": 1,
+      "expected_failure": "neutrality",
+      "criteria": {
+        "neutrality": {
+          "score": 3,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술에 대해 기술적 근거, 시장성, 이해관계자 의견, 도메인 적용 등 다양한 관점에서 상세히 비교하고 있으나, 결론 부분에서 '데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다'라는 표현이 있어 특정 기술 도입을 권장하는 뉘앙스를 포함하고 있습니다. 이는 명시적 추천이나 우월성 판단은 아니지만, 약간의 선호 암시로 볼 수 있습니다. 그 외에는 기술 성숙도, 시장성, 도메인 적용에서 각각의 한계와 불확실성을 명확히 언급하며 중립적인 평가를 유지하려는 노력이 보입니다. 따라서 중립성 점수는 3점으로 판단합니다.",
+          "problem_sentences": [
+            "- 데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- 운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- Megatron Bridge 서빙 프레임워크가 DeepSeek V2 모델을 지원하는 것은 소프트웨어 생태계의 지지로, 소프트웨어 기술의 채택을 촉진하는 요인으로 작용할 수 있다. (불확실성: 수집된 공개 정보에 근거한 추론이며 검증되지 않음) 〔근거: market:ev:afb9e08590cd〕"
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "4: The excerpt does not mention ITME or NVMe-oF throughput improvements, so the claim about ITME achieving up to 1.80x throughput improvement over NVMe-oF is not supported.; 8: The excerpt mentions a 35.7% throughput improvement over CPU-offload baseline, but the claim notes a conflict due to missing comparison conditions, so the claim about general performance is not supported as stated.",
+          "problem_sentences": [
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 2,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 6.5585,
+      "usage": {
+        "input_tokens": 9269,
+        "output_tokens": 797,
+        "total_tokens": 10066
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "neutrality_implicit",
+      "repeat": 2,
+      "expected_failure": "neutrality",
+      "criteria": {
+        "neutrality": {
+          "score": 3,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술에 대해 기술적 근거, 시장성, 이해관계자 의견, 도메인 적용 등 다양한 관점에서 상세히 비교하고 있으나, 결론 부분에서 '데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다'라는 표현이 있어 특정 기술 도입을 권장하는 뉘앙스를 포함하고 있습니다. 이는 명시적 추천이나 우월성 판단은 아니지만, 약한 선호 암시로 볼 수 있습니다. 그 외에는 기술 성숙도, 시장성, 도메인 적용에서 각각의 한계와 불확실성을 명확히 언급하며 중립적인 평가를 유지하려는 노력이 보입니다. 따라서 중립성 점수는 3점으로 판단합니다.",
+          "problem_sentences": [
+            "- 데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- 운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- Megatron Bridge 서빙 프레임워크가 DeepSeek V2 모델을 지원하는 것은 소프트웨어 생태계의 지지로, 소프트웨어 기술의 채택을 촉진하는 요인으로 작용할 수 있다. (불확실성: 수집된 공개 정보에 근거한 추론이며 검증되지 않음) 〔근거: market:ev:afb9e08590cd〕"
+          ]
+        },
+        "groundedness": {
+          "score": 3,
+          "passed": true,
+          "reasons": "4: The excerpt does not mention any throughput improvement of ITME over NVMe-oF or any 1.80x improvement; thus, the claim is not supported by the provided excerpt.",
+          "problem_sentences": [
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕"
+          ],
+          "unsupported_count": 1,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.985,
+      "usage": {
+        "input_tokens": 9269,
+        "output_tokens": 811,
+        "total_tokens": 10080
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "groundedness_fabricated",
+      "repeat": 1,
+      "expected_failure": "groundedness",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술에 대해 각각의 기술적 특성, 성능, 시장성, 이해관계자 의견, 도메인 적용 가능성 등을 균형 있게 제시하고 있으며, 명확한 추천이나 선호, 도입 조언, 우월성 판단 없이 중립적인 서술에 충실하다. 각 기술의 장단점과 한계, 불확실성도 함께 언급하여 독자가 스스로 판단할 수 있도록 정보를 제공하고 있다. 따라서 기술 평가 목적에 부합하는 중립적인 보고서이다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "2: The excerpt mentions MLA reduces KV cache and boosts inference efficiency but does not provide any information about reducing rack power consumption by 63%, so the claim is not supported.; 5: The excerpt does not mention ITME or throughput improvements relative to NVMe-oF, so the claim about 1.80x throughput improvement is unsupported.; 7: The claim about KV cache occupancy directly limiting concurrent request count is not explicitly stated or supported by the provided excerpts, which only mention KV cache reduction percentages and performance improvements.; 8: Similar to index 7, the excerpts do not explicitly state that KV cache occupancy per request directly limits concurrent request count, so the claim is not directly supported.",
+          "problem_sentences": [
+            "- 동일 구성은 랙 전력을 63% 절감했다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 9
+        }
+      },
+      "latency_seconds": 4.9795,
+      "usage": {
+        "input_tokens": 9355,
+        "output_tokens": 570,
+        "total_tokens": 9925
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "groundedness_fabricated",
+      "repeat": 2,
+      "expected_failure": "groundedness",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술에 대해 각각의 기술적 특성, 성능, 적용 사례, 한계점 등을 근거를 들어 상세히 설명하고 있으며, 두 기술 간의 상충점과 보완 관계도 명확히 제시하고 있다. 또한, 시장성, 이해관계자 의견, 도메인 적용 등 다양한 관점에서 균형 있게 기술을 평가하고 있다. 보고서 내에서 특정 기술을 우월하다고 판단하거나 도입을 권장하는 표현이 없으며, 중립적인 어조를 유지하고 있다. 따라서 기술 평가 목적에 부합하는 중립적인 보고서로 판단된다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "2: The excerpt mentions MLA reduces KV cache and boosts inference efficiency but does not provide any information about reducing rack power by 63%, so the claim is not supported.; 5: The excerpt does not mention ITME or throughput improvements relative to NVMe-oF, so the claim about 1.80x throughput improvement is unsupported.; 7: The claim about KV cache occupancy directly limiting concurrent request count is not explicitly stated or supported by the excerpts, which only mention KV cache reduction percentages and performance improvements.; 8: Similar to index 7, the excerpts do not explicitly state that KV cache occupancy per request directly limits concurrent request count, so the claim is not directly supported.",
+          "problem_sentences": [
+            "- 동일 구성은 랙 전력을 63% 절감했다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 9
+        }
+      },
+      "latency_seconds": 4.7765,
+      "usage": {
+        "input_tokens": 9355,
+        "output_tokens": 590,
+        "total_tokens": 9945
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "bias_onesided",
+      "repeat": 1,
+      "expected_failure": "bias_control",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술에 대해 각각의 기술적 특성, 성능, 시장성, 이해관계자 반응, 도메인 적용 가능성 등을 근거를 들어 상세히 비교하고 있다. 기술 성숙도(TRL) 수준, 시장 생태계 지지, 이해관계자 의견, 도메인 적용 조건 등 다양한 관점에서 균형 있게 서술하며, 특정 기술을 우선 도입하거나 추천하는 표현 없이 객관적 사실과 근거 중심으로 기술 평가를 수행하였다. 다만, 일부 상충 지점과 한계점은 명확히 설명하고 있어 독자가 판단할 수 있도록 하였으며, 결론이나 선호를 유도하는 문장은 발견되지 않는다. 따라서 기술 평가의 중립성 기준을 충족한다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 3,
+          "passed": true,
+          "reasons": "4: The excerpt does not mention ITME or NVMe-oF throughput improvements, so the claim about ITME achieving up to 1.80x throughput improvement over NVMe-oF is not supported.",
+          "problem_sentences": [
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕"
+          ],
+          "unsupported_count": 1,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.1756,
+      "usage": {
+        "input_tokens": 9093,
+        "output_tokens": 598,
+        "total_tokens": 9691
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "bias_onesided",
+      "repeat": 2,
+      "expected_failure": "bias_control",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술에 대해 각각의 기술적 특성, 성능, 시장성, 이해관계자 반응, 도메인 적용 가능성 등을 균형 있게 서술하고 있으며, 특정 기술을 우선 도입하거나 추천하는 표현 없이 객관적 근거와 불확실성을 명시하여 중립적으로 평가하고 있다. 또한, 상충 지점과 한계점도 명확히 설명하여 결론을 유도하지 않고 있다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 3,
+          "passed": true,
+          "reasons": "4: The excerpt does not mention ITME or NVMe-oF throughput improvements, so the claim about ITME achieving up to 1.80x throughput improvement is not supported by the provided excerpt.",
+          "problem_sentences": [
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕"
+          ],
+          "unsupported_count": 1,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 4.7294,
+      "usage": {
+        "input_tokens": 9093,
+        "output_tokens": 531,
+        "total_tokens": 9624
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "coverage_missing",
+      "repeat": 1,
+      "expected_failure": "coverage",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "The report maintains a neutral tone throughout, presenting technical details, evidence, and evaluations without recommending, preferring, or advising the adoption of either technology. It explicitly states limitations, uncertainties, and conflicting evidence without drawing conclusions that favor one technology over the other. The report avoids any language that would imply superiority or preference, focusing solely on factual comparison and analysis based on available evidence.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 3,
+          "passed": true,
+          "reasons": "4: The excerpt does not mention ITME or NVMe-oF throughput improvements, so the claim about ITME achieving up to 1.80x throughput improvement over NVMe-oF is not supported.",
+          "problem_sentences": [
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕"
+          ],
+          "unsupported_count": 1,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 4.365,
+      "usage": {
+        "input_tokens": 8982,
+        "output_tokens": 504,
+        "total_tokens": 9486
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "coverage_missing",
+      "repeat": 2,
+      "expected_failure": "coverage",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "The report maintains a neutral tone throughout, presenting technical details, evidence, and evaluations without recommending, preferring, or advising the adoption of either technology. It carefully distinguishes between evidence levels, uncertainties, and conflicting points without drawing conclusions that favor one technology over the other. The report explicitly states limitations and unresolved issues, avoiding any language that would imply superiority or preference. Therefore, it fully complies with the neutrality criterion for technology evaluation.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 3,
+          "passed": true,
+          "reasons": "4: The excerpt does not mention ITME or NVMe-oF throughput improvements, so the claim about ITME achieving up to 1.80x throughput improvement over NVMe-oF is not supported.",
+          "problem_sentences": [
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕"
+          ],
+          "unsupported_count": 1,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 4.6032,
+      "usage": {
+        "input_tokens": 8982,
+        "output_tokens": 523,
+        "total_tokens": 9505
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "clean",
+      "repeat": 1,
+      "expected_failure": null,
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술의 특성, 적용 사례, 성능, 한계, 시장성, 이해관계자 의견 등을 체계적으로 비교·분석하고 있다. 각 항목에서 근거를 명확히 제시하며, 기술의 장점·단점, 적용 조건, 불확실성, 상충 지점, 보완 관계, 남은 과제 등을 객관적으로 기술한다. 특정 기술의 도입, 우선순위, 추천, 우월성에 대한 직접적 또는 간접적 조언이나 암시는 발견되지 않는다. 결론 및 시사점에서도 판단 보류, 근거 부족, 불확실성 등을 명확히 언급하며, 독자에게 특정 선택을 유도하지 않는다. 전체적으로 중립성과 객관성이 매우 잘 유지되어 있다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 문장은 MLA의 93% KV 캐시 압축이 정확도를 유지한다고 단정하지만, 인용문은 'meaningful output'과 'comparable performance across multiple benchmarks'를 fine-tuning(6B tokens) 후에 회복했다고 언급한다. 즉, 압축만으로 바로 정확도 유지가 직접적으로 증명된 것은 아니다.; 3: 문장은 8x H800 환경에서 5.76배 throughput을 달성한다고 했으나, 인용문은 단순히 'boosts the maximum generation throughput to 5.76 times'라고만 하며, 8x H800 환경이라는 조건이 명시되어 있지 않다.; 4: 문장은 ITME가 NVMe-oF 대비 최대 1.80배 throughput 개선을 재현한다고 했으나, 인용문에는 ITME의 throughput 개선 수치나 NVMe-oF와의 비교가 전혀 언급되어 있지 않다.; 5: 문장은 MLA가 LLaMA-2-7B에서 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다고 했으나, 인용문은 'maintaining meaningful output'과 'comparable performance'를 fine-tuning(6B tokens) 후에 회복했다고 하므로, 압축만으로 바로 성능이 유지된다는 직접적 근거는 아니다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.9531,
+      "usage": {
+        "input_tokens": 9180,
+        "output_tokens": 839,
+        "total_tokens": 10019
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "clean",
+      "repeat": 2,
+      "expected_failure": null,
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술의 구조, 적용 사례, 성능, 시장성, 이해관계자 반응, 도메인 적용 등 다양한 관점에서 근거 기반으로 비교·분석하고 있다. 각 기술의 장점, 한계, 불확실성, 상충 지점, 보완 관계, 남은 과제 등을 구체적으로 기술하며, 특정 기술의 도입, 추천, 우월성, 선호를 직접적으로 또는 간접적으로 조언하거나 유도하는 표현이 전혀 없다. 모든 평가는 근거와 조건, 불확실성을 명확히 밝히고, 판단 보류·한계점도 명시적으로 언급한다. 결론이나 시사점에서도 특정 기술을 선택하라고 유도하지 않는다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 근거 excerpt에서는 'maintaining meaningful output'와 'recover comparable performance across multiple benchmarks'라고만 언급되어 있고, '정확도를 유지하는 수준'이라는 표현(즉, 정확도 유지가 직접적으로 수치나 기준으로 확인됨)이 직접적으로 뒷받침되지는 않는다. '의미 있는 출력'과 '비슷한 성능'은 정확도 유지의 직접적 근거로 보기 어렵다.; 3: 근거 excerpt에서는 'boosts the maximum generation throughput to 5.76 times'라고만 언급되어 있고, '8x H800 환경'이라는 실험 환경 조건이 명시되어 있지 않다. 따라서 측정 조건이 일치하지 않아 supported=false이다.; 4: 근거 excerpt에는 ITME의 throughput 개선이나 NVMe-oF와의 비교, 1.80배 수치, 대용량 LLM inference 환경 등 관련 정보가 전혀 언급되어 있지 않다. 따라서 직접 뒷받침되지 않는다.; 5: 근거 excerpt에서는 'maintaining meaningful output'과 'recover comparable performance across multiple benchmarks'라고만 언급되어 있고, '유사 이상의 성능'이라는 표현(즉, 성능이 동일하거나 더 좋다는 의미)이 직접적으로 수치나 기준으로 확인되지 않는다. '의미 있는 출력'과 '비슷한 성능'은 '유사 이상의 성능'을 직접적으로 뒷받침하지 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 4.9929,
+      "usage": {
+        "input_tokens": 9180,
+        "output_tokens": 832,
+        "total_tokens": 10012
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "neutrality_implicit",
+      "repeat": 1,
+      "expected_failure": "neutrality",
+      "criteria": {
+        "neutrality": {
+          "score": 2,
+          "passed": false,
+          "reasons": "보고서에는 특정 기술의 도입을 명확히 조언하거나 우선순위를 제시하는 표현이 반복적으로 등장한다. 예를 들어, \"데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다\"와 \"운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다\" 등은 특정 기술의 우선 도입을 권고하는 명확한 도입 조언이다. 이는 중립성 기준을 위반한다. 다만, 전체 보고서가 일관되게 한 기술만을 추천하는 것은 아니고, 일부 구간에서는 조건부·불확실성·상충 설명 등도 포함되어 있어, 직접적 추천과 조언이 반복되지만 1점(명시적 추천/도입 조언만 있는 경우)보다는 2점(특정 기술을 택하도록 유도하거나 상대적 우월성을 반복)으로 평가한다.",
+          "problem_sentences": [
+            "데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다.",
+            "운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다."
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 문장은 MLA의 93% KV 캐시 압축이 정확도를 유지한다고 단정하지만, 인용문은 'meaningful output'과 'comparable performance across multiple benchmarks'를 fine-tuning(6B tokens) 후에 회복했다고 언급한다. 즉, 압축만으로 정확도 유지가 직접적으로 증명된 것은 아니며, fine-tuning이 필요함을 시사한다.; 3: 문장은 8x H800 환경에서 5.76배 throughput을 달성한다고 했으나, 인용문은 단순히 'boosts the maximum generation throughput to 5.76 times'라고만 하며, 8x H800 환경이라는 조건이 명시되어 있지 않다. 따라서 조건 불일치로 supported=false.; 4: 문장은 ITME가 NVMe-oF 대비 최대 1.80배 throughput 개선을 재현한다고 했으나, 인용문에는 ITME, NVMe-oF, throughput 개선 수치(1.80배)에 대한 언급이 전혀 없다.; 5: 문장은 MLA가 LLaMA-2-7B에서 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다고 했으나, 인용문은 'maintaining meaningful output'과 'comparable performance'를 fine-tuning(6B tokens) 후에 회복했다고 한다. 즉, 압축만으로 성능 유지가 직접적으로 증명된 것은 아니다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 8.127,
+      "usage": {
+        "input_tokens": 9269,
+        "output_tokens": 937,
+        "total_tokens": 10206
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "neutrality_implicit",
+      "repeat": 2,
+      "expected_failure": "neutrality",
+      "criteria": {
+        "neutrality": {
+          "score": 2,
+          "passed": false,
+          "reasons": "보고서에는 여러 곳에서 특정 기술의 도입을 우선하거나 타당하다고 명시적으로 언급하고 있다. 예를 들어, '데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다.'와 같이 특정 기술의 도입을 조언하는 문장이 있다. 또한, '운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다.'와 같이 특정 기술의 우선 도입을 권장하는 표현이 반복적으로 등장한다. 이는 중립성 기준에서 벗어나 특정 기술을 택하도록 유도하는 것으로 간주된다. 다만, 직접적으로 '도입하라'고 명령하지는 않으므로 2점으로 평가한다.",
+          "problem_sentences": [
+            "데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다. 〔근거: technical:ev:d79a70ccc3c9cc74〕"
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 문장은 MLA의 93% KV 캐시 압축이 정확도를 유지한다고 단정하지만, 인용문은 'meaningful output'과 'comparable performance across multiple benchmarks'를 fine-tuning(6B tokens) 후에 회복했다고 언급한다. 즉, 압축만으로 바로 정확도 유지가 직접적으로 증명된 것은 아니다.; 3: 문장은 8x H800 환경에서 5.76배 throughput을 달성한다고 했으나, 인용문은 단순히 'boosts the maximum generation throughput to 5.76 times'라고만 하고, 8x H800 환경이라는 조건은 명시되어 있지 않다. 따라서 조건 불일치로 supported=false.; 4: 문장은 ITME가 NVMe-oF 대비 최대 1.80배 throughput 개선을 재현한다고 했으나, 인용문에는 ITME, NVMe-oF, throughput 개선 수치에 대한 언급이 전혀 없다.; 5: 문장은 MLA가 LLaMA-2-7B에서 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다고 했으나, 인용문은 'maintaining meaningful output'과 'comparable performance'를 fine-tuning(6B tokens) 후에 회복했다고 언급한다. 즉, 압축만으로 바로 성능 유지가 직접적으로 증명된 것은 아니다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.4966,
+      "usage": {
+        "input_tokens": 9269,
+        "output_tokens": 917,
+        "total_tokens": 10186
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "groundedness_fabricated",
+      "repeat": 1,
+      "expected_failure": "groundedness",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술의 특성, 성능, 적용 사례, 한계, 시장성, 이해관계자 의견 등을 체계적으로 비교·서술하고 있다. 각 기술의 장점, 한계, 실험 결과, 적용 조건, 시장 및 생태계 현황, 기술 성숙도 등 다양한 관점을 근거와 함께 제시하지만, 어느 한쪽의 도입을 권장하거나 우월성을 직접적으로 또는 간접적으로 암시하지 않는다. 결론 및 시사점에서도 특정 기술의 선택을 유도하지 않고, 상충·보완 관계와 남은 과제, 한계점 등을 중립적으로 기술한다. 추천, 선호, 도입 조언, 우월성 판단이 전혀 없으며, 평가의 초점이 기술적 사실과 근거 제시에만 맞춰져 있다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 근거 excerpt에서는 '93% KV 캐시 압축'이 'meaningful output'을 유지한다고만 언급되어 있고, '정확도를 유지하는 수준'임을 직접적으로 언급하지 않는다. '유사 이상의 성능'이나 'comparable performance'를 회복하려면 6B 토큰의 파인튜닝이 필요하다고 되어 있어, 압축만으로 정확도 유지가 직접적으로 증명되지는 않는다.; 2: 근거 excerpt에는 MLA가 MHA 대비 성능이 우수하고 KV 캐시를 줄여 효율을 높인다고만 되어 있으며, '랙 전력을 63% 절감'했다는 수치나 전력 관련 언급이 없다.; 5: 근거 excerpt에는 ITME의 throughput 개선이나 NVMe-oF와의 비교, 1.80배라는 수치가 전혀 언급되어 있지 않다.; 6: 근거 excerpt에서는 93% KV 캐시 압축 시 'meaningful output'을 유지한다고만 되어 있고, '유사 이상의 성능'을 유지한다는 직접적 언급은 없다. 또한, comparable performance를 위해서는 6B 토큰 파인튜닝이 필요하다고 되어 있어, 압축만으로 성능 유지가 직접적으로 증명되지는 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- 동일 구성은 랙 전력을 63% 절감했다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 9
+        }
+      },
+      "latency_seconds": 6.1737,
+      "usage": {
+        "input_tokens": 9355,
+        "output_tokens": 812,
+        "total_tokens": 10167
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "groundedness_fabricated",
+      "repeat": 2,
+      "expected_failure": "groundedness",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술의 특성, 적용 사례, 성능, 한계, 시장성, 이해관계자 의견 등을 체계적으로 비교·서술하고 있다. 각 기술의 장점, 한계, 실험 결과, 적용 조건, 시장 및 생태계 현황, 기술 성숙도(TRL) 등 다양한 관점을 근거와 함께 제시하되, 어느 한쪽의 도입을 권고하거나 우월성을 직접적으로 주장하지 않는다. 결론 및 시사점에서도 특정 기술의 선택을 유도하거나 추천하는 표현이 없으며, 상충·보완 관계, 한계점, 미확인 과제 등도 중립적으로 기술되어 있다. 전체적으로 평가·비교에 집중하며, 도입 조언이나 선호, 우월성 판단이 전혀 드러나지 않는다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 근거 excerpt에서는 '93% KV 캐시 압축'이 'meaningful output'을 유지한다고만 언급되어 있고, '정확도를 유지하는 수준'임을 직접적으로 언급하지 않는다. '유사 이상의 성능'이나 'comparable performance'를 회복하려면 6B 토큰의 파인튜닝이 필요하다고 되어 있어, 압축만으로 정확도 유지가 직접적으로 증명되지는 않는다.; 2: 근거 excerpt에서는 MLA가 MHA 대비 성능이 우수하고 KV 캐시를 줄여 효율을 높인다고만 언급되어 있으며, '랙 전력을 63% 절감'했다는 수치나 전력 관련 언급이 전혀 없다.; 4: 근거 excerpt에서는 'maximum generation throughput to 5.76 times'라고만 되어 있고, '8x H800 환경'이라는 조건이 명시되어 있지 않다. 따라서 측정 조건이 일치하지 않아 직접적으로 뒷받침되지 않는다.; 5: 근거 excerpt에서는 ITME의 throughput 개선이나 NVMe-oF와의 비교, 1.80배라는 수치, 대용량 LLM inference 환경 등과 관련된 내용이 전혀 언급되어 있지 않다.; 6: 근거 excerpt에서는 93% KV 캐시 압축 시 'meaningful output'을 유지한다고만 언급되어 있고, '유사 이상의 성능'을 유지한다는 표현이나 'comparable performance'는 6B 토큰 파인튜닝 후에 해당한다. 압축만으로 성능 유지가 직접적으로 증명되지는 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- 동일 구성은 랙 전력을 63% 절감했다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 5,
+          "checked_items": 9
+        }
+      },
+      "latency_seconds": 5.8237,
+      "usage": {
+        "input_tokens": 9355,
+        "output_tokens": 847,
+        "total_tokens": 10202
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "bias_onesided",
+      "repeat": 1,
+      "expected_failure": "bias_control",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술의 구조, 성능, 적용 사례, 한계, 시장성, 이해관계자 관점 등을 체계적으로 비교·서술하고 있다. 각 기술의 장점, 한계, 실험 결과, 적용 조건, 상충 지점, 보완 관계, 미확인 과제 등을 근거와 함께 제시하며, 특정 기술의 도입, 우월성, 추천, 선호를 직접적으로 또는 간접적으로 유도하는 표현이 없다. 비교 매트릭스와 대조표 등에서도 단순히 사실과 근거, 조건, 불확실성만을 기술하고 있다. 결론이나 시사점에서도 특정 기술을 선택하라고 조언하거나 우선 도입을 권고하는 문장이 없다. 전반적으로 중립성을 엄격히 유지하고 있다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 근거 excerpt에서는 'maintaining meaningful output'와 'recover comparable performance across multiple benchmarks'라고만 언급되어 있고, '정확도를 유지하는 수준'이라는 표현(즉, 정확도 유지가 직접적으로 수치나 기준으로 확인됨)이 직접적으로 뒷받침되지는 않는다. '의미 있는 출력'과 '비슷한 성능'은 정확도 유지의 직접적 근거로 보기 어렵다.; 3: 근거 excerpt에서는 'boosts the maximum generation throughput to 5.76 times'라고만 언급되어 있고, '8x H800 환경'이라는 실험 환경 조건이 명시되어 있지 않다. 따라서 측정 조건이 일치하지 않아 supported=false이다.; 4: 근거 excerpt에는 ITME의 throughput 개선이나 NVMe-oF와의 비교, 1.80배 수치, 대용량 LLM inference 환경 등과 관련된 내용이 전혀 없다. 따라서 직접적 근거가 없다.; 5: 근거 excerpt에서는 'maintaining meaningful output'과 'recover comparable performance across multiple benchmarks'라고만 언급되어 있고, '유사 이상의 성능'이라는 표현(즉, 성능이 동일하거나 더 좋다는 의미)이 직접적으로 수치나 기준으로 확인되지 않는다. '비슷한 성능'은 '유사 이상의 성능'을 직접적으로 뒷받침하지 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.4366,
+      "usage": {
+        "input_tokens": 9093,
+        "output_tokens": 805,
+        "total_tokens": 9898
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "bias_onesided",
+      "repeat": 2,
+      "expected_failure": "bias_control",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술의 특성, 적용 사례, 성능, 한계, 시장성, 이해관계자 관점, 도메인 적용 등 다양한 관점에서 근거 기반으로 비교·분석하고 있다. 각 기술의 장점, 한계, 실험 결과, 적용 조건, 상충 지점, 보완 관계, 미확인 과제 등을 구체적으로 기술하였으나, 어느 한쪽의 도입을 권고하거나 우월성을 직접적으로 또는 간접적으로 암시하는 표현이 없다. \"적합하다\", \"conditional\" 등은 특정 기술의 우월성이나 도입을 유도하는 것이 아니라, 조건부 평가 또는 근거 기반의 사실 진술에 그친다. 결론 및 시사점에서도 특정 기술의 선택을 유도하지 않고, 판단 보류, 근거 부족, 상충 설명 등 중립적 태도를 일관되게 유지한다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 근거 excerpt에서는 'maintaining meaningful output'와 'recover comparable performance across multiple benchmarks'라고만 언급되어 있고, '정확도를 유지하는 수준'이라는 표현(즉, 정확도 유지가 직접적으로 수치나 기준으로 확인됨)이 직접적으로 뒷받침되지는 않는다. '의미 있는 출력'과 '비슷한 성능'은 정확도 유지의 직접적 근거로 보기 어렵다.; 3: 근거 excerpt에서는 'boosts the maximum generation throughput to 5.76 times'라고만 언급되어 있고, 8x H800 환경이라는 조건이 명시되어 있지 않다. 따라서 실험 환경이 일치하지 않아 직접적 근거로 볼 수 없다.; 4: 근거 excerpt에는 ITME의 throughput 개선 수치(1.80배)나 NVMe-oF와의 비교, 대용량 LLM inference 환경에 대한 언급이 전혀 없다. 따라서 직접적 근거가 아니다.; 5: 근거 excerpt에서는 'maintaining meaningful output'과 'recover comparable performance across multiple benchmarks'라고만 언급되어 있고, '유사 이상의 성능'이라는 표현(즉, 성능이 동일하거나 더 좋다는 의미)이 직접적으로 수치나 기준으로 확인되지 않는다. '비슷한 성능'은 '유사 이상의 성능'을 직접적으로 뒷받침하지 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.4148,
+      "usage": {
+        "input_tokens": 9093,
+        "output_tokens": 826,
+        "total_tokens": 9919
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "coverage_missing",
+      "repeat": 1,
+      "expected_failure": "coverage",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술의 구조, 성능, 적용 사례, 한계, 시장성, 이해관계자 의견 등을 체계적으로 비교·서술하고 있다. 각 기술의 장점, 한계, 실험 결과, 적용 조건, 불확실성, 상충 지점 등을 근거와 함께 명확히 제시하며, 특정 기술의 도입, 우선 적용, 추천, 우월성에 대한 직접적·간접적 조언이나 암시는 전혀 없다. 결론 및 시사점에서도 판단 보류, 근거 부족, 상충 설명 등 중립적 태도를 일관되게 유지한다. 기술 평가에 집중하며, 선택이나 도입을 유도하는 표현이 없다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 근거 excerpt에서는 'maintaining meaningful output'와 'recover comparable performance across multiple benchmarks'라고만 언급되어 있고, '정확도를 유지하는 수준'이라는 표현(즉, 정확도 유지가 직접적으로 수치나 기준으로 확인됨)이 직접적으로 뒷받침되지는 않는다. '의미 있는 출력'과 '비슷한 성능'은 정확도 유지의 직접적 근거로 보기 어렵다.; 3: 근거 excerpt에서는 'boosts the maximum generation throughput to 5.76 times'라고만 언급되어 있고, '8x H800 환경'이라는 조건이 명시되어 있지 않다. 따라서 실험 환경이 일치하지 않아 직접적으로 뒷받침된다고 볼 수 없다.; 4: 근거 excerpt에는 ITME의 throughput 개선 수치(1.80배)나 NVMe-oF와의 비교가 전혀 언급되어 있지 않다. 따라서 해당 측정값 문장은 근거로 뒷받침되지 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕"
+          ],
+          "unsupported_count": 3,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 4.9386,
+      "usage": {
+        "input_tokens": 8982,
+        "output_tokens": 813,
+        "total_tokens": 9795
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "coverage_missing",
+      "repeat": 2,
+      "expected_failure": "coverage",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 MLA와 ITME 두 기술의 구조, 성능, 적용 사례, 한계점, 시장성, 이해관계자 의견 등을 체계적으로 비교·서술하고 있다. 각 기술의 장점, 한계, 실험 결과, 적용 조건, 불확실성, 상충 지점 등을 근거와 함께 명확히 제시하며, 특정 기술의 도입, 우선순위, 추천, 우월성에 대한 직접적·간접적 조언이나 암시는 발견되지 않는다. 결론 및 시사점에서도 판단 보류, 근거 부족, 상충 설명 등 중립적 태도를 일관되게 유지한다. 기술 평가에 집중하며, 선택을 유도하는 표현이 없다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 근거 excerpt에서는 'maintaining meaningful output'와 'recover comparable performance'라고만 언급되어 있고, '정확도를 유지하는 수준'임을 직접적으로 확인할 수 있는 수치적 근거 또는 명확한 성능 유지 언급이 없다. '의미 있는 출력'과 '비슷한 성능 회복'은 정확도 유지의 직접적 근거로 보기 어렵다.; 4: 근거 excerpt에는 ITME의 throughput 개선이나 NVMe-oF와의 비교, 1.80배라는 수치가 전혀 언급되어 있지 않다. DeepSeek-V2 Chat의 성능에 대한 내용만 있을 뿐, ITME나 throughput 수치와는 무관하다.; 5: 근거 excerpt에서는 'maintaining meaningful output'과 'recover comparable performance'라고만 언급되어 있고, '유사 이상의 성능을 유지'한다는 직접적이고 수치적인 근거가 없다. '의미 있는 출력'과 '비슷한 성능 회복'은 유사 이상의 성능 유지의 직접적 근거로 보기 어렵다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ],
+          "unsupported_count": 3,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.2098,
+      "usage": {
+        "input_tokens": 8982,
+        "output_tokens": 807,
+        "total_tokens": 9789
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "clean",
+      "repeat": 1,
+      "expected_failure": null,
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "The report maintains a neutral tone throughout, providing detailed descriptions and evaluations of the technologies without making recommendations or expressing preferences. It presents the strengths and limitations of each technology objectively and discusses various perspectives and conflicts without suggesting a particular course of action. The report also highlights areas of uncertainty and incomplete evidence, further supporting its neutral stance.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "3: The excerpt mentions a 5.76x increase in maximum generation throughput but does not specify the 8x H800 environment, which is a condition in the claim.; 4: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF, so the claim is not supported by the provided evidence.; 8: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the claim notes a conflict due to missing comparison conditions, which is not resolved by the evidence.",
+          "problem_sentences": [
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 3,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.1477,
+      "usage": {
+        "input_tokens": 9180,
+        "output_tokens": 456,
+        "total_tokens": 9636
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "clean",
+      "repeat": 2,
+      "expected_failure": null,
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "The report maintains a largely neutral tone throughout, focusing on presenting technical details, evidence, and comparisons without explicitly recommending or favoring one technology over the other. It discusses the features, applications, and limitations of both MLA and ITME technologies, providing evidence and context for each. While there are some instances where the report mentions the adoption or support of certain technologies, these are presented as factual observations rather than endorsements. The report also highlights conflicts and limitations, further contributing to its balanced approach.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "3: The excerpt mentions a 5.76 times increase in maximum generation throughput but does not specify the 8x H800 environment, which is a condition in the claim.; 4: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF, so it does not support the claim.; 8: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the claim lacks this specific comparison condition, leading to a conflict.",
+          "problem_sentences": [
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 3,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 4.9885,
+      "usage": {
+        "input_tokens": 9180,
+        "output_tokens": 490,
+        "total_tokens": 9670
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "neutrality_implicit",
+      "repeat": 1,
+      "expected_failure": "neutrality",
+      "criteria": {
+        "neutrality": {
+          "score": 2,
+          "passed": false,
+          "reasons": "The report contains several instances where it suggests a preference or recommendation for certain technologies over others. For example, it explicitly states that adopting MLA models before HBM expansion is more reasonable, and it suggests that organizations should consider MLA-based configurations before CXL tiers. These statements imply a recommendation or preference, which affects the neutrality of the report.",
+          "problem_sentences": [
+            "데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다.",
+            "운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다."
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "3: The excerpt mentions a 5.76 times increase in maximum generation throughput but does not specify the 8x H800 environment, which is a condition in the claim.; 4: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF, so it does not support the claim.; 8: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the claim lacks this specific comparison context, leading to a conflict.",
+          "problem_sentences": [
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 3,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.3964,
+      "usage": {
+        "input_tokens": 9269,
+        "output_tokens": 510,
+        "total_tokens": 9779
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "neutrality_implicit",
+      "repeat": 2,
+      "expected_failure": "neutrality",
+      "criteria": {
+        "neutrality": {
+          "score": 2,
+          "passed": false,
+          "reasons": "The report contains several instances where it suggests a preference or recommendation for certain technologies over others. For example, it explicitly states that adopting MLA models before HBM expansion is more reasonable and suggests that organizations should consider MLA-based configurations before CXL tiers. These statements imply a recommendation or preference, which affects the neutrality of the report.",
+          "problem_sentences": [
+            "데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다.",
+            "운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다."
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "3: The excerpt mentions a 5.76 times increase in maximum generation throughput but does not specify the 8x H800 environment, which is a condition in the claim.; 4: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF, so it does not support the claim.; 8: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the claim lacks this specific comparison context, leading to a conflict.",
+          "problem_sentences": [
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 3,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 4.9886,
+      "usage": {
+        "input_tokens": 9269,
+        "output_tokens": 499,
+        "total_tokens": 9768
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "groundedness_fabricated",
+      "repeat": 1,
+      "expected_failure": "groundedness",
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "The report maintains a largely neutral tone throughout, focusing on presenting technical details, evidence, and comparisons without explicitly recommending or favoring one technology over the other. It discusses the features, applications, and limitations of both MLA and ITME technologies, providing evidence and context for each. While there are some instances where the report mentions the adoption or support of certain technologies, these are presented as factual observations rather than endorsements. The report avoids making direct recommendations or judgments about which technology is superior or should be adopted, thus maintaining a neutral stance.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: The excerpt mentions compressing 93% of the KV cache in LLaMA-2-7B, achieving a speedup while maintaining meaningful output, but does not explicitly confirm that the accuracy is maintained, which is required to support the claim.; 2: The excerpt does not mention any reduction in rack power consumption, so the claim about a 63% reduction in rack power is not supported by the provided evidence.; 5: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF, so the claim about a 1.80x throughput improvement is not supported by the provided evidence.; 9: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the claim lacks the specific comparison context, leading to a conflict with the general performance expression.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- 동일 구성은 랙 전력을 63% 절감했다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 9
+        }
+      },
+      "latency_seconds": 6.0052,
+      "usage": {
+        "input_tokens": 9355,
+        "output_tokens": 582,
+        "total_tokens": 9937
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "groundedness_fabricated",
+      "repeat": 2,
+      "expected_failure": "groundedness",
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "The report maintains a largely neutral tone throughout, focusing on presenting technical details, evidence, and comparisons without explicitly recommending or favoring one technology over another. It discusses the features, applications, and limitations of both MLA and ITME technologies, providing evidence and context for each. While there are some instances where the report mentions the adoption or support of certain technologies, these are presented as factual observations rather than endorsements. The report also highlights conflicts and complements between different perspectives, maintaining an objective stance.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: The excerpt mentions compressing 93% of the KV cache in LLaMA-2-7B, achieving a speedup while maintaining meaningful output, but does not explicitly confirm that the accuracy is maintained, which is what the sentence claims.; 2: The excerpt does not mention any reduction in rack power by 63%. It discusses MLA's performance and KV cache reduction, but not power consumption.; 5: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF. It discusses DeepSeek-V2 and its performance.; 9: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the sentence claims a conflict due to missing comparison conditions, which is not directly supported by the excerpt.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- 동일 구성은 랙 전력을 63% 절감했다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 9
+        }
+      },
+      "latency_seconds": 4.9907,
+      "usage": {
+        "input_tokens": 9355,
+        "output_tokens": 558,
+        "total_tokens": 9913
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "bias_onesided",
+      "repeat": 1,
+      "expected_failure": "bias_control",
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "The report maintains a largely neutral tone throughout, focusing on the technical aspects and evidence supporting the capabilities and limitations of both MLA and ITME technologies. It avoids making explicit recommendations or showing clear preference for one technology over the other. The language used is descriptive and factual, presenting findings and evidence without suggesting superiority or advising on adoption. However, there are some instances where the report could be interpreted as slightly favoring MLA due to its adoption in certain frameworks, but these are presented as factual observations rather than recommendations.",
+          "problem_sentences": [
+            "MLA 채택은 DeepSeek-V2, DeepSeek-V2 Chat 등 실제 배포 모델과 vLLM 등 오픈서스·상용 프레임워크에서 생태계 지지를 추론 근거로 확보하였다. 〔근거: market:ev:afb9e08590cd〕",
+            "SW 접근은 이해관계자의 도입 부담을 낮추고 운영 유연성을 높인다. 〔근거: technical:ev:d79a70ccc3c9cc74〕"
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: The excerpt mentions compressing 93% of the KV cache in LLaMA-2-7B and achieving a speedup while maintaining meaningful output, but it does not explicitly confirm that the accuracy is maintained, which is what the sentence claims.; 3: The excerpt mentions a 5.76 times increase in maximum generation throughput but does not specify the 8x H800 environment condition mentioned in the sentence.; 4: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF, so the claim is not supported.; 8: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the sentence claims a conflict due to missing comparison conditions, which is not directly addressed in the excerpt.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.9814,
+      "usage": {
+        "input_tokens": 9093,
+        "output_tokens": 621,
+        "total_tokens": 9714
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "bias_onesided",
+      "repeat": 2,
+      "expected_failure": "bias_control",
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "The report maintains a generally neutral tone throughout, focusing on the technical aspects and evidence supporting each technology without explicitly recommending one over the other. It provides detailed descriptions and comparisons based on technical performance, market presence, and stakeholder perspectives without making direct recommendations or showing clear preference for either technology. However, there are some instances where the language could be interpreted as slightly favoring one technology, such as mentioning the adoption and support in ecosystems, but these do not amount to explicit recommendations or superiority claims.",
+          "problem_sentences": [
+            "MLA 채택은 DeepSeek-V2, DeepSeek-V2 Chat 등 실제 배포 모델과 vLLM 등 오픈서스·상용 프레임워크에서 생태계 지지를 추론 근거로 확보하였다.",
+            "SW 접근은 이해관계자의 도입 부담을 낮추고 운영 유연성을 높인다.",
+            "MLA는 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하여 운영 부담을 줄인다."
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "3: The excerpt mentions a 5.76x increase in maximum generation throughput but does not specify the 8x H800 environment condition, so the specific condition is not supported.; 4: The excerpt does not mention ITME or any throughput improvement related to NVMe-oF, so the claim is not supported.; 8: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the claim lacks the specific comparison condition, leading to a conflict with the general performance expression.",
+          "problem_sentences": [
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 3,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.9908,
+      "usage": {
+        "input_tokens": 9093,
+        "output_tokens": 594,
+        "total_tokens": 9687
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "coverage_missing",
+      "repeat": 1,
+      "expected_failure": "coverage",
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "The report maintains a neutral tone throughout, providing factual information and evidence for both MLA and ITME technologies without making any recommendations or expressing preferences. It discusses the features, applications, and limitations of each technology objectively, and highlights areas of conflict and complementarity without suggesting superiority or advising on adoption. The report also acknowledges uncertainties and limitations in the available evidence, further supporting its neutral stance.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: The excerpt mentions compressing 93% of the KV cache in LLaMA-2-7B and achieving a speedup while maintaining meaningful output, but it does not explicitly confirm that the accuracy is maintained, which is what the sentence claims.; 3: The excerpt mentions a 5.76 times increase in maximum generation throughput but does not specify the 8x H800 environment condition mentioned in the sentence.; 4: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF, so the claim is not supported by the provided evidence.; 8: The excerpt mentions a 35.7% throughput improvement over a CPU-offload baseline, but the sentence claims a conflict due to missing comparison conditions, which is not addressed in the excerpt.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.1969,
+      "usage": {
+        "input_tokens": 8982,
+        "output_tokens": 491,
+        "total_tokens": 9473
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "coverage_missing",
+      "repeat": 2,
+      "expected_failure": "coverage",
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "The report maintains a largely neutral tone throughout, focusing on the technical aspects and performance metrics of the technologies being compared. It provides detailed descriptions and evidence for both MLA and ITME without explicitly recommending one over the other. The report does mention the adoption and support of MLA in certain frameworks and models, but it does not suggest that this makes it superior or preferable. The language used is factual and descriptive, avoiding direct recommendations or superiority claims.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "3: The excerpt mentions a 5.76 times increase in maximum generation throughput but does not specify the 8x H800 environment, which is a condition in the claim.; 4: The excerpt does not mention ITME or any throughput improvement compared to NVMe-oF, so the claim is not supported.; 8: The excerpt specifies a 35.7% throughput improvement over a CPU-offload baseline, but the claim lacks this comparison context, leading to a conflict.",
+          "problem_sentences": [
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 3,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 5.0921,
+      "usage": {
+        "input_tokens": 8982,
+        "output_tokens": 468,
+        "total_tokens": 9450
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "clean",
+      "repeat": 1,
+      "expected_failure": null,
+      "criteria": {
+        "neutrality": {
+          "score": 5,
+          "passed": true,
+          "reasons": "보고서는 근거 인용과 불확실성 표기를 통해 사실적·증거 기반으로 두 기술의 특성·제한·상충점을 제시하고 있으며, 특정 기술의 도입·선호·우월성을 권고하거나 독려하는 문구가 없다. 다양한 관점(technical, market, domain, stakeholder)을 분리해 제시하고 상충점과 보완관계를 설명하며 ‘조건’, ‘불확실성’, ‘추정’ 등을 일관되게 표기해 결론을 유도하지 않는다. 따라서 평가 목적(중립성 평가)에 부합한다.",
+          "problem_sentences": []
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "2: 인용문은 DeepSeek 67B 대비 KV 캐시를 93.3% 줄였다고 명시하지만(숫자·비교 대상 일치), 'HBM 용량 압박을 완화한다'는 표현은 인용문에 직접적으로 나오지 않는다. 따라서 문장의 후반부(용량 압박 완화)는 인용문으로 직접 확인되지 않는다.; 3: 인용문은 DeepSeek-V2가 비교 대상 대비 최대 generation throughput을 5.76배로 끌어올린다고 하나, 인용문에는 '8x H800 환경'이라는 측정 조건이나 환경이 명시되어 있지 않으므로 해당 환경을 조건으로 단정한 문장은 인용문에 의해 뒷받침되지 않는다.; 4: 인용문은 DeepSeek-V2의 성능 및 모델 릴리스 등에 대해 언급하지만, 'ITME가 NVMe-oF 대비 최대 1.80배 throughput 개선을 재현한다'는 수치나 비교조건은 인용문에 전혀 나타나지 않는다.; 6: 인용문(domain:ev:22be89c9700c)은 KV 캐시를 93.3% 줄였다는 수치만 제시할 뿐이고, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 인과관계나 HBM 용량 완화와 같은 설명은 인용문들에서 확인되지 않는다. 따라서 전체 문장은 인용문으로 직접 뒷받침되지 않는다.; 7: 제시된 근거(domain:ev:22be89c9700c 등)는 93.3% 감소라는 수치와 비교대상을 제공하지만, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 직접적 근거나 'production' 환경에 대한 명시는 인용문에 없다. 문장의 추가적 주장들은 인용문으로 확인되지 않는다.",
+          "problem_sentences": [
+            "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄여 HBM 용량 압박을 완화한다. (조건: DeepSeek 67B 모델과 비교 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:22be89c9700c〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 5,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 38.4332,
+      "usage": {
+        "input_tokens": 9172,
+        "output_tokens": 4075,
+        "total_tokens": 13247
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "clean",
+      "repeat": 2,
+      "expected_failure": null,
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "보고서는 전반적으로 사실(근거) 기반으로 기술 특징·성능·제약·증거 출처를 제시하며 직접적인 추천·도입 권유나 선호 표시는 없다. 다만 복수 지점에서 상대적 성능·효율 우월성을 단정하거나(예: 기존 MHA 대비 더 적은 캐시로 유사 이상 성능, KV 캐시 93% 축소 유지) 생태계 채택을 촉진할 수 있다는 추론 등 약한 방향성 표현이 반복되어 있어 완전 무편향(점수 5)으로 보기에는 다소 유도성이 남아 있다. 요약하면: 명시적 추천·도입 조언은 없으나, 우월성·채택 촉진을 암시하는 서술이 일부 존재하므로 대체로 중립적이지만 약한 표현이 관찰된다.",
+          "problem_sentences": [
+            "MLA는 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하는 어텐션 구조임을 직접 근거에서 밝힌다.",
+            "MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다.",
+            "Megatron Bridge 서빙 프레임워크가 DeepSeek V2 모델을 지원하는 것은 소프트웨어 생태계의 지지로, 소프트웨어 기술의 채택을 촉진하는 요인으로 작용할 수 있다."
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "2: excerpt는 DeepSeek-V2(모델 전체)가 DeepSeek 67B 대비 KV 캐시를 93.3% 줄였다고 명시한다. 문장은 이를 MLA(구성 요소) 자체가 93.3%를 줄였다고 단정하는데, excerpt는 감소를 모델 전체 성과로 보고하며 MLA 단독 기여를 직접적으로 명시하지 않으므로 근거와 대상이 일치하지 않는다.; 3: excerpt는 DeepSeek-V2가 DeepSeek 67B 대비 최대 generation throughput을 5.76배로 높였다고 하나, 문장은 이를 '8x H800 환경'에서 MLA가 달성했다고 특정한다. excerpt에 8x H800 환경 언급이 없고 MLA 단독 기여도 명시되지 않아 조건과 대상이 일치하지 않는다.; 4: 제공된 excerpt(domain:ev:a6b7ddda9683)은 DeepSeek-V2 관련 성능과 오픈소스 비교를 다루며 ITME, NVMe-oF 또는 '1.80배' 같은 수치를 전혀 포함하지 않는다. 따라서 해당 측정값은 근거에 의해 뒷받침되지 않는다.; 6: 제공된 excerpt(domain:ev:22be89c9700c)은 KV 캐시를 93.3% 줄였다는 수치를 제시하지만, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 인과관계나 직접적 제한 메커니즘은 명시하지 않는다. 따라서 표의 진술(직접 제한)은 근거에서 확인되지 않는다.; 7: 위와 동일하게, excerpt들은 93.3% 감소 수치를 제시하나 '직접, production 환경 근거 1건' 등과 같은 근거 기반 주장(요청당 점유가 동시성에 직접 제한을 가한다)은 excerpt에서 명확히 서술되지 않으므로 근거 불충분이다.",
+          "problem_sentences": [
+            "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄여 HBM 용량 압박을 완화한다. (조건: DeepSeek 67B 모델과 비교 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:22be89c9700c〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 5,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 53.1713,
+      "usage": {
+        "input_tokens": 9172,
+        "output_tokens": 4981,
+        "total_tokens": 14153
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "neutrality_implicit",
+      "repeat": 1,
+      "expected_failure": "neutrality",
+      "criteria": {
+        "neutrality": {
+          "score": 1,
+          "passed": false,
+          "reasons": "보고서에 명시적 권고·선호·도입 조언 문구가 포함되어 있어 중립성 기준을 심각하게 위반합니다. 예컨대 데이터센터 사업자에게 특정 기술(MLA)을 HBM 증설보다 ‘먼저 도입’하라고 권하는 문장과 운영 조직이 CXL 계층보다 MLA를 ‘먼저 검토’하는 편이 타당하다고 제시한 문장은 직접적 권고·선호·도입 조언으로 분류됩니다. 보고서의 나머지 부분은 주로 기술·증거 열거와 제약·불확실성 표기로 구성되어 비교적 서술·분석적이지만, 위의 권고성 문장들이 중립성 위반으로 평가 점수를 크게 떨어뜨립니다.",
+          "problem_sentences": [
+            "데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다. 〔근거: technical:ev:d79a70ccc3c9cc74〕"
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 제공된 발췌문은 LLaMA-2-7B에 대해 'KV 캐시를 93% 압축하면서 meaningful output을 유지'했고 '비교 성능을 회복하려면 6B 토큰의 파인튜닝이 필요하다'고 명시합니다. 문장은 '직접 근거로 정확도 유지'라고 일반화했으나, 발췌문은 대상(LLaMA-2-7B)과 파인튜닝 조건을 명시하고 있어 문장의 조건·표현과 일치하지 않습니다.; 3: 발췌문은 최대 generation throughput이 5.76배로 향상되었다고 하나, 하드웨어/환경(예: '8x H800')에 관한 언급은 없습니다. 문장은 특정 환경(8x H800)을 조건으로 제시하므로 발췌문과 측정 조건이 일치하지 않습니다.; 4: 제공된 발췌문에는 ITME, NVMe-oF 또는 '1.80배'라는 수치가 전혀 언급되어 있지 않습니다. 따라서 해당 문장의 주장과 근거가 일치하지 않습니다.; 5: 발췌문은 LLaMA-2-7B에서 KV 캐시 93% 압축 후 'meaningful output'을 유지했으며, '비교 성능을 회복하려면 6B 토큰의 파인튜닝'이 필요하다고 명시합니다. 문장은 '유사 이상의 성능을 유지한다'고 단정하는데 파인튜닝 조건을 누락하여 발췌문과 조건이 일치하지 않습니다.; 6: domain:ev:22...는 'KV 캐시를 93.3% 줄였다'고 하나, domain:ev:a6b7...에는 해당 수치나 '요청당 KV 캐시 점유가 동시 처리 요청 수를 직접 제한한다'는 인과 관계가 없습니다. 결합된 근거로 문장의 인과·적합성 판단을 뒷받침하지 못합니다.; 7: 제시된 두 발췌문 중 하나는 93.3% 감소를 언급하지만(발췌1), 다른 발췌는 관련 수치나 '요청당 KV 점유가 동시 처리 수를 직접 제한한다'는 설명을 제공하지 않습니다. 따라서 표의 단정적 표현과 근거가 일치하지 않습니다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 6,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 57.8702,
+      "usage": {
+        "input_tokens": 9261,
+        "output_tokens": 5348,
+        "total_tokens": 14609
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "neutrality_implicit",
+      "repeat": 2,
+      "expected_failure": "neutrality",
+      "criteria": {
+        "neutrality": {
+          "score": 1,
+          "passed": false,
+          "reasons": "보고서는 여러 곳에서 명시적 도입 권고·선호 표현과 우월성 판단을 제시하고 있어 중립성 위배가 명확합니다. 예컨대 운영자에게 특정 기술(MLA)을 먼저 도입·검토하라고 직접 권하는 문장이 복수 존재하고(추천/도입 조언 금지 항목 위반), KV 캐시 압축이 정확도를 유지한다는 단정적 비교 표현 등 우월성 암시가 나타납니다. 이러한 표현들은 기술 ‘평가’(중립적 서술)가 아니라 특정 선택을 권장하거나 상대적 우월성을 주장하므로 중립성 점수를 최저 등급으로 판정합니다.",
+          "problem_sentences": [
+            "- 데이터센터 사업자는 HBM 증설보다 MLA 계열 모델을 먼저 도입하는 편이 합리적이다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- 운영 조직은 CXL 계층보다 MLA 기반 구성을 먼저 검토하는 편이 타당하다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕"
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 인용문은 LLaMA-2-7B에서 KV 캐시를 93% 압축했을 때(8K 컨텍스트) 'maintaining meaningful output'과 파인튜닝(6B 토큰)으로 'comparable performance'를 회복했다고 밝힌다. 원문 문장은 모델·컨디션(예: LLaMA-2-7B, 파인튜닝 필요 여부)을 명시하지 않고 '정확도를 유지'라고 일반화하므로, 측정 조건과 표현이 일치하지 않아 직접 뒷받침되지 않는다.; 3: 인용문은 최대 generation throughput을 '5.76 times'로 부스트했다고 하나, 특정 하드웨어 환경(예: '8x H800')은 언급하지 않는다. 문장은 8x H800 환경을 조건으로 명시하므로 인용문과 측정 조건이 일치하지 않아 뒷받침되지 않는다.; 4: 인용문(domain:ev:a6b7ddda9683)은 중국어 성능과 DeepSeek-V2-Lite 공개에 대해 언급할 뿐, ITME나 NVMe-oF 대비 최대 1.80배 처리량 개선과 관련된 수치·비교 근거가 전혀 없다. 따라서 뒷받침되지 않는다.; 5: 인용문(domain:ev:34e6255b3e6a)은 LLaMA-2-7B에서 93% KV 캐시 압축 후 'maintaining meaningful output' 및 파인튜닝(6B 토큰)으로 'comparable performance'를 회복했다고 한다. 문장은 '유사 이상의 성능을 유지한다'고 표현했으나 파인튜닝 조건을 명시하지 않아 인용문이 제공한 정확한 조건과 표현이 일치하지 않는다.; 6: 인용문(domain:ev:22be89c9700c)은 'KV cache를 93.3% 줄였다'는 수치와 비교 대상을 제공하지만, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 주장은 인용문에 명시되어 있지 않으며 추가 추론이다. 따라서 주장의 일부(93.3%)는 근거가 있으나 문장 전체는 인용문으로 직접 뒷받침되지 않는다.; 7: 인용문은 93.3% 감소라는 수치와 비교 대상을 제시하지만, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 기술적 인과관계는 인용문에 명시되어 있지 않다. 주장 전체가 인용문과 일치하지 않으므로 뒷받침되지 않는다.; 8: 인용문(technical:ev:4f3d2b...)은 'up to a 35.7% throughput improvement over the CPU-offload baseline in these extended turns'라고 적어 숫자(35.7%)와 비교 기준(CPU-offload baseline), 조건('in these extended turns')을 명시한다. 그러나 입력 문장은 이 비교 조건이 누락되어 일반적 표현과 충돌을 유발했다고 지적하는데, 인용문 자체에는 비교 기준과 조건이 이미 포함되어 있으므로 '비교 조건이 누락되었다'는 비판까지는 인용문으로 지원되지 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "- conflict: 35.7% 처리량 증가는 CPU-offload 대비의 최대값이 근거인데, 해당 비교 조건이 누락되어 일반적 성능 표현과 상충을 유발하였다. / 해소 상태: explained 〔근거: technical:ev:4f3d2b343ba193db〕"
+          ],
+          "unsupported_count": 7,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 49.0301,
+      "usage": {
+        "input_tokens": 9261,
+        "output_tokens": 4976,
+        "total_tokens": 14237
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "groundedness_fabricated",
+      "repeat": 1,
+      "expected_failure": "groundedness",
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "보고서는 근거 표기, 불확실성 및 관점 간 상충을 명시하는 등 대체로 근거 기반·균형적 서술을 유지하고 있어 직접적인 도입 권고나 선호를 제시하지 않는다. 다만 여러 곳에서 성능·효율 개선(예: ‘유사 이상 성능’, ‘93% 캐시 축소로 HBM 완화’, ‘운영 부담 감소’)을 비교·강조하는 표현이 있어 특정 기술의 상대적 우월성을 암시하는 약한 편향성이 존재한다. 전반적으로 결론 유도 표현은 약하며(권고·도입 조언은 없음), 일부 우월성·효용 진술 때문에 완전한 중립(5)보다는 약간 감점해 4점을 판정한다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하여 운영 부담을 줄인다. (조건: 기존 MHA 대비 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:b03a29267458〕",
+            "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄여 HBM 용량 압박을 완화한다. (조건: DeepSeek 67B 모델과 비교 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:22be89c9700c〕"
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "2: 제공된 excerpt은 MLA가 MHA보다 우수한 성능을 내고 KV 캐시를 크게 줄여 추론 효율을 높인다고 밝히지만, '랙 전력을 63% 절감'했다는 수치나 전력 관련 비교는 전혀 포함되어 있지 않음. 따라서 근거 부족으로 미지원.; 4: excerpt에는 'boosts the maximum generation throughput to 5.76 times'라고 하나, 실험 조건으로서 '8x H800 환경'이라는 특정 하드웨어/구성은 excerpt에 언급되어 있지 않음. 문장은 측정 조건(8x H800)을 명시하므로, 조건 불일치로 미지원.; 5: 제공된 excerpt들은 DeepSeek-V2의 중국어 성능 및 모델 공개에 관한 내용으로, 'ITME가 NVMe-oF 대비 최대 1.80배 throughput 개선을 재현한다'는 주장의 대상(ITME)과 비교 대상(NVMe-oF) 및 1.80배 수치가 전혀 포함되어 있지 않음. 근거 불일치로 미지원.; 7: 제공된 excerpts는 KV 캐시를 93.3% 줄였다는 수치와 성능 향상을 보고하지만, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'라는 인과(직접 제한한다)는 문구는 excerpt들에 명시되어 있지 않음. 인과 관계의 직접성은 근거에 나타나지 않아 미지원.; 8: 해당 문장도 '요청당 KV cache 점유가 동시 처리 수를 직접 제한한다'는 직접적 근거 및 'basis=direct, production' 등의 주장을 포함하는데, 제공된 excerpts에는 동시 처리 제한을 직접적으로 기술한 내용이나 production 기반 근거 표기가 없음. 따라서 근거 불일치로 미지원.",
+          "problem_sentences": [
+            "- 동일 구성은 랙 전력을 63% 절감했다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 5,
+          "checked_items": 9
+        }
+      },
+      "latency_seconds": 51.7691,
+      "usage": {
+        "input_tokens": 9347,
+        "output_tokens": 4874,
+        "total_tokens": 14221
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "groundedness_fabricated",
+      "repeat": 2,
+      "expected_failure": "groundedness",
+      "criteria": {
+        "neutrality": {
+          "score": 3,
+          "passed": true,
+          "reasons": "보고서는 대체로 기술적 근거와 불확실성 표기를 포함한 서술형 평가로 유지되어 있으며, 직접적인 추천·도입 권고 문구(예: “추천”, “도입해야 함”, “우선 도입” 등)는 포함하지 않는다. 다만 여러 곳에서 특정 기술이 기존 대안 대비 성능·운영 부담·효율 측면에서 우위에 있음을 반복적으로 표현(예: '유사 이상의 성능', 'KV 캐시를 93% 줄여')하여 특정 기술에 대한 제한적 선호·우월성 암시가 존재한다. 따라서 완전한 중립(5점)으로 보기보다는 '제한적 선호 암시' 수준(3점)이 적절하다.問題 문장들은 기술 우월성 또는 채택 적합성을 직접적으로 암시하는 표현들이다.",
+          "problem_sentences": [
+            "MLA는 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하여 운영 부담을 줄인다.",
+            "MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다.",
+            "MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄여 HBM 용량 압박을 완화한다. (조건: DeepSeek 67B 모델과 비교 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:22be89c9700c〕"
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "2: 해당 excerpt는 MLA가 MHA보다 우수한 성능을 보이고 KV 캐시를 크게 줄여 추론 효율을 높인다고만 언급하며 '랙 전력(rack power) 63% 절감'이나 전력 관련 수치(63%)는 전혀 포함되어 있지 않다.; 4: excerpt는 최대 generation throughput이 5.76배로 증가했다고 하나, 하드웨어 조건(예: '8x H800 환경')은 언급하지 않는다. 주장에 포함된 환경 조건이 excerpt에 없으므로 직접 근거가 없다.; 5: 제공된 excerpt는 중국어 성능과 모델 공개에 관한 내용일 뿐이며, 'ITME'나 'NVMe-oF', '최대 1.80배 throughput 개선'과 관련된 어떤 수치나 비교도 포함되어 있지 않다.; 7: 해당 excerpt들은 DeepSeek-V2의 KV 캐시 93.3% 감소 수치를 제공하지만, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 인과 관계 설명은 excerpt에 명시되어 있지 않다. 인과 주장까지는 직접 뒷받침되지 않는다.; 8: excerpt는 93.3% 감소라는 수치만 제시할 뿐 'basis=direct, production'이라는 근거 유형이나 프로덕션 환경 근거, 또는 '요청당 KV 캐시 점유가 동시 처리 수를 직접 제한한다'는 문구를 포함하지 않는다. 따라서 이 문장에 포함된 세부 표기들은 excerpt로 직접 증명되지 않는다.",
+          "problem_sentences": [
+            "- 동일 구성은 랙 전력을 63% 절감했다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 5,
+          "checked_items": 9
+        }
+      },
+      "latency_seconds": 52.91,
+      "usage": {
+        "input_tokens": 9347,
+        "output_tokens": 5122,
+        "total_tokens": 14469
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "bias_onesided",
+      "repeat": 1,
+      "expected_failure": "bias_control",
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "보고서는 대체로 근거(레퍼런스)에 기반한 기술적·도메인적 서술로 구성되어 있으며 추천·도입 권고 같은 직접적 권유 문구는 없다. 다만 몇몇 문장은 특정 기술의 상대적 우월성 또는 이득을 단정적으로 표현하거나(예: \"유사 이상의 성능\", \"93% KV 캐시 압축이 정확도 유지\"), 혜택을 강조하는 서술(예: \"도입 부담을 낮추고 운영 유연성을 높인다\")을 반복해 사용하고 있어 완전한 중립성(평가·비교에서의 가치판단 배제)에서 다소 벗어난다. 요약하면: 권고나 명백한 도입 조언은 없으므로 중립성 위반 정도는 경미하나, 비교우위·이점 강조 표현이 있어서 완전 무편향(점수 5)보다는 다소 유도적인 어조로 판단되어 점수 4를 부여한다.",
+          "problem_sentences": [
+            "MLA는 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하는 어텐션 구조이다.",
+            "SW 접근은 이해관계자의 도입 부담을 낮추고 운영 유연성을 높인다.",
+            "MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다."
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "2: 인용문(domain:ev:22be89c9700c)은 DeepSeek 67B 대비 KV 캐시를 93.3% 줄였다고 명시하지만, HBM(또는 HBM 용량 압박 완화)에 대한 언급이나 ‘용량 압박 완화’라는 인과를 직접 제시하지 않음. 따라서 문장의 수치·비교 대상은 일치하나 HBM 완화 주장은 인용문에 없음.; 3: 인용문(domain:ev:22be89c9700c)은 최대 generation throughput이 5.76배로 향상되었다고 하나, 문장은 이를 \"8x H800 환경에서\"라고 특정하고 있음. 인용문에는 8x H800 같은 실험 환경 정보가 없으므로 조건 불일치로 직접 뒷받침되지 않음.; 4: 제시된 인용문(domain:ev:a6b7ddda9683)은 DeepSeek-V2 관련 성능·오픈소스 공개 언급일 뿐, ITME나 NVMe-oF 대비 1.80배 throughput 개선에 대한 어떤 수치나 비교 조건도 포함하고 있지 않음.; 6: 인용문(domain:ev:22be89c9700c)은 KV 캐시 감소 비율(93.3%)을 주며, domain:ev:a6b7ddda9683는 모델·오픈소스 관련 내용이지만, \"요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다\"는 주장(즉시적인 동시성 제한에 대한 기술적 인과)은 두 인용문 어디에도 명시되어 있지 않음. 따라서 전체 문장은 인용문으로 직접 뒷받침되지 않음.; 7: 제시된 근거들(domain:ev:22be89c9700c, domain:ev:a6b7ddda9683)은 93.3% 수치와 모델 공개 관련 정보를 담고 있으나, \"요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다\"는 주장의 근거(직접·production 환경에서의 인과적 진술)는 인용문에 없음. 일치하지 않음.",
+          "problem_sentences": [
+            "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄여 HBM 용량 압박을 완화한다. (조건: DeepSeek 67B 모델과 비교 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:22be89c9700c〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 5,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 50.7538,
+      "usage": {
+        "input_tokens": 9085,
+        "output_tokens": 4798,
+        "total_tokens": 13883
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "bias_onesided",
+      "repeat": 2,
+      "expected_failure": "bias_control",
+      "criteria": {
+        "neutrality": {
+          "score": 3,
+          "passed": true,
+          "reasons": "보고서는 대체로 근거 기반 서술을 유지하고 있으나, 특정 기술(MLA/SW 접근)의 상대적 이점(캐시 감소, 유사 이상 성능, 도입 부담 완화 등)을 반복적으로 강조하여 향후 선택을 암시하는 한계를 보입니다. 문장들은 주로 성능·운영 이점을 단정적 또는 긍정적으로 진술하고 있어 특정 기술에 대한 제한적 선호를 암시하지만, 명시적 도입 권고나 우선순위 제시는 포함되어 있지 않아 완전한 중립성 위반까지는 이르지 않습니다. 따라서 '제한적인 선호 암시' 수준에 해당하여 점수 3을 부여합니다.",
+          "problem_sentences": [
+            "- MLA는 키와 값을 저차원 잠재 벡터로 공동 압축하여 KV 캐시 크기를 줄이고, 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하는 어텐션 구조이다. 〔근거: technical:ev:d79a70ccc3c9cc74, technical:ev:e46bfb339102bda3〕",
+            "- SW 접근은 이해관계자의 도입 부담을 낮추고 운영 유연성을 높인다. 〔근거: technical:ev:d79a70ccc3c9cc74〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕"
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 제공된 excerpt는 LLaMA-2-7B에서 KV 캐시를 93% 압축했을 때 'meaningful output' 유지 및 벤치마크 상 'comparable performance' 회복을 언급한다. 그런데 문장은 'MLA의 93% KV 캐시 압축'이라고 특정하고 있으며(대상 불일치) excerpt에 MLA라는 주체 언급이 없어 대상(MLA)과 측정대상이 일치하지 않는다.; 2: excerpt는 DeepSeek-V2가 DeepSeek 67B 대비 KV 캐시를 93.3% 줄였다고 직접 서술한다. 문장은 동일한 수치(93.3%)를 'MLA'에 귀속시키고 있는데, excerpt는 해당 감축을 DeepSeek-V2(문서의 결과)로 보고 있으며 'MLA 단독'의 수치라고 명시하지 않으므로 대상 불일치로 지지되지 않는다.; 3: excerpt는 최대 generation throughput을 5.76배로 향상시켰다고 하나, 하드웨어/배치 조건(예: '8x H800')에 대한 언급이 없다. 문장은 '8x H800 환경에서 5.76배'라고 특정하므로 측정 조건이 일치하지 않아 지지되지 않는다.; 4: 제공된 excerpt는 DeepSeek-V2의 언어 성능 및 오픈소스 모델 비교, DeepSeek-V2-Lite 공개 등에 관해 서술할 뿐 ITME나 NVMe-oF, '최대 1.80배 throughput 개선' 같은 수치나 비교대상을 전혀 포함하지 않는다. 따라서 문장의 주장은 excerpt로 지지되지 않는다.; 6: 제공된 excerpt들 중 하나는 DeepSeek-V2가 DeepSeek 67B 대비 KV 캐시를 93.3% 줄였다고 보고하지만(수치 존재), '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 인과·설명은 excerpt에 나오지 않는다. 또한 HBM 용량 압박 완화에 대한 직접적 진술이나 실험적 근거도 제공되지 않으므로 해당 해석은 지지되지 않는다.; 7: 위 6번과 동일한 이유: excerpt는 93.3% 감축 수치를 보고하지만 '요청당 KV cache 점유가 동시 처리량을 직접 제한한다'거나 'basis=direct, production'과 같은 근거성을 명시하지 않는다. 조건·해석이 excerpt에 직접적으로 나타나지 않아 지지되지 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄여 HBM 용량 압박을 완화한다. (조건: DeepSeek 67B 모델과 비교 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:22be89c9700c〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 6,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 66.691,
+      "usage": {
+        "input_tokens": 9085,
+        "output_tokens": 5767,
+        "total_tokens": 14852
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "coverage_missing",
+      "repeat": 1,
+      "expected_failure": "coverage",
+      "criteria": {
+        "neutrality": {
+          "score": 3,
+          "passed": true,
+          "reasons": "보고서는 전반적으로 근거(technical/domain/market 등)를 빈번히 인용하며 기술적 사실과 불확실성을 함께 제시하는 등 설명형·증거 기반 서술이 많아 중립적이다. 다만 여러 문장에서 비교·우월성(예: 기존 MHA 대비 더 적은 캐시로 유사 이상 성능, 93% KV 캐시 감소에도 성능 유지 등)과 'suitable'·'adopted' 평가표현을 반복하여 특정 기술의 이점이 강조되는 편향적 암시가 있다. 이러한 표현들은 명시적 도입 권고나 '이 기술을 선택하라'는 직접적인 조언은 포함하지 않으나, 제한적 선호를 암시하므로 완전한 중립(5점)보다는 일부 편향 암시(3점)에 해당한다. 문제 문장(비교/우월성 표현)은 보고서 맥락에서 근거로 제시되긴 하나 판단 유도 소지가 있어 중립성 점수를 낮추는 이유가 된다.",
+          "problem_sentences": [
+            "MLA는 키와 값을 저차원 잠재 벡터로 공동 압축하여 KV 캐시 크기를 줄이고, 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하는 어텐션 구조이다.",
+            "MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다.",
+            "MLA는 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하여 운영 부담을 줄인다."
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "1: 인용문은 LLaMA-2-7B에서 KV 캐시를 93% 압축했을 때 'maintaining meaningful output'라고 적시하고 있으나, 문장은 해당 결과를 MLA에 귀속시켜 주장한다. 인용문에 MLA라는 대상 언급이 없으므로 주체(MLA vs LLaMA-2-7B)가 일치하지 않아 근거로 보기 어렵다.; 2: 인용문은 DeepSeek-V2가 DeepSeek 67B 대비 KV 캐시를 93.3% 줄였다고 명시한다. 문장은 동일한 수치(93.3%)를 MLA가 줄였다고 기술하는데, 인용문은 해당 감소를 DeepSeek-V2의 결과로 보고 있으며 MLA를 직접적으로 동일시하지 않는다. 주체 불일치로 지원되지 않는다.; 3: 인용문에는 DeepSeek-V2가 DeepSeek 67B 대비 최대 generation throughput을 5.76배로 높였다고 기록되어 있지만, 문장은 '8x H800 환경에서 MLA가 5.76배'라고 특정 하드웨어 조건과 주체(MLA)를 제시한다. 인용문은 8x H800 조건을 명시하지 않고 주체도 일치하지 않으므로 근거로 보기 불충분하다.; 4: 제공된 인용문(domain:ev:a6b7...)은 DeepSeek-V2의 중국어 성능과 관련된 내용이며, ITME나 NVMe-oF, 1.80배 향상과 관련된 내용은 전혀 포함되어 있지 않다. 따라서 근거가 없다.; 5: 인용문은 LLaMA-2-7B에서 KV 캐시를 93% 압축했을 때 'meaningful output'을 유지했다고 하므로 LLaMA-2-7B 조건과 수치는 일치하지만, 문장은 이를 MLA의 성능으로 기술한다. 인용문에 MLA라는 명시가 없으므로 주체 불일치로 직접 뒷받침되지 않는다.; 6: 인용문(domain:ev:22be89c...)은 KV 캐시를 93.3% 줄였다고 보고하지만, 문장은 '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 인과적·구조적 주장을 하고 있다. 인용문은 그런 직접적 제한 관계나 동시 처리 수와의 정량적 연관을 명시하지 않으므로 제시된 주장(및 'suitable (93.3%)' 표기)을 직접적으로 뒷받침하지 않는다. 두 번째 인용문은 관련 내용이 아니다.; 7: 인용문들은 93.3% 감소 수치와 DeepSeek-V2 성과를 제시하지만, 문장은 'direct, production, 근거 1건' 등 근거의 성격(직접성·프로덕션 환경)을 주장한다. 인용문들에는 해당 감소가 프로덕션(실운용) 환경에서 직접적으로 입증되었다는 근거나 'direct' 근거 표기가 없어 일치하지 않는다.",
+          "problem_sentences": [
+            "- MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다. 〔근거: domain:ev:34e6255b3e6a〕",
+            "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄여 HBM 용량 압박을 완화한다. (조건: DeepSeek 67B 모델과 비교 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:22be89c9700c〕",
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "- MLA는 KV 캐시를 93% 줄이면서도 유사 이상의 성능을 유지한다. (조건: LLaMA-2-7B 모델 사용 / 불확실성: 영어·중국어 외 언어 성능 한계) 〔근거: domain:ev:34e6255b3e6a〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 7,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 63.1673,
+      "usage": {
+        "input_tokens": 8974,
+        "output_tokens": 4980,
+        "total_tokens": 13954
+      },
+      "error": null
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "coverage_missing",
+      "repeat": 2,
+      "expected_failure": "coverage",
+      "criteria": {
+        "neutrality": {
+          "score": 4,
+          "passed": true,
+          "reasons": "보고서는 전반적으로 근거(technical/domain/market)를 표기하고 불확실성·상충점을 명시하는 등 중립적 분석 구조를 유지한다. TRL·제약·검증 조건을 명시하고 conflict와 보완 관계를 설명하여 결론 유도를 최소화하고 있다. 다만 일부 문장은 기술의 성능·효과를 단정적으로 표현하거나(예: KV 캐시 93% 축소, 운영 부담 감소), 생태계 채택을 추론(adopted)하는 어조를 사용하여 약한 긍정적 뉘앙스를 줄 수 있다. 이런 표현들은 직접적인 도입 권고나 우월성 주장으로 발전하지는 않지만 결론을 암시할 여지가 있어 완전한 중립(점수 5)보다는 다소 유도적이지 않은 수준의 중립(점수 4)으로 평가한다.",
+          "problem_sentences": [
+            "MLA의 93% KV 캐시 압축은 정확도를 유지하는 수준임이 직접 근거로 확인된다.",
+            "MLA는 기존 MHA 대비 저차원 압축 방식으로 KV 캐시와 메모리 소모를 줄이는 어텐션 구조임을 직접 근거에서 밝힌다.",
+            "MLA는 기존 MHA 대비 더 적은 캐시로 유사 이상의 성능을 제공하여 운영 부담을 줄인다."
+          ]
+        },
+        "groundedness": {
+          "score": 1,
+          "passed": false,
+          "reasons": "3: 근거(excerpt)는 최대 generation throughput이 5.76배로 증가했다고 하나, 하드웨어 조건(예: '8x H800 환경')은 언급하지 않는다. 문장은 '8x H800 환경'이라는 측정 조건을 추가했으므로 excerpt와 조건이 일치하지 않는다.; 4: 제시된 근거(excerpt)는 DeepSeek-V2의 성능/비용/KV 캐시 감소 등을 다루지만, ITME나 NVMe-oF, '1.80배'라는 수치에 관한 언급은 전혀 없다. 따라서 문장의 주장과 근거가 일치하지 않는다.; 6: 제시된 근거 중 domain:ev:22be89c9700c는 KV 캐시 감소(93.3%)를 명시하지만, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 기술적 인과관계(동시성 제한)에 대해서는 언급이 없다. 따라서 해당 결론은 근거에 직접적으로 뒷받침되지 않는다.; 7: 근거로 인용된 문서들은 93.3% 감소 등 수치적 사실을 제공하지만, '요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다'는 진술(인과·운영적 해석)은 근거에 명시되지 않았다. 조건 및 인과관계가 일치하지 않으므로 지지되지 않는다.",
+          "problem_sentences": [
+            "- MLA는 8x H800 환경에서 최대 generation throughput을 5.76배까지 달성한다. (조건: 8x H800 환경 / 불확실성: 실험 환경과 데이터센터의 차이) 〔근거: domain:ev:22be89c9700c〕",
+            "- ITME는 NVMe-oF 대비 최대 1.80배의 throughput 개선을 재현한다. (조건: 대용량 LLM inference 환경 / 불확실성: 환경별 성능 변동) 〔근거: domain:ev:a6b7ddda9683〕",
+            "| domain | HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable (93.3%) | suitable 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |",
+            "| domain/HBM 용량 압박 완화: 요청당 KV cache 점유가 동시 처리 요청 수를 직접 제한한다 | suitable 93.3% (basis=direct, production, 근거 1건) | suitable (basis=direct, production, 근거 1건) 〔근거: domain:ev:22be89c9700c, domain:ev:a6b7ddda9683〕 |"
+          ],
+          "unsupported_count": 4,
+          "checked_items": 8
+        }
+      },
+      "latency_seconds": 53.5128,
+      "usage": {
+        "input_tokens": 8974,
+        "output_tokens": 4334,
+        "total_tokens": 13308
+      },
+      "error": null
+    }
+  ],
+  "metrics": {
+    "gpt-4.1-mini": {
+      "detection_rate": 0.5,
+      "false_positive_rate": 0.5,
+      "consistency_rate": 1.0,
+      "mean_absolute_score_diff": 0.2,
+      "mean_latency_seconds": 5.169410000000001,
+      "input_tokens": 91758,
+      "output_tokens": 6108,
+      "total_tokens": 97866,
+      "estimated_cost_usd": 0.04647600000000001,
+      "successful_calls": 10,
+      "errors": 0
+    },
+    "gpt-4.1": {
+      "detection_rate": 1.0,
+      "false_positive_rate": 0.5,
+      "consistency_rate": 1.0,
+      "mean_absolute_score_diff": 0.0,
+      "mean_latency_seconds": 5.75668,
+      "input_tokens": 91758,
+      "output_tokens": 8435,
+      "total_tokens": 100193,
+      "estimated_cost_usd": 0.250996,
+      "successful_calls": 10,
+      "errors": 0
+    },
+    "gpt-4o": {
+      "detection_rate": 1.0,
+      "false_positive_rate": 0.5,
+      "consistency_rate": 1.0,
+      "mean_absolute_score_diff": 0.2,
+      "mean_latency_seconds": 5.37783,
+      "input_tokens": 91758,
+      "output_tokens": 5269,
+      "total_tokens": 97027,
+      "estimated_cost_usd": 0.282085,
+      "successful_calls": 10,
+      "errors": 0
+    },
+    "gpt-5-mini": {
+      "detection_rate": 1.0,
+      "false_positive_rate": 0.5,
+      "consistency_rate": 1.0,
+      "mean_absolute_score_diff": 0.4,
+      "mean_latency_seconds": 53.73088,
+      "input_tokens": 91678,
+      "output_tokens": 49255,
+      "total_tokens": 140933,
+      "estimated_cost_usd": 0.1214295,
+      "successful_calls": 10,
+      "errors": 0
+    }
+  },
+  "detection_matrix": [
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "clean",
+      "expected": "no failure",
+      "code": true,
+      "llm_rate": 0.0,
+      "hybrid_rate": 0.0
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "neutrality_implicit",
+      "expected": "neutrality",
+      "code": false,
+      "llm_rate": 0.0,
+      "hybrid_rate": 0.0
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "groundedness_fabricated",
+      "expected": "groundedness",
+      "code": true,
+      "llm_rate": 1.0,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "bias_onesided",
+      "expected": "bias_control",
+      "code": true,
+      "llm_rate": null,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "variant": "coverage_missing",
+      "expected": "coverage",
+      "code": true,
+      "llm_rate": null,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "clean",
+      "expected": "no failure",
+      "code": true,
+      "llm_rate": 0.0,
+      "hybrid_rate": 0.0
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "neutrality_implicit",
+      "expected": "neutrality",
+      "code": false,
+      "llm_rate": 1.0,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "groundedness_fabricated",
+      "expected": "groundedness",
+      "code": true,
+      "llm_rate": 1.0,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "bias_onesided",
+      "expected": "bias_control",
+      "code": true,
+      "llm_rate": null,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4.1",
+      "variant": "coverage_missing",
+      "expected": "coverage",
+      "code": true,
+      "llm_rate": null,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "clean",
+      "expected": "no failure",
+      "code": true,
+      "llm_rate": 0.0,
+      "hybrid_rate": 0.0
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "neutrality_implicit",
+      "expected": "neutrality",
+      "code": false,
+      "llm_rate": 1.0,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "groundedness_fabricated",
+      "expected": "groundedness",
+      "code": true,
+      "llm_rate": 1.0,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "bias_onesided",
+      "expected": "bias_control",
+      "code": true,
+      "llm_rate": null,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-4o",
+      "variant": "coverage_missing",
+      "expected": "coverage",
+      "code": true,
+      "llm_rate": null,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "clean",
+      "expected": "no failure",
+      "code": true,
+      "llm_rate": 0.0,
+      "hybrid_rate": 0.0
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "neutrality_implicit",
+      "expected": "neutrality",
+      "code": false,
+      "llm_rate": 1.0,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "groundedness_fabricated",
+      "expected": "groundedness",
+      "code": true,
+      "llm_rate": 1.0,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "bias_onesided",
+      "expected": "bias_control",
+      "code": true,
+      "llm_rate": null,
+      "hybrid_rate": 1.0
+    },
+    {
+      "model": "gpt-5-mini",
+      "variant": "coverage_missing",
+      "expected": "coverage",
+      "code": true,
+      "llm_rate": null,
+      "hybrid_rate": 1.0
+    }
+  ]
+}

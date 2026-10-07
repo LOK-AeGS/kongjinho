@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Annotated, Literal, TypeVar, TypedDict
+from uuid import uuid4
 
 
 # =========================================================
@@ -282,6 +283,41 @@ class QualityReport(TypedDict):
     checked_claim_ids: list[str]
 
 
+class NodeStatus(TypedDict):
+    status: Literal["pending", "running", "done", "failed"]
+    attempts: int
+    completed_step: int | None
+    last_error: str | None
+    sufficiency: str | None
+    updated_at: str
+
+
+class ReworkDirective(TypedDict):
+    reason: str
+    focus: list[str]
+    round: int
+    max_search_rounds: int
+    feedback: list[str]
+
+
+class Decision(TypedDict):
+    step: int
+    next: list[str]
+    reason: str
+    ts: str
+
+
+class EvalVerdict(TypedDict):
+    passed: bool
+    mode: Literal["hybrid", "code_only"]
+    criteria: dict[str, dict]
+    failed_criteria: list[str]
+    feedback: list[str]
+    rework_targets: list[str]
+    judge_model: str | None
+    evaluated_report_version: int
+
+
 # =========================================================
 # 8. Reducer
 # =========================================================
@@ -388,6 +424,26 @@ class AppState(TypedDict):
     ]
 
 
+class SupervisorState(AppState, total=False):
+    # 제어 vs 페이로드 분리: 라우팅은 node_status·rework·step_count·next만 읽는다. 관점 결과(*_findings)는 supervisor가 충분도 계산에만 읽고 수정하지 않는다.
+    # 관측성 위치: 결정 전체 로그는 State 밖 outputs/graph/<run>/decisions.jsonl({trace_id, step, node, decision, reason, ts}). State엔 last_decision 1건만. LangSmith에는 run metadata로 trace_id.
+    # 지속성 비용: 최종 보고서 Markdown·PDF는 파일로 쓰고 State엔 artifacts의 URI만. 원문 본문은 기존 fetch_cache, 결정 로그는 JSONL. last_decision은 덮어쓰기로 체크포인트마다 커지지 않음.
+    # 상관: trace_id = LangGraph checkpoint thread_id = LangSmith metadata/tags = decisions.jsonl 키.
+    # 재개/복구: node_status(attempts·completed_step·last_error)와 rework만 있으면 supervisor가 다음 행동을 재계산 가능. MemorySaver 체크포인터를 기본 연결.
+    # 동시 처리: 병렬 worker가 함께 쓰는 키는 reducer: evidence_store(멱등 병합), node_status·artifacts·quality_by_perspective·search_log_by_perspective·run_meta(dict 병합). 그 외 키는 노드별 소유.
+    # 종료 보장: step_count >= max_steps면 강제 END(사유 기록), MAX_REWORK_PER_AGENT=1, MAX_REPORT_VERSIONS=2, 모든 분기가 유한 카운터를 소모.
+    trace_id: str
+    step_count: int
+    max_steps: int
+    next: list[str]
+    node_status: Annotated[dict[str, NodeStatus], merge_dict_right]
+    rework: dict[str, ReworkDirective]
+    last_decision: Decision | None
+    report_version: int
+    eval_result: EvalVerdict | None
+    artifacts: Annotated[dict[str, str], merge_dict_right]
+
+
 # =========================================================
 # 10. 초기 State 생성
 # =========================================================
@@ -426,4 +482,36 @@ def create_initial_state(
             "report": 0,
         },
         "run_meta": {},
+    }
+
+
+DEFAULT_MAX_STEPS = 20
+
+
+def create_supervisor_state(
+    *,
+    request: RequestSpec,
+    selected_tech: dict[Technology, TechSpec],
+    corpus_manifest: list[DocMeta],
+    trace_id: str | None = None,
+    max_steps: int = DEFAULT_MAX_STEPS,
+) -> SupervisorState:
+    """기존 AppState 페이로드에 supervisor 제어 메타를 더한다."""
+    state = create_initial_state(
+        request=request,
+        selected_tech=selected_tech,
+        corpus_manifest=corpus_manifest,
+    )
+    return {
+        **state,
+        "trace_id": trace_id or uuid4().hex[:12],
+        "step_count": 0,
+        "max_steps": max_steps,
+        "next": [],
+        "node_status": {},
+        "rework": {},
+        "last_decision": None,
+        "report_version": 0,
+        "eval_result": None,
+        "artifacts": {},
     }
