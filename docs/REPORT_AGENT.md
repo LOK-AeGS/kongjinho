@@ -179,6 +179,38 @@ deps = ReportAgentDeps(generation_mode="deterministic")
 - 기타 : Google Research(2026-03-30). *TurboQuant for KV Cache Compression*. Google Research Blog. https://...
 ```
 
+## 분량 예산과 10장 제한
+
+과제 규정상 보고서는 표지 포함 최대 10장입니다. 전체를 같은 비율로 줄이지 않고
+섹션마다 예산을 둡니다(`agents/report/budget.py`의 `SECTION_BUDGETS`).
+
+| 등급 | 섹션 | 처리 |
+|---|---|---|
+| A 보호 | SUMMARY, 4.1~4.4 | 페이지 가드에서도 줄이지 않음. 4.1~4.4는 상한·하한을 비슷하게 맞춤 |
+| B 압축 | 5.1~5.5, 6 | 상충은 미해소·상충 우선 상위 N건, 표는 관점별로 번갈아 선별 |
+| C 축약 | 1, 3 | 항목 수를 작게 |
+| 고정 | 2, REFERENCE | 2는 그대로, REFERENCE는 본문 인용으로 결정 |
+
+강제 단계:
+
+1. **입력 선별** — `section_payload()`와 결정적 writer가 같은 선별 함수(`select_*`)로
+   항목을 `max_items`개까지 줄입니다. SW·HW를 번갈아 고르고 기술마다 반대 근거를 1건 먼저
+   확보합니다(`balanced_pick`). 생략한 수는 본문에 "전체 N건 중 M건"으로 밝힙니다.
+2. **프롬프트** — 섹션 규칙에 분량 상한과 "소제목·하위 불릿 금지"를 넣습니다.
+3. **검증** — 상한 초과(`section_over_budget`)·관점 하한 미달(`section_under_budget`)은
+   경고입니다. 부분 수정 한도(2회)를 분량 때문에 쓰지 않기 위해서입니다.
+4. **페이지 가드** — 제출본을 PDF로 렌더링해 장수를 셉니다. 10장을 넘으면 상한을 넘긴
+   섹션을 결정적 렌더로 교체하고, 그래도 넘으면 B·C 예산을 0.8배로 줄입니다(최대 3회,
+   LLM 재호출 없음). 교체 후보가 근거·수치 검증을 통과하지 못하면 교체하지 않습니다.
+   끝까지 넘으면 `page_limit_exceeded`로 `needs_review` 처리합니다.
+
+제출본(`report.md`, PDF)은 인용을 `[n]` 번호로 표기합니다. 번호는 코드가 REFERENCE 순서에서
+직접 계산하므로 본문 번호와 실제 출처가 어긋나지 않습니다. 같은 arXiv 논문의 판본(v2·v4)과
+형식(abs·html·pdf)은 한 출처로 합칩니다. 검증·추적용 evidence ID 원본은
+`report_sections["final_markdown_with_ids"]`에 남습니다.
+
+2026-09-22 live 실행 State로 결정적 재생성 시 15장 → 8장(본문 35,339자 → 13,031자).
+
 ## 결정적 품질 검사
 
 - 필수 목차와 섹션 순서

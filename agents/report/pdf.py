@@ -120,6 +120,17 @@ def export_markdown_pdf(
     subtitle: str = "",
 ) -> Path:
     """Markdown 보고서를 A4 PDF로 저장하고 절대 경로를 반환한다."""
+    return export_report_pdf(markdown, output_path, title=title, subtitle=subtitle)[0]
+
+
+def export_report_pdf(
+    markdown: str,
+    output_path: str | Path,
+    *,
+    title: str = "기술 비교 평가 보고서",
+    subtitle: str = "",
+) -> tuple[Path, int]:
+    """PDF를 저장하고 (절대 경로, 표지 포함 장수)를 반환한다. 장수는 분량 가드가 쓴다."""
     try:
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_CENTER
@@ -220,4 +231,4 @@ def export_markdown_pdf(
     document.build(story, onFirstPage=first_page, onLaterPages=later_pages)
     if not target.is_file() or target.stat().st_size == 0:
         raise PdfExportError(f"PDF 파일이 생성되지 않았습니다: {target}")
-    return target
+    return target, int(document.page)

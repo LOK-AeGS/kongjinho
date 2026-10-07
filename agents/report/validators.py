@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from agents.report.budget import OVER_BUDGET_TOLERANCE, SectionBudget, body_length
 from agents.report.references import source_identity
 from agents.report.state import SECTION_ORDER, SectionDraft, SectionId, ValidationIssue
 
@@ -251,6 +252,29 @@ def validate_report(report: dict, context: dict) -> list[ValidationIssue]:
     for name, status in degraded.items():
         if name not in limitation_text or status not in limitation_text:
             issues.append(issue("upstream_status_hidden", f"{name}의 {status} 상태가 한계점에 노출되지 않음", "limitations"))
+    return issues
+
+
+def validate_budget(draft: SectionDraft, budget: SectionBudget) -> list[ValidationIssue]:
+    """섹션 분량 검사. 차단하지 않고 경고로 남긴다 — 실제 장수 제한은 페이지 가드가 강제한다.
+
+    부분 수정 한도(전체 2회)를 분량 때문에 소진하면 근거·수치 오류를 고칠 기회가 사라지므로
+    분량 초과는 수정 루프 대상에서 뺀다.
+    """
+    length = body_length(draft["markdown"])
+    issues: list[ValidationIssue] = []
+    if length > budget.max_chars * OVER_BUDGET_TOLERANCE:
+        issues.append(issue(
+            "section_over_budget",
+            f"분량 상한 초과: {length}자 / 상한 {budget.max_chars}자",
+            draft["section_id"], blocking=False,
+        ))
+    if budget.min_chars and length < budget.min_chars:
+        issues.append(issue(
+            "section_under_budget",
+            f"관점 분량 하한 미달: {length}자 / 하한 {budget.min_chars}자 (근거 부족이면 gap 명시 필요)",
+            draft["section_id"], blocking=False,
+        ))
     return issues
 
 

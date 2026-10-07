@@ -5,8 +5,23 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Iterable
 
+from agents.report.budget import (
+    MAX_PAGE_GUARD_ROUNDS,
+    OVER_BUDGET_TOLERANCE,
+    PAGE_LIMIT,
+    SECTION_BUDGETS,
+    Budgets,
+    balanced_pick,
+    body_length,
+    clip,
+    default_budgets,
+    estimate_pages,
+    omitted_note,
+    round_robin_pick,
+    shrink,
+)
 from agents.report.prompts import build_section_prompt
-from agents.report.references import collect_references
+from agents.report.references import collect_references, number_citations, reference_numbers
 from agents.report.state import (
     BODY_SECTION_ORDER,
     MAX_REPORT_REVISIONS,
@@ -22,6 +37,7 @@ from agents.report.validators import (
     blocking,
     extract_citations,
     validate_input,
+    validate_budget,
     validate_report,
     validate_section,
 )
@@ -204,10 +220,129 @@ def _heading(section_id: SectionId) -> str:
     return f"{level} {SECTION_TITLES[section_id]}"
 
 
+def _counter_claim(context: dict):
+    store = context["evidence_store"]
+    return lambda item: any(
+        (store.get(evidence_id) or {}).get("stance") == "counter"
+        for evidence_id in item.get("evidence_ids", [])
+    )
+
+
+def _usable_claims(context: dict, perspective: str) -> list[dict]:
+    store = context["evidence_store"]
+    result = []
+    for claim in context["claims"].values():
+        if claim.get("perspective") != perspective:
+            continue
+        evidence_ids = claim.get("evidence_ids", [])
+        if any(eid not in store for eid in evidence_ids):
+            continue
+        if claim.get("basis") in {"direct", "direct_evidence"} and not evidence_ids:
+            continue
+        result.append(claim)
+    return result
+
+
+def select_claims(context: dict, perspective: str, limit: int) -> tuple[list[dict], int]:
+    """관점 claim을 SW·HW 균형과 반대 근거를 지키며 limit개 고른다. (선택, 전체 수)"""
+    claims = _usable_claims(context, perspective)
+    return balanced_pick(claims, limit, is_counter=_counter_claim(context)), len(claims)
+
+
+def _usable_records(context: dict, perspective: str, *, trl_only: bool = False) -> list[dict]:
+    result = context["findings"].get(perspective) or {}
+    records = []
+    for record in result.get("records", []):
+        criterion = str(record.get("criterion") or "")
+        if trl_only and "trl" not in criterion.casefold() and "성숙" not in criterion:
+            continue
+        ids = record.get("evidence_ids", [])
+        if any(eid not in context["evidence_store"] for eid in ids):
+            continue
+        records.append(record)
+    return records
+
+
+def select_records(
+    context: dict, perspective: str, limit: int, *, trl_only: bool = False
+) -> tuple[list[dict], int]:
+    records = _usable_records(context, perspective, trl_only=trl_only)
+    return balanced_pick(records, limit, is_counter=_counter_claim(context)), len(records)
+
+
+def _matrix_groups(context: dict) -> dict[tuple[str, str], dict[str, dict]]:
+    grouped: dict[tuple[str, str], dict[str, dict]] = {}
+    for cell in context["synthesis"].get("matrix") or []:
+        key = (str(cell.get("perspective") or ""), str(cell.get("criterion") or ""))
+        grouped.setdefault(key, {})[str(cell.get("technology") or "")] = cell
+    return grouped
+
+
+def select_matrix_keys(context: dict, limit: int) -> tuple[list[tuple[str, str]], int]:
+    """비교 매트릭스 행을 관점별로 번갈아 골라 네 관점이 모두 남게 한다."""
+    keys = list(_matrix_groups(context))
+    return round_robin_pick(keys, limit, key=lambda item: item[0]), len(keys)
+
+
+def _linked_rows(context: dict, rows: list[dict]) -> list[tuple[dict, list[str], list[str]]]:
+    """claim·evidence 참조가 모두 실재하는 행만 (행, claim_ids, evidence_ids)로 돌려준다."""
+    linked = []
+    for row in rows:
+        ids = [cid for cid in row.get("claim_ids", []) if cid in context["claims"]]
+        direct_ids = [eid for eid in row.get("evidence_ids", []) if eid in context["evidence_store"]]
+        if (row.get("claim_ids") and len(ids) != len(row["claim_ids"])) or (
+            row.get("evidence_ids") and len(direct_ids) != len(row["evidence_ids"])
+        ):
+            continue
+        evidence_ids = _unique(direct_ids + [eid for cid in ids for eid in context["claims"][cid].get("evidence_ids", [])])
+        linked.append((row, ids, evidence_ids))
+    return linked
+
+
+def select_relations(
+    context: dict, accepted: set[str], limit: int
+) -> tuple[list[tuple[dict, list[str], list[str]]], int]:
+    """설명이 있는 행을, 상충을 일치보다, 미해소를 해소보다 앞에 두고 limit개 고른다."""
+    rows = context["synthesis"].get("cross_findings") or context["synthesis"].get("relations") or []
+    linked = [item for item in _linked_rows(context, rows) if item[0].get("kind") in accepted]
+    ranked = sorted(
+        linked,
+        key=lambda item: (
+            0 if (item[0].get("explanation") or item[0].get("reason")) else 1,
+            0 if item[0].get("kind") == "conflict" else 1,
+            0 if item[0].get("resolution") == "unresolved" else 1,
+        ),
+    )
+    return ranked[:limit], len(linked)
+
+
+def select_contrast(context: dict, limit: int) -> tuple[list[tuple[dict, list[str], list[str]]], int]:
+    linked = _linked_rows(context, context["synthesis"].get("contrast_table") or [])
+    picked = round_robin_pick(
+        linked, limit, key=lambda item: str(item[0].get("criterion") or "").split("/", 1)[0]
+    )
+    return picked, len(linked)
+
+
+def select_gaps(context: dict, limit: int) -> tuple[list[str], int]:
+    gaps = list(context["upstream_gaps"])
+    for request in context["synthesis"].get("retry_requests", []):
+        gaps.append(str(request.get("reason") if isinstance(request, dict) else request))
+    gaps = _unique(gaps)
+    return round_robin_pick(gaps, limit, key=lambda item: item.split(":", 1)[0]), len(gaps)
+
+
 class DeterministicSectionWriter:
-    """상위 구조화 결과를 그대로 배치하는 API-key-free 재현용 writer."""
+    """상위 구조화 결과를 그대로 배치하는 API-key-free 재현용 writer.
+
+    섹션 예산(budget.py)을 넘지 않을 때까지 항목 수를 줄여 렌더링한다.
+    분량 가드는 예산을 넘긴 LLM 섹션을 이 writer의 출력으로 교체한다.
+    """
 
     receives_full_context = True
+
+    def __init__(self, budgets: Budgets | None = None) -> None:
+        self.budgets = budgets or default_budgets()
 
     def write(self, section_id: SectionId, context: dict) -> SectionDraft:
         return self._render(section_id, context)
@@ -216,21 +351,17 @@ class DeterministicSectionWriter:
         # 외부 초안에 문제가 있어도 상위 claim만 사용하는 결정적 출력으로 해당 섹션만 교체한다.
         return self._render(section_id, context)
 
-    def _claims(self, context: dict, perspective: str) -> list[dict]:
-        store = context["evidence_store"]
-        result = []
-        for claim in context["claims"].values():
-            if claim.get("perspective") != perspective:
-                continue
-            evidence_ids = claim.get("evidence_ids", [])
-            if any(eid not in store for eid in evidence_ids):
-                continue
-            if claim.get("basis") in {"direct", "direct_evidence"} and not evidence_ids:
-                continue
-            result.append(claim)
-        return result
+    def _render(self, section_id: SectionId, context: dict) -> SectionDraft:
+        # 하위 클래스가 __init__을 건너뛰어도 기본 예산으로 동작한다.
+        budget = (getattr(self, "budgets", None) or SECTION_BUDGETS)[section_id]
+        draft = self._build(section_id, context, budget.max_items)
+        for limit in range(budget.max_items - 1, 0, -1):
+            if body_length(draft["markdown"]) <= budget.max_chars:
+                break
+            draft = self._build(section_id, context, limit)
+        return draft
 
-    def _claim_draft(self, section_id: SectionId, claims: list[dict], empty: str) -> SectionDraft:
+    def _claim_lines(self, claims: list[dict]) -> tuple[list[str], list[str], list[str]]:
         claim_ids: list[str] = []
         evidence_ids: list[str] = []
         lines: list[str] = []
@@ -239,15 +370,24 @@ class DeterministicSectionWriter:
             citation = f" 〔근거: {', '.join(ids)}〕" if ids else ""
             details: list[str] = []
             if claim.get("conditions"):
-                details.append("조건: " + "; ".join(claim["conditions"]))
+                details.append("조건: " + clip("; ".join(claim["conditions"]), 120))
             if claim.get("uncertainty"):
-                details.append("불확실성: " + claim["uncertainty"])
+                details.append("불확실성: " + clip(claim["uncertainty"], 120))
             suffix = f" ({' / '.join(details)})" if details else ""
-            lines.append(f"- {claim['statement']}{suffix}{citation}")
+            lines.append(f"- {clip(claim['statement'])}{suffix}{citation}")
             claim_ids.append(claim["claim_id"])
             evidence_ids.extend(ids)
+        return lines, claim_ids, evidence_ids
+
+    def _claim_draft(
+        self, section_id: SectionId, claims: list[dict], empty: str, total: int | None = None
+    ) -> SectionDraft:
+        lines, claim_ids, evidence_ids = self._claim_lines(claims)
         if not lines:
             lines = [empty]
+        note = omitted_note(total if total is not None else len(claims), len(claims))
+        if note:
+            lines.append(note)
         return {
             "section_id": section_id,
             "title": SECTION_TITLES[section_id],
@@ -256,28 +396,59 @@ class DeterministicSectionWriter:
             "evidence_ids": _unique(evidence_ids),
         }
 
-    def _render(self, section_id: SectionId, context: dict) -> SectionDraft:
+    def _record_line(self, record: dict, context: dict) -> tuple[str, list[str]]:
+        ids = list(record.get("evidence_ids", []))
+        value = record.get("value") or record.get("assessment") or "판단 보류"
+        citation = f" 〔근거: {', '.join(ids)}〕" if ids else ""
+        limitations = clip("; ".join(str(item) for item in record.get("limitations", [])), 120)
+        suffix = f" / {limitations}" if limitations else ""
+        line = (
+            f"- {record.get('technology', '기술')}: {record.get('criterion', '')} "
+            f"{value} — {clip(record.get('findings', ''), 200)}{suffix}{citation}"
+        )
+        return line, ids
+
+    def _perspective(self, section_id: SectionId, context: dict, limit: int) -> SectionDraft:
+        claims, total = select_claims(context, section_id, limit)
+        draft = self._claim_draft(
+            section_id, claims, f"- {SECTION_TITLES[section_id]}에 인용 가능한 결과가 확인되지 않았다.", total
+        )
+        if len(claims) >= limit:
+            return draft
+        # claim이 적은 관점(예: 시장)은 판정 기록으로 채워 관점 간 분량 차이를 줄인다.
+        records, _ = select_records(context, section_id, limit - len(claims))
+        if not records:
+            return draft
+        lines, evidence_ids = [], []
+        for record in records:
+            line, ids = self._record_line(record, context)
+            lines.append(line)
+            evidence_ids.extend(ids)
+        body = draft["markdown"].split("\n\n", 1)[1]
+        if not claims:
+            body = ""
+        draft["markdown"] = _heading(section_id) + "\n\n" + "\n".join(filter(None, [body, *lines]))
+        draft["evidence_ids"] = _unique(draft["evidence_ids"] + evidence_ids)
+        return draft
+
+    def _build(self, section_id: SectionId, context: dict, limit: int) -> SectionDraft:
         if section_id == "summary":
-            synthesis_claims = self._claims(context, "synthesis")
-            base = self._claim_draft(section_id, synthesis_claims[:5], "- 종합 결과에서 인용 가능한 핵심 문장이 확인되지 않았다.")
+            synthesis_claims = _usable_claims(context, "synthesis")
+            base = self._claim_draft(section_id, synthesis_claims[:limit], "- 종합 결과에서 인용 가능한 핵심 문장이 확인되지 않았다.")
             relation_lines: list[str] = []
             relation_claims: list[str] = []
             relation_evidence: list[str] = []
             seen_kinds: set[str] = set()
             rows = context["synthesis"].get("cross_findings") or context["synthesis"].get("relations") or []
-            for row in rows:
+            for row, claim_ids, evidence_ids in _linked_rows(context, rows):
                 kind = str(row.get("kind") or "")
                 if kind not in {"agreement", "conflict"} or kind in seen_kinds:
-                    continue
-                claim_ids = [cid for cid in row.get("claim_ids", []) if cid in context["claims"]]
-                direct_ids = [eid for eid in row.get("evidence_ids", []) if eid in context["evidence_store"]]
-                evidence_ids = _unique(direct_ids + [eid for cid in claim_ids for eid in context["claims"][cid].get("evidence_ids", [])])
-                if (row.get("claim_ids") and len(claim_ids) != len(row["claim_ids"])) or (row.get("evidence_ids") and len(direct_ids) != len(row["evidence_ids"])):
                     continue
                 label = "주요 일치" if kind == "agreement" else "주요 상충"
                 cause = f" / 원인 유형: {row['conflict_type']}" if row.get("conflict_type") else ""
                 citation = f" 〔근거: {', '.join(evidence_ids)}〕" if evidence_ids else ""
-                relation_lines.append(f"- {label}: {row.get('explanation') or row.get('reason') or '설명 미입력'}{cause}{citation}")
+                explanation = clip(row.get("explanation") or row.get("reason") or "설명 미입력")
+                relation_lines.append(f"- {label}: {explanation}{cause}{citation}")
                 relation_claims.extend(claim_ids)
                 relation_evidence.extend(evidence_ids)
                 seen_kinds.add(kind)
@@ -294,7 +465,8 @@ class DeterministicSectionWriter:
             base["evidence_ids"] = _unique(base["evidence_ids"] + relation_evidence)
             return base
         if section_id == "background":
-            return self._claim_draft(section_id, self._claims(context, "technical")[:3], "- 인용 가능한 분석 배경 자료가 확인되지 않았다.")
+            claims = _usable_claims(context, "technical")
+            return self._claim_draft(section_id, claims[:limit], "- 인용 가능한 분석 배경 자료가 확인되지 않았다.")
         if section_id == "technology_selection":
             lines = []
             for side in ("sw", "hw"):
@@ -304,55 +476,44 @@ class DeterministicSectionWriter:
                 lines.append(f"- {side.upper()}: {name} — {reason}")
             return self._plain(section_id, lines)
         if section_id == "technology_overview":
-            return self._claim_draft(section_id, self._claims(context, "technical"), "- 인용 가능한 기술 개요가 확인되지 않았다.")
+            claims, total = select_claims(context, "technical", limit)
+            return self._claim_draft(section_id, claims, "- 인용 가능한 기술 개요가 확인되지 않았다.", total)
         if section_id == "trl":
-            result = context["findings"].get("technical") or {}
+            records, total = select_records(context, "technical", limit, trl_only=True)
             lines, evidence_ids = [], []
-            records = [
-                record
-                for record in result.get("records", [])
-                if "trl" in str(record.get("criterion") or "").casefold()
-                or "성숙" in str(record.get("criterion") or "")
-            ]
             for record in records:
-                ids = [eid for eid in record.get("evidence_ids", []) if eid in context["evidence_store"]]
-                if len(ids) != len(record.get("evidence_ids", [])):
-                    continue
-                value = record.get("value") or record.get("assessment") or "판단 보류"
-                citation = f" 〔근거: {', '.join(ids)}〕" if ids else ""
-                limitations = "; ".join(str(item) for item in record.get("limitations", []))
-                suffix = f" / {limitations}" if limitations else ""
-                lines.append(
-                    f"- {record.get('technology', '기술')}: {record.get('criterion', 'TRL')} "
-                    f"{value} — {record.get('findings', '')}{suffix}{citation}"
-                )
+                line, ids = self._record_line(record, context)
+                lines.append(line)
                 evidence_ids.extend(ids)
-            draft = self._plain(section_id, lines or ["- 공개 정보 기반 TRL 기록이 확인되지 않았다."])
+            note = omitted_note(total, len(records))
+            draft = self._plain(section_id, (lines or ["- 공개 정보 기반 TRL 기록이 확인되지 않았다."]) + ([note] if note else []))
             draft["evidence_ids"] = _unique(evidence_ids)
             return draft
         if section_id in {"market", "stakeholder", "domain"}:
-            return self._claim_draft(section_id, self._claims(context, section_id), f"- {SECTION_TITLES[section_id]}에 인용 가능한 결과가 확인되지 않았다.")
+            return self._perspective(section_id, context, limit)
         if section_id == "comparison_matrix":
-            return self._matrix(context)
+            return self._matrix(context, limit)
         if section_id == "conditions":
-            return self._conditions(context)
+            return self._conditions(context, limit)
         if section_id in {"conflicts", "shared_and_complement"}:
-            return self._relations(section_id, context)
+            return self._relations(section_id, context, limit)
         if section_id == "open_questions":
-            gaps = list(context["upstream_gaps"])
-            for request in context["synthesis"].get("retry_requests", []):
-                gaps.append(str(request.get("reason") if isinstance(request, dict) else request))
-            return self._plain(section_id, [f"- {value}" for value in _unique(gaps)] or ["- 자료 미확인"])
+            gaps, total = select_gaps(context, limit)
+            note = omitted_note(total, len(gaps))
+            lines = [f"- {clip(value, 200)}" for value in gaps] or ["- 자료 미확인"]
+            return self._plain(section_id, lines + ([note] if note else []))
         if section_id == "limitations":
-            lines = ["- 모든 평가는 공개 정보로 확인 가능한 범위에 한정된다."]
+            # upstream 상태 노출은 검증 필수 항목이라 예산과 무관하게 남긴다.
+            required = ["- 모든 평가는 공개 정보로 확인 가능한 범위에 한정된다."]
             for name, status in context["upstream_statuses"].items():
                 if status in {"partial", "failed"}:
-                    lines.append(f"- {name} upstream 상태는 {status}이며 관련 공백을 최종 판단에 반영해야 한다.")
-            lines.extend(f"- {value}" for value in context["synthesis"].get("limitations", []))
+                    required.append(f"- {name} upstream 상태는 {status}이며 관련 공백을 최종 판단에 반영해야 한다.")
             if context.get("not_found_present"):
-                lines.append("- not_found는 기록된 검색 범위에서 자료를 확인하지 못한 상태이며 실제 부재를 뜻하지 않는다.")
-            lines.append("- 근거 수준과 적용 조건을 함께 표시하고 반대 방향 근거의 미확인을 남겨 확증편향을 줄였다.")
-            return self._plain(section_id, _unique(lines))
+                required.append("- not_found는 기록된 검색 범위에서 자료를 확인하지 못한 상태이며 실제 부재를 뜻하지 않는다.")
+            optional = [f"- {clip(value, 200)}" for value in context["synthesis"].get("limitations", [])]
+            optional.append("- 근거 수준과 적용 조건을 함께 표시하고 반대 방향 근거의 미확인을 남겨 확증편향을 줄였다.")
+            room = max(0, limit - len(required))
+            return self._plain(section_id, _unique(required + optional[:room]))
         raise ValueError(f"지원하지 않는 섹션: {section_id}")
 
     def _plain(self, section_id: SectionId, lines: list[str]) -> SectionDraft:
@@ -364,15 +525,13 @@ class DeterministicSectionWriter:
             "evidence_ids": [],
         }
 
-    def _matrix(self, context: dict) -> SectionDraft:
-        cells = context["synthesis"].get("matrix") or []
+    def _matrix(self, context: dict, limit: int) -> SectionDraft:
+        grouped = _matrix_groups(context)
+        keys, total = select_matrix_keys(context, limit)
         lines = ["| 관점 | 기준 | SW | HW |", "|---|---|---|---|"]
         evidence_ids: list[str] = []
-        grouped: dict[tuple[str, str], dict[str, dict]] = {}
-        for cell in cells:
-            key = (str(cell.get("perspective") or ""), str(cell.get("criterion") or ""))
-            grouped.setdefault(key, {})[str(cell.get("technology") or "")] = cell
-        for (perspective, criterion), pair in grouped.items():
+        for perspective, criterion in keys:
+            pair = grouped[(perspective, criterion)]
             row_evidence = self._record_evidence(context, perspective, criterion)
             citation = f" 〔근거: {', '.join(row_evidence)}〕" if row_evidence else ""
             sw = pair.get("sw") or {}
@@ -389,7 +548,8 @@ class DeterministicSectionWriter:
             evidence_ids.extend(row_evidence)
         if len(lines) == 2:
             lines.append("| 자료 미확인 | 자료 미확인 | 자료 미확인 | 자료 미확인 |")
-        draft = self._plain("comparison_matrix", lines)
+        note = omitted_note(total, len(keys), "행")
+        draft = self._plain("comparison_matrix", lines + (["", note] if note else []))
         draft["evidence_ids"] = _unique(evidence_ids)
         return draft
 
@@ -404,16 +564,11 @@ class DeterministicSectionWriter:
         ]
         return _unique(ids)
 
-    def _conditions(self, context: dict) -> SectionDraft:
-        rows = context["synthesis"].get("contrast_table") or []
+    def _conditions(self, context: dict, limit: int) -> SectionDraft:
+        rows, total = select_contrast(context, limit)
         lines = ["| 항목 | SW | HW |", "|---|---|---|"]
         claim_ids, evidence_ids = [], []
-        for row in rows:
-            ids = [cid for cid in row.get("claim_ids", []) if cid in context["claims"]]
-            direct_ids = [eid for eid in row.get("evidence_ids", []) if eid in context["evidence_store"]]
-            row_evidence = _unique(direct_ids + [eid for cid in ids for eid in context["claims"][cid].get("evidence_ids", [])])
-            if (row.get("claim_ids") and len(ids) != len(row["claim_ids"])) or (row.get("evidence_ids") and len(direct_ids) != len(row["evidence_ids"])):
-                continue
+        for row, ids, row_evidence in rows:
             citation = f" 〔근거: {', '.join(row_evidence)}〕" if row_evidence else ""
             label = row.get("criterion") or row.get("label") or row.get("item") or "조건"
             lines.append(f"| {label} | {row.get('sw', row.get('sw_assessment', ''))} | {row.get('hw', row.get('hw_assessment', ''))}{citation} |")
@@ -421,38 +576,75 @@ class DeterministicSectionWriter:
             evidence_ids.extend(row_evidence)
         if len(lines) == 2:
             lines.append("| 자료 미확인 | 자료 미확인 | 자료 미확인 |")
-        draft = self._plain("conditions", lines)
+        note = omitted_note(total, len(rows), "행")
+        draft = self._plain("conditions", lines + (["", note] if note else []))
         draft["claim_ids"], draft["evidence_ids"] = _unique(claim_ids), _unique(evidence_ids)
         return draft
 
-    def _relations(self, section_id: SectionId, context: dict) -> SectionDraft:
-        rows = context["synthesis"].get("cross_findings") or context["synthesis"].get("relations") or []
+    def _relations(self, section_id: SectionId, context: dict, limit: int) -> SectionDraft:
         if section_id == "conflicts":
             accepted = {"agreement", "conflict"}
         else:
             accepted = {"complement", "complementarity", "shared_evidence"}
+        rows, total = select_relations(context, accepted, limit)
         lines, claim_ids, evidence_ids = [], [], []
-        for row in rows:
-            if row.get("kind") not in accepted:
-                continue
-            ids = [cid for cid in row.get("claim_ids", []) if cid in context["claims"]]
-            direct_ids = [eid for eid in row.get("evidence_ids", []) if eid in context["evidence_store"]]
-            row_evidence = _unique(direct_ids + [eid for cid in ids for eid in context["claims"][cid].get("evidence_ids", [])])
-            if (row.get("claim_ids") and len(ids) != len(row["claim_ids"])) or (row.get("evidence_ids") and len(direct_ids) != len(row["evidence_ids"])):
-                continue
+        for row, ids, row_evidence in rows:
             citation = f" 〔근거: {', '.join(row_evidence)}〕" if row_evidence else ""
-            explanation = row.get("explanation") or row.get("reason") or "설명 미입력"
+            explanation = clip(row.get("explanation") or row.get("reason") or "설명 미입력")
             resolution = f" / 해소 상태: {row['resolution']}" if row.get("resolution") else ""
             lines.append(f"- {row.get('kind')}: {explanation}{resolution}{citation}")
             claim_ids.extend(ids)
             evidence_ids.extend(row_evidence)
-        draft = self._plain(section_id, lines or ["- 구조화된 관계 기록이 확인되지 않았다."])
+        note = omitted_note(total, len(rows))
+        draft = self._plain(section_id, (lines or ["- 구조화된 관계 기록이 확인되지 않았다."]) + ([note] if note else []))
         draft["claim_ids"], draft["evidence_ids"] = _unique(claim_ids), _unique(evidence_ids)
         return draft
 
 
-def section_payload(section_id: SectionId, context: NormalizedInput) -> dict:
-    """외부 writer에 전체 evidence_store 대신 해당 섹션의 최소 입력만 제공한다."""
+def _synthesis_view(section_id: SectionId, context: NormalizedInput, limit: int) -> dict:
+    """시사점 계열 섹션에 synthesis 전체 대신 그 섹션에 필요한 행만 선별해 넘긴다."""
+    synthesis = context["synthesis"]
+    if section_id == "summary":
+        relations, _ = select_relations(context, {"agreement", "conflict"}, 2)
+        return {
+            "summary_claims": [c for c in synthesis.get("summary_claims", [])][:limit],
+            "cross_findings": [row for row, _, _ in relations],
+            "status": synthesis.get("status"),
+        }
+    if section_id == "comparison_matrix":
+        keys, total = select_matrix_keys(context, limit)
+        wanted = set(keys)
+        cells = [
+            cell for cell in synthesis.get("matrix") or []
+            if (str(cell.get("perspective") or ""), str(cell.get("criterion") or "")) in wanted
+        ]
+        return {"matrix": cells, "omitted": {"total_rows": total, "kept_rows": len(keys)}}
+    if section_id == "conditions":
+        rows, total = select_contrast(context, limit)
+        return {"contrast_table": [row for row, _, _ in rows], "omitted": {"total_rows": total, "kept_rows": len(rows)}}
+    if section_id in {"conflicts", "shared_and_complement"}:
+        accepted = {"agreement", "conflict"} if section_id == "conflicts" else {"complement", "complementarity", "shared_evidence"}
+        rows, total = select_relations(context, accepted, limit)
+        return {"cross_findings": [row for row, _, _ in rows], "omitted": {"total": total, "kept": len(rows)}}
+    if section_id == "open_questions":
+        gaps, total = select_gaps(context, limit)
+        return {"gaps": gaps, "omitted": {"total": total, "kept": len(gaps)}}
+    # limitations
+    return {
+        "limitations": list(synthesis.get("limitations", []))[:limit],
+        "imbalance": synthesis.get("imbalance", []),
+    }
+
+
+def section_payload(
+    section_id: SectionId, context: NormalizedInput, budgets: Budgets | None = None
+) -> dict:
+    """외부 writer에 전체 evidence_store 대신 해당 섹션의 최소 입력만 제공한다.
+
+    결정적 writer와 같은 선별 함수로 항목을 max_items개까지 줄이고, 분량 상한을 함께 넘긴다.
+    """
+    budget = (budgets or SECTION_BUDGETS)[section_id]
+    limit = budget.max_items
     perspective = {
         "background": "technical",
         "technology_overview": "technical",
@@ -468,13 +660,30 @@ def section_payload(section_id: SectionId, context: NormalizedInput) -> dict:
         "as_of_date": context["as_of_date"],
         "domain": context["domain"],
         "technologies": context["technologies"],
+        "budget": {"max_chars": budget.max_chars, "max_items": limit},
     }
     if perspective:
-        payload["findings"] = context["findings"].get(perspective)
+        source = context["findings"].get(perspective) or {}
+        claims, total_claims = select_claims(context, perspective, limit)
+        records, total_records = select_records(
+            context, perspective, limit, trl_only=section_id == "trl"
+        )
+        payload["findings"] = {
+            "perspective": perspective,
+            "status": source.get("status"),
+            "claims": [] if section_id == "trl" else claims,
+            "records": [] if section_id in {"background", "technology_overview"} else records,
+            "gaps": list(source.get("gaps") or [])[:limit],
+        }
+        payload["omitted"] = {
+            "claims": {"total": total_claims, "kept": len(claims)},
+            "records": {"total": total_records, "kept": len(records)},
+        }
     elif section_id in {"summary", "comparison_matrix", "conditions", "conflicts", "shared_and_complement", "open_questions", "limitations"}:
-        payload["synthesis"] = context["synthesis"]
+        payload["synthesis"] = _synthesis_view(section_id, context, limit)
         payload["upstream_statuses"] = context["upstream_statuses"]
-        payload["upstream_gaps"] = context["upstream_gaps"]
+        if section_id in {"summary", "limitations"}:
+            payload["upstream_gaps"] = context["upstream_gaps"][:limit]
     claim_ids = set()
     raw = str(payload)
     for claim_id in context["claims"]:
@@ -496,9 +705,13 @@ def section_payload(section_id: SectionId, context: NormalizedInput) -> dict:
 
 
 def _writer_context(
-    section_id: SectionId, context: NormalizedInput, *, include_normalized: bool
+    section_id: SectionId,
+    context: NormalizedInput,
+    *,
+    include_normalized: bool,
+    budgets: Budgets | None = None,
 ) -> dict:
-    payload = section_payload(section_id, context)
+    payload = section_payload(section_id, context, budgets)
     public = {"payload": payload, "prompt": build_section_prompt(section_id, payload)}
     # 결정적 재현 writer만 정규형 전체를 읽는다. 일반 LLM writer에는 최소 입력만 노출한다.
     return {**context, **public} if include_normalized else public
@@ -575,8 +788,10 @@ def finalize_report(
     input_issues: list[dict],
     revisions_used: int,
     summary_override: SectionDraft | None = None,
+    budgets: Budgets | None = None,
 ) -> dict:
     """SUMMARY 작성부터 품질 검사와 통과 판정까지 한 사이클에서 수행한다."""
+    budgets = budgets or default_budgets()
     steps = ["summary", "citations", "references", "quality", "decision"]
     issues = list(input_issues)
     summary_context = _writer_context(
@@ -642,6 +857,7 @@ def finalize_report(
     for section_id in SECTION_ORDER:
         if section_id != "reference":
             issues.extend(validate_section(sections[section_id], context))
+        issues.extend(validate_budget(sections[section_id], budgets[section_id]))
     issues.extend(validate_report(report, context))
     unresolved = _unique(item["message"] for item in blocking(issues))
     invalid_sections = _unique(
@@ -666,6 +882,112 @@ def finalize_report(
         "issues": issues,
         "invalid_sections": invalid_sections,
     }
+
+
+def _pdf_titles(context: NormalizedInput) -> tuple[str, str]:
+    technology_names = [
+        str(context["technologies"].get(side, {}).get("name") or "").strip()
+        for side in ("sw", "hw")
+    ]
+    compared = " · ".join(name for name in technology_names if name)
+    title = f"{compared} 기술 비교 평가 보고서" if compared else "기술 비교 평가 보고서"
+    subtitle_parts = [
+        context["domain"],
+        f"조사 기준일 {context['as_of_date']}" if context["as_of_date"] else "",
+    ]
+    return title, " · ".join(part for part in subtitle_parts if part)
+
+
+def _render_pages(report: dict, context: NormalizedInput, deps: ReportAgentDeps) -> dict:
+    """제출용 표기(번호 인용)로 렌더링하고 장수를 센다. PDF 경로가 없으면 글자 수로 추정한다."""
+    numbers = reference_numbers(report["cited_evidence_ids"], context["evidence_store"])
+    display = number_citations(report["markdown"], numbers)
+    if deps.pdf_output_path:
+        from agents.report.pdf import export_report_pdf
+
+        title, subtitle = _pdf_titles(context)
+        path, pages = export_report_pdf(display, deps.pdf_output_path, title=title, subtitle=subtitle)
+        return {"pages": pages, "method": "pdf", "display": display, "pdf_path": str(path)}
+    return {"pages": estimate_pages(display), "method": "estimate", "display": display, "pdf_path": None}
+
+
+def _enforce_page_limit(
+    final: dict,
+    *,
+    body_sections: dict[SectionId, SectionDraft],
+    context: NormalizedInput,
+    writer,
+    deps: ReportAgentDeps,
+    input_issues: list[dict],
+    revisions_used: int,
+) -> tuple[dict, dict, list[dict]]:
+    """보고서가 PAGE_LIMIT장을 넘으면 섹션을 결정적 렌더로 줄인다. LLM은 다시 부르지 않는다.
+
+    1) 분량 상한을 넘긴 섹션을 같은 예산의 결정적 렌더로 교체한다.
+    2) 넘긴 섹션이 없으면 B·C 등급 예산을 SHRINK_FACTOR만큼 줄여 다시 렌더링한다.
+    교체 후보가 근거·수치 검증을 통과하지 못하면 교체하지 않는다(분량보다 정확성 우선).
+    최대 MAX_PAGE_GUARD_ROUNDS회 후에도 넘으면 page_limit_exceeded를 남기고 멈춘다.
+    """
+    budgets = default_budgets()
+    replaced: set[SectionId] = set()
+    log: list[dict] = []
+    summary = final["sections"]["summary"]
+    rendered = _render_pages(final["report"], context, deps)
+    for round_index in range(MAX_PAGE_GUARD_ROUNDS + 1):
+        log.append({
+            "round": round_index,
+            "pages": rendered["pages"],
+            "method": rendered["method"],
+            "replaced": sorted(replaced),
+            "shrunk": round_index > 0 and budgets != SECTION_BUDGETS,
+        })
+        if rendered["pages"] <= PAGE_LIMIT or round_index == MAX_PAGE_GUARD_ROUNDS:
+            break
+        sections = final["sections"]
+        targets = [
+            section_id
+            for section_id in ("summary", *BODY_SECTION_ORDER)
+            if section_id not in replaced
+            and body_length(sections[section_id]["markdown"])
+            > budgets[section_id].max_chars * OVER_BUDGET_TOLERANCE
+        ]
+        if not targets:
+            budgets = shrink(budgets)
+            targets = [sid for sid in BODY_SECTION_ORDER if budgets[sid].tier in {"B", "C"}]
+        fallback = DeterministicSectionWriter(budgets)
+        for section_id in targets:
+            candidate = fallback.write(
+                section_id,
+                _writer_context(section_id, context, include_normalized=True, budgets=budgets),
+            )
+            if blocking(validate_section(candidate, context)):
+                continue
+            if section_id == "summary":
+                summary = candidate
+            else:
+                body_sections[section_id] = candidate
+            replaced.add(section_id)
+        final = finalize_report(
+            body_sections=body_sections,
+            context=context,
+            writer=writer,
+            deps=deps,
+            input_issues=input_issues,
+            revisions_used=revisions_used,
+            summary_override=summary,
+            budgets=budgets,
+        )
+        summary = final["sections"]["summary"]
+        rendered = _render_pages(final["report"], context, deps)
+    if rendered["pages"] > PAGE_LIMIT:
+        message = f"보고서가 {PAGE_LIMIT}장 제한을 넘음: {rendered['pages']}장"
+        final["issues"].append({
+            "code": "page_limit_exceeded", "message": message, "section_id": None, "blocking": True,
+        })
+        final["report"]["quality_status"] = "needs_review"
+        final["report"]["completion"]["status"] = "partial"
+        final["report"]["completion"]["errors"].append(message)
+    return final, rendered, log
 
 
 def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
@@ -753,8 +1075,24 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
         if not repaired:
             break
 
+    final, rendered, page_guard = _enforce_page_limit(
+        final,
+        body_sections=body_sections,
+        context=context,
+        writer=writer,
+        deps=deps,
+        input_issues=input_issues,
+        revisions_used=revisions_used,
+    )
     report = final["report"]
     report["completion"]["revision_rounds_used"] = revisions_used
+    report["page_count"] = rendered["pages"]
+    report["page_count_method"] = rendered["method"]
+    report["page_limit"] = PAGE_LIMIT
+    report["page_guard"] = page_guard
+    report["display_markdown"] = rendered["display"]
+    if rendered["pdf_path"]:
+        report["pdf_path"] = rendered["pdf_path"]
     checked_claim_ids = _unique(
         claim_id
         for section_id in SECTION_ORDER
@@ -764,27 +1102,9 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
     report_sections = {
         name: final["sections"][name]["markdown"] for name in SECTION_ORDER
     }
-    report_sections["final_markdown"] = report["markdown"]
-    if deps.pdf_output_path:
-        from agents.report.pdf import export_markdown_pdf
-
-        technology_names = [
-            str(context["technologies"].get(side, {}).get("name") or "").strip()
-            for side in ("sw", "hw")
-        ]
-        compared = " · ".join(name for name in technology_names if name)
-        title = f"{compared} 기술 비교 평가 보고서" if compared else "기술 비교 평가 보고서"
-        subtitle_parts = [
-            context["domain"],
-            f"조사 기준일 {context['as_of_date']}" if context["as_of_date"] else "",
-        ]
-        pdf_path = export_markdown_pdf(
-            report["markdown"],
-            deps.pdf_output_path,
-            title=title,
-            subtitle=" · ".join(part for part in subtitle_parts if part),
-        )
-        report["pdf_path"] = str(pdf_path)
+    # 제출본(report.md·PDF)은 번호 인용, 추적용 원본은 evidence ID 인용.
+    report_sections["final_markdown"] = rendered["display"]
+    report_sections["final_markdown_with_ids"] = report["markdown"]
     return {
         "report": report,
         "report_sections": report_sections,

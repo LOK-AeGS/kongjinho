@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 
 
-PROMPT_VERSION = "report-v2-llm"
+PROMPT_VERSION = "report-v3-budget"
 
 SYSTEM_RULES = """당신은 KV cache 다관점 평가 보고서 편집자다.
 주어진 구조화 자료만 사용하고 새 조사·검색·사실·수치·사례를 추가하지 않는다.
@@ -40,15 +40,30 @@ SECTION_RULES = {
 }
 
 
+def budget_rule(budget: dict | None) -> str:
+    """보고서 10장 제한을 위한 섹션 분량 지시. 상한 초과는 validator가 경고로 잡는다."""
+    if not budget:
+        return ""
+    return (
+        f"분량 상한: 제목을 뺀 본문 {budget['max_chars']}자 이내, 항목(불릿·표 행) 최대 {budget['max_items']}개. "
+        "섹션 안에 ###/#### 소제목이나 '상충 여부:' 같은 항목별 하위 불릿을 만들지 말고 "
+        "항목마다 불릿 한 줄 또는 표 한 행으로 쓴다. SW와 HW에 비슷한 분량을 배정한다. "
+        "입력의 omitted에 생략 수가 있으면 '분량 제한으로 전체 N건 중 M건만 실었다'고 한 줄로 밝힌다."
+    )
+
+
 def build_section_prompt(section_id: str, payload: dict) -> str:
     """LLM writer가 사용할 수 있는 작고 재현 가능한 사용자 prompt를 만든다."""
     return "\n\n".join(
-        (
+        part
+        for part in (
             f"섹션 규칙: {SECTION_RULES[section_id]}",
+            budget_rule(payload.get("budget")),
             f"반드시 사용할 첫 제목: {payload['required_heading']}",
             "간결한 보고서 문체로 작성하고 입력에 없는 연결 논리를 보충하지 않는다.",
             "입력(JSON):\n" + json.dumps(payload, ensure_ascii=False, sort_keys=True),
         )
+        if part
     )
 
 
