@@ -12,7 +12,7 @@ from agents.report.budget import OVER_BUDGET_TOLERANCE, SectionBudget, body_leng
 from agents.report.metrics import METRIC_RULES, metric_violations
 from agents.report.references import source_identity
 from agents.report.state import SECTION_ORDER, SectionDraft, SectionId, ValidationIssue
-from graph.metrics import MEASUREMENT, extract_measurements
+from graph.metrics import MEASUREMENT, extract_measurements, measurement_values
 
 
 REQUIRED_HEADINGS = (
@@ -212,6 +212,52 @@ def validate_section(draft: SectionDraft, context: dict) -> list[ValidationIssue
         issues.append(issue("not_found_generalization", "not_found를 실제 부재로 일반화함", section_id))
 
     issues.extend(_metric_issues(section_id, draft["markdown"]))
+    issues.extend(_citation_binding_issues(section_id, draft["markdown"], context))
+    return issues
+
+
+def _citation_binding_issues(section_id: SectionId, markdown: str, context: dict) -> list[ValidationIssue]:
+    """인용이 붙은 줄의 수치는 그 줄이 인용한 근거 원문이나, 그 근거를 인용한 claim·판정 기록에 있어야 한다.
+
+    섹션 단위 numeric_grounding은 섹션 어딘가에 같은 수치가 있으면 통과시킨다. live 2차 실행에서 LLM writer가
+    technical 주장의 93.3%를 도메인 근거 ID에 붙여(출처 혼합) 이를 통과했기 때문에 줄 단위로 다시 묶는다.
+    """
+    store = context["evidence_store"]
+    claims = context["claims"].values()
+    records = [
+        record
+        for result in context.get("findings", {}).values()
+        for record in (result or {}).get("records", [])
+    ]
+    issues: list[ValidationIssue] = []
+    for line in markdown.splitlines():
+        ids = [eid for eid in extract_citations(line) if eid in store]
+        if not ids:
+            continue
+        text = _CITATION.sub("", line)
+        for rule in METRIC_RULES:
+            if rule.canonical_condition:
+                text = text.replace(rule.canonical_condition, "")
+        values = measurement_values(text)
+        if not values:
+            continue
+        cited = set(ids)
+        corpus = [store[eid].get("excerpt", "") for eid in ids]
+        corpus += [
+            " ".join([claim.get("statement", ""), *claim.get("conditions", []), claim.get("uncertainty", "")])
+            for claim in claims if cited & set(claim.get("evidence_ids", []))
+        ]
+        corpus += [
+            f"{record.get('value') or ''} {record.get('findings') or ''}"
+            for record in records if cited & set(record.get("evidence_ids", []))
+        ]
+        missing = sorted(values - measurement_values("\n".join(corpus)), key=float)
+        if missing:
+            issues.append(issue(
+                "numeric_citation_mismatch",
+                f"인용 근거에 없는 수치({', '.join(missing)}): {text.strip()[:60]}",
+                section_id,
+            ))
     return issues
 
 

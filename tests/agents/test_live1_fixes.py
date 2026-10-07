@@ -96,3 +96,21 @@ def test_supervisor_summary_carries_evidence_count_and_next_report_version():
     summary = state_summary(state)
     assert summary["perspectives"]["domain"]["evidence_count"] == 16
     assert summary["next_report_is"] == "version 2"
+
+
+def test_line_citing_evidence_without_its_number_is_blocking():
+    # live 2차: LLM writer가 technical 주장의 93.3%를 수치가 없는 도메인 근거에 붙였다.
+    from agents.report.validators import _citation_binding_issues
+
+    context = {
+        "evidence_store": {
+            "domain:ev:x": {"excerpt": "MLA reduces the KV cache to 70KB per token in DeepSeek-V3."},
+            "technical:ev:y": {"excerpt": "DeepSeek-V2 reduces the KV cache by 93.3% compared with DeepSeek 67B."},
+        },
+        "claims": {},
+        "findings": {},
+    }
+    mixed = "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄인다. 〔근거: domain:ev:x〕"
+    bound = "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄인다. 〔근거: technical:ev:y〕"
+    assert [item["code"] for item in _citation_binding_issues("domain", mixed, context)] == ["numeric_citation_mismatch"]
+    assert _citation_binding_issues("domain", bound, context) == []
