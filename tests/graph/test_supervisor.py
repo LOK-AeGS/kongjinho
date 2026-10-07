@@ -651,3 +651,40 @@ def test_consumed_directive_is_removed_on_next_dispatch():
     update = decide(state)
     assert update["next"] == ["report"]
     assert "report" not in update["rework"]
+
+
+def test_worse_rework_result_keeps_previous_findings():
+    # live 4차: stakeholder 재작업이 근거 1→0건으로 결과를 악화시켰다.
+    previous = {"status": "partial", "records": [{"evidence_ids": ["ev1", "ev2"]}], "claims": [], "gaps": []}
+    worse = {"status": "partial", "records": [], "claims": [], "gaps": [{"reason": "blocked"}]}
+    worker = as_worker("stakeholder", lambda view: {"stakeholder_findings": worse, "evidence_store": {}})
+    state = {
+        "stakeholder_findings": previous,
+        "evidence_store": {"ev1": {}, "ev2": {}},
+        "rework": {"stakeholder": {"reason": "근거 부족", "focus": [], "round": 1, "max_search_rounds": 2,
+                                   "feedback": [], "created_step": 3}},
+        "node_status": {"stakeholder": {"status": "done", "attempts": 1, "completed_step": 2}},
+        "step_count": 3,
+    }
+    update = worker(state)
+    assert update["stakeholder_findings"] is previous
+    assert "이전 결과 유지" in update["node_status"]["stakeholder"]["note"]
+    assert update["node_status"]["stakeholder"]["attempts"] == 2
+
+
+def test_better_rework_result_replaces_previous_findings():
+    previous = {"status": "partial", "records": [{"evidence_ids": ["ev1"]}], "claims": [], "gaps": []}
+    better = {"status": "partial", "records": [{"evidence_ids": ["ev1", "ev2", "ev3"]}], "claims": [], "gaps": []}
+    worker = as_worker("market", lambda view: {"market_findings": better,
+                                               "evidence_store": {"ev2": {}, "ev3": {}}})
+    state = {
+        "market_findings": previous,
+        "evidence_store": {"ev1": {}},
+        "rework": {"market": {"reason": "근거 부족", "focus": [], "round": 1, "max_search_rounds": 2,
+                              "feedback": [], "created_step": 3}},
+        "node_status": {"market": {"status": "done", "attempts": 1, "completed_step": 2}},
+        "step_count": 3,
+    }
+    update = worker(state)
+    assert update["market_findings"] is better
+    assert "note" not in update["node_status"]["market"]

@@ -256,7 +256,8 @@ def _usable_claims(context: dict, perspective: str) -> list[dict]:
         evidence_ids = claim.get("evidence_ids", [])
         if any(eid not in store for eid in evidence_ids):
             continue
-        if claim.get("basis") in {"direct", "direct_evidence"} and not evidence_ids:
+        if not evidence_ids:
+            # 인용할 근거가 없는 주장은 사실 문장으로 싣지 않는다(공백·한계는 별도 섹션에 남는다).
             continue
         if _violates_report_rules(claim.get("statement", ""), evidence_ids, context):
             continue
@@ -691,6 +692,19 @@ class DeterministicSectionWriter:
         return draft
 
 
+NUMERIC_EXCLUSION_REASON = "수치가 인용 근거 원문에서 확인되지 않아 제외"
+
+
+def _writer_gap(gap):
+    """근거로 확인되지 않아 제외한 수치는 LLM 입력에서도 뺀다.
+
+    live 4차: 도메인 gap의 missing_evidence(5.76, 35.7)를 보고 LLM이 그 수치를 사실 문장으로 다시 썼다.
+    """
+    if isinstance(gap, dict) and NUMERIC_EXCLUSION_REASON in str(gap.get("reason") or ""):
+        return {**gap, "missing_evidence": []}
+    return gap
+
+
 def _synthesis_view(section_id: SectionId, context: NormalizedInput, limit: int) -> dict:
     """시사점 계열 섹션에 synthesis 전체 대신 그 섹션에 필요한 행만 선별해 넘긴다."""
     synthesis = context["synthesis"]
@@ -773,7 +787,7 @@ def section_payload(
             "status": source.get("status"),
             "claims": [] if section_id == "trl" else claims,
             "records": [] if section_id in {"background", "technology_overview"} else records,
-            "gaps": list(source.get("gaps") or [])[:limit],
+            "gaps": [_writer_gap(gap) for gap in list(source.get("gaps") or [])[:limit]],
         }
         payload["omitted"] = {
             "claims": {"total": total_claims, "kept": len(claims)},

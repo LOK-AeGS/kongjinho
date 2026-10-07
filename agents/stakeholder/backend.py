@@ -1,7 +1,9 @@
 """검색은 URL 발견만 담당하며, 구조화에는 직접 가져온 원문 block만 전달한다."""
 
 import json
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,6 +11,7 @@ from .models import Extraction
 from .web import PageFetcher
 
 PROMPT_VERSION = "stakeholder-v0.3.1"
+MAX_PARALLEL_SEARCHES = 6
 SEARCH_INSTRUCTIONS = """데이터센터 LLM 추론의 이해관계자 반응에 대한 원문 URL을 찾는다.
 지정 기술과 지정 관계자 그룹만 조사한다. support/counter/neutral을 모두 탐색하되 없는 반응은 만들지 않는다.
 DeepSeek-V2 MLA와 V3/R1/회사 일반론, ITME와 다른 CXL 제품을 구분한다.
@@ -88,16 +91,53 @@ class OpenAIBackend:
         )
         self.allowed_domains = list(allowed_domains)
         self.last_call = 0.0
+        self._pace_lock = threading.Lock()
 
     def _pace(self):
-        time.sleep(max(0, 1.0 - (time.monotonic() - self.last_call)))
-        self.last_call = time.monotonic()
+        # 병렬 호출도 시작 간격 1초를 지키도록 잠근다(요청 폭주 방지).
+        with self._pace_lock:
+            time.sleep(max(0, 1.0 - (time.monotonic() - self.last_call)))
+            self.last_call = time.monotonic()
+
+    def _discover(self, request, query, technical_findings):
+        """질의 하나의 웹 검색(URL 발견). 질의끼리 독립이라 병렬로 실행한다."""
+        self._pace()
+        tool = {"type": "web_search", "search_context_size": "medium"}
+        if self.allowed_domains:
+            tool["filters"] = {"allowed_domains": self.allowed_domains}
+        response = self.client.responses.create(
+            model=self.model,
+            instructions=SEARCH_INSTRUCTIONS,
+            input=json.dumps({
+                "query": query,
+                "as_of_date": request["as_of_date"],
+                "tech_profiles": technical_findings,
+            }, ensure_ascii=False),
+            tools=[tool],
+            tool_choice="required",
+            include=["web_search_call.action.sources"],
+            max_tool_calls=2,
+            max_output_tokens=8000,
+            store=False,
+        )
+        return unpack_search(response)
 
     def search(self, request, queries, technical_findings):
         if self.offline:
             raise RuntimeError("offline mode requires recorded fixture backend; network disabled")
+        # 웹 검색 LLM 호출이 질의당 약 55초로 이 에이전트 시간의 대부분이었다(live 4차: 6개 순차 약 5분 50초).
+        # 호출만 병렬로 돌리고, 원문 수집은 PageFetcher의 캐시·요청 간격을 지키도록 질의 순서대로 한다.
+        with ThreadPoolExecutor(max_workers=max(1, min(MAX_PARALLEL_SEARCHES, len(queries)))) as pool:
+            futures = [pool.submit(self._discover, request, query, technical_findings) for query in queries]
+            outcomes = []
+            for future in futures:
+                try:
+                    outcomes.append((future.result(), None))
+                except Exception as exc:
+                    outcomes.append((None, exc))
+
         logs, pages, errors = [], {}, []
-        for query in queries:
+        for query, (found, exc) in zip(queries, outcomes):
             log = {
                 **query,
                 "provider": "openai.responses.web_search",
@@ -112,26 +152,8 @@ class OpenAIBackend:
                 "urls": [],
             }
             try:
-                self._pace()
-                tool = {"type": "web_search", "search_context_size": "medium"}
-                if self.allowed_domains:
-                    tool["filters"] = {"allowed_domains": self.allowed_domains}
-                response = self.client.responses.create(
-                    model=self.model,
-                    instructions=SEARCH_INSTRUCTIONS,
-                    input=json.dumps({
-                        "query": query,
-                        "as_of_date": request["as_of_date"],
-                        "tech_profiles": technical_findings,
-                    }, ensure_ascii=False),
-                    tools=[tool],
-                    tool_choice="required",
-                    include=["web_search_call.action.sources"],
-                    max_tool_calls=2,
-                    max_output_tokens=8000,
-                    store=False,
-                )
-                found = unpack_search(response)
+                if exc is not None:
+                    raise exc
                 urls = found["cited_urls"][:5]
                 log.update(
                     status="ok" if urls else "no_results",
@@ -144,9 +166,9 @@ class OpenAIBackend:
                 if any(pages[url]["status"] != "ok" for url in urls):
                     log["status"] = "access_incomplete"
                 log["discovery_notes"] = found["notes"]
-            except Exception as exc:
-                log["error_type"] = type(exc).__name__
-                errors.append(f"{query['id']}: {type(exc).__name__}")
+            except Exception as error:
+                log["error_type"] = type(error).__name__
+                errors.append(f"{query['id']}: {type(error).__name__}")
             logs.append(log)
         batch = {"pages": pages, "search_logs": logs, "errors": errors}
         self.cache_dir.mkdir(parents=True, exist_ok=True)

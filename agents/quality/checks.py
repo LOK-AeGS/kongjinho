@@ -6,23 +6,21 @@ import re
 from collections import Counter, defaultdict
 
 from agents.report.references import source_identity
+from graph.groundedness import (
+    CITATION,
+    GROUNDEDNESS_EXCLUDED_SECTIONS,
+    META_PHRASES,
+    MIN_CITATION_RATIO,
+    _body,
+    citation_ids,
+    factual_body_lines,
+)
 from graph.metrics import MEASUREMENT
 from graph.rules import PROHIBITED_COMPARISON, VERIFICATION_ADVICE_PATTERN
 
 
-CITATION = re.compile(r"〔근거:\s*([^〕]+)〕")
 # 보고서 검증과 같은 목록(graph/rules.py).
 PROHIBITED = PROHIBITED_COMPARISON
-META_PHRASES = (
-    "확인되지 않았다", "미확인", "분량 제한", "판단 보류", "not_assessed",
-    "silent", "unknown", "근거 0건", "찾지 못", "None |", "평가 범위:",
-    "조사 기준일", "공개 정보로 확인 가능한 범위", "판단 보류 상태:",
-)
-GROUNDEDNESS_EXCLUDED_SECTIONS = (
-    "# 2. 기술 선정",
-    "## 5.5 남은 확인 과제",
-    "# 6. 한계점",
-)
 SECTIONS = {
     "technical": "4.1 기술 성숙도(TRL)",
     "market": "4.2 시장성",
@@ -34,44 +32,6 @@ SECTIONS = {
 # 병리 사례·bias_onesided의 1.0에 가까운 집중만 실패로 분리한다.
 SECTION_SOURCE_WARNING_THRESHOLD = 0.6
 SECTION_SOURCE_FAILURE_THRESHOLD = 0.8
-
-
-def citation_ids(text: str) -> list[str]:
-    return [item.strip() for group in CITATION.findall(text or "") for item in group.split(",") if item.strip()]
-
-
-def _body(markdown: str) -> str:
-    head = markdown.partition("# REFERENCE")[0]
-    start = head.find("# SUMMARY")
-    return head[start:] if start >= 0 else head
-
-
-def factual_body_lines(markdown: str) -> list[str]:
-    """groundedness 분모가 되는 사실 불릿·표 행을 반환한다."""
-    factual = []
-    lines = _body(markdown).splitlines()
-    excluded_level: int | None = None
-    for index, raw in enumerate(lines):
-        line = raw.strip()
-        if line.startswith("#"):
-            level = len(line) - len(line.lstrip("#"))
-            if line in GROUNDEDNESS_EXCLUDED_SECTIONS:
-                excluded_level = level
-            elif excluded_level is not None and level <= excluded_level:
-                excluded_level = None
-            continue
-        if excluded_level is not None or not line or set(line.replace(" ", "")) <= {"|", "-", ":"}:
-            continue
-        if not line.startswith(("- ", "* ", "|")):
-            continue
-        if line.startswith("|") and index + 1 < len(lines):
-            separator = lines[index + 1].strip().replace(" ", "")
-            if separator and set(separator) <= {"|", "-", ":"}:
-                continue
-        if any(phrase in line for phrase in META_PHRASES):
-            continue
-        factual.append(line)
-    return factual
 
 
 def groundedness(
@@ -92,7 +52,7 @@ def groundedness(
         details.append("존재하지 않는 근거 ID: " + ", ".join(unknown))
     details.extend("측정값 무인용: " + line for line in uncited_measurements)
     details.extend(str(item) for item in (report_violations or []) if str(item).strip())
-    passed = ratio >= 0.8 and not unknown and not uncited_measurements and not report_violations
+    passed = ratio >= MIN_CITATION_RATIO and not unknown and not uncited_measurements and not report_violations
     return {"passed": passed, "score": ratio if not unknown else 0.0, "details": details}
 
 
@@ -208,6 +168,12 @@ def _section(markdown: str, title: str) -> str:
 
 
 def coverage(markdown: str) -> dict:
+    """4개 관점(4.1~4.4)이 각각 인용 근거를 가진 실질 내용으로 다뤄졌는지 본다.
+
+    정책: 근거 부재를 공백으로 명시했더라도 인용이 하나도 없는 관점은 '포괄'로 보지 않는다.
+    과제의 관점 커버리지는 다관점 평가가 실제로 이뤄졌는지를 묻는 항목이라, 근거 0건을 통과시키면
+    취지에 어긋난다(live 4차: stakeholder 근거 0건 → 불합격 유지, 재작업 예산 소진 후 needs_review).
+    """
     missing = []
     for perspective, title in SECTIONS.items():
         body = _section(markdown, title)

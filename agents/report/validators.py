@@ -10,9 +10,10 @@ import re
 
 from agents.report.budget import OVER_BUDGET_TOLERANCE, SectionBudget, body_length
 from agents.report.metrics import METRIC_RULES, metric_violations
-from graph.rules import PROHIBITED_COMPARISON as SHARED_PROHIBITED_COMPARISON
+from graph.rules import PROHIBITED_COMPARISON as SHARED_PROHIBITED_COMPARISON, VERIFICATION_ADVICE_PATTERN
 from agents.report.references import source_identity
 from agents.report.state import SECTION_ORDER, SectionDraft, SectionId, ValidationIssue
+from graph.groundedness import MIN_CITATION_RATIO, factual_body_lines
 from graph.metrics import MEASUREMENT, extract_measurements, measurement_values
 
 
@@ -196,8 +197,9 @@ def validate_section(draft: SectionDraft, context: dict) -> list[ValidationIssue
     if ungrounded:
         issues.append(issue("numeric_grounding", f"근거/claim에 없는 측정값: {', '.join(ungrounded)}", section_id))
 
+    neutral_text = re.sub(VERIFICATION_ADVICE_PATTERN, "", draft["markdown"])
     for expression in PROHIBITED_COMPARISON:
-        if expression in draft["markdown"]:
+        if expression in neutral_text:
             issues.append(issue("prohibited_comparison", f"금지된 서열·권고 표현: {expression}", section_id))
 
     if context.get("not_found_present") and re.search(r"(?:의견|근거|사례|자료).{0,12}(?:없다|존재하지 않는다)", draft["markdown"]):
@@ -205,6 +207,35 @@ def validate_section(draft: SectionDraft, context: dict) -> list[ValidationIssue
 
     issues.extend(_metric_issues(section_id, draft["markdown"]))
     issues.extend(_citation_binding_issues(section_id, draft["markdown"], context))
+    issues.extend(_section_groundedness_issues(section_id, draft["markdown"]))
+    return issues
+
+
+def _section_groundedness_issues(section_id: SectionId, markdown: str) -> list[ValidationIssue]:
+    """품질 평가와 같은 기준(graph/groundedness.py)을 섹션 단위로 미리 적용한다.
+
+    live 4차에서 보고서 LLM이 인용 없는 수치 문장을 써 품질 평가 인용률이 0.51이었는데 보고서 검증은
+    위반 0건이었다. 여기서 차단하면 부분 수정과 결정적 렌더 대체가 같은 섹션에서 작동한다.
+    """
+    factual = factual_body_lines(markdown)
+    if not factual:
+        return []
+    issues: list[ValidationIssue] = []
+    uncited_numbers = [line for line in factual if MEASUREMENT.search(line) and not extract_citations(line)]
+    if uncited_numbers:
+        issues.append(issue(
+            "uncited_measurement",
+            f"인용 없는 수치 문장 {len(uncited_numbers)}개: {uncited_numbers[0][:60]}",
+            section_id,
+        ))
+    cited = sum(1 for line in factual if extract_citations(line))
+    ratio = cited / len(factual)
+    if len(factual) >= 3 and ratio < MIN_CITATION_RATIO:
+        issues.append(issue(
+            "low_citation_ratio",
+            f"사실 문장 인용률 {ratio:.2f}({cited}/{len(factual)}) < {MIN_CITATION_RATIO}",
+            section_id,
+        ))
     return issues
 
 
