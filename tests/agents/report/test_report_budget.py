@@ -84,6 +84,25 @@ class SectionBudgetTests(unittest.TestCase):
         payload = section_payload("market", normalize_state(fixture()))
         self.assertNotIn("omitted", payload)
 
+    def test_claim_flagged_unsupported_by_quality_is_dropped_on_rewrite(self):
+        state = fixture()
+        claim = next(c for c in state["market_findings"]["claims"] if c.get("evidence_ids"))
+        state["eval_result"] = {"passed": False, "criteria": {"groundedness": {"llm": {"unsupported_items": [
+            {"sentence": f"- {claim['text']} 〔근거: {', '.join(claim['evidence_ids'])}〕",
+             "evidence_ids": list(claim["evidence_ids"])},
+        ]}}}}
+        context = normalize_state(state)
+        kept = {c["claim_id"] for c in subgraph.select_claims(context, "market", 50)[0]}
+        before = {c["claim_id"] for c in subgraph.select_claims(normalize_state(fixture()), "market", 50)[0]}
+        self.assertLess(len(kept), len(before))
+        self.assertGreaterEqual(subgraph.quality_excluded_count(context), 1)
+        self.assertTrue(any("직전 품질 평가" in line for line in subgraph._required_upstream_status_lines(context)))
+
+    def test_passed_eval_does_not_drop_claims(self):
+        state = fixture()
+        state["eval_result"] = {"passed": True, "criteria": {}}
+        self.assertEqual(normalize_state(state)["unsupported_items"], [])
+
     def test_llm_omission_sentence_is_replaced_by_counted_note(self):
         from agents.report.writer import _with_omitted_note
 

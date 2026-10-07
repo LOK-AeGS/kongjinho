@@ -24,7 +24,7 @@ from agents.report.budget import (
 )
 from agents.report.prompts import build_section_prompt
 from agents.report.metrics import annotate_metrics, unsupported_metric_rules
-from graph.metrics import MEASUREMENT
+from graph.metrics import MEASUREMENT, measurement_values
 from agents.report.references import collect_references, number_citations, reference_numbers
 from agents.report.state import (
     BODY_SECTION_ORDER,
@@ -228,7 +228,50 @@ def normalize_state(state: dict) -> NormalizedInput:
         "upstream_gaps": list(dict.fromkeys(gaps)),
         "not_found_present": not_found,
         "quality_feedback": list(state.get("report_feedback") or []),
+        "unsupported_items": _quality_unsupported_items(state),
     }
+
+
+def _quality_unsupported_items(state: dict) -> list[dict]:
+    """직전 품질 평가가 인용 근거가 뒷받침하지 않는다고 판정한 문장. 통과했거나 첫 작성이면 비어 있다."""
+    verdict = state.get("eval_result") or {}
+    if not verdict or verdict.get("passed"):
+        return []
+    llm = ((verdict.get("criteria") or {}).get("groundedness") or {}).get("llm") or {}
+    return [item for item in llm.get("unsupported_items") or [] if item.get("evidence_ids")]
+
+
+def _flagged_by_quality(text: str, evidence_ids, context: dict) -> bool:
+    """품질 평가가 지목한 문장의 출처로 보이는 상위 결과인가: 인용 근거 집합이 같고 수치가 겹친다.
+
+    보고서를 다시 써도 같은 상위 주장을 입력으로 받으면 같은 문장이 되살아났다(live: 인용 발췌에 없는
+    '캐시 적중률 향상'을 덧붙인 technical 주장이 v1·v2 모두에 실림). 지목된 결과는 재작성 입력에서 빼고
+    한계점에 건수를 밝힌다.
+    """
+    ids = set(evidence_ids or [])
+    if not ids:
+        return False
+    numbers = measurement_values(text or "")
+    for item in context.get("unsupported_items") or []:
+        if set(item["evidence_ids"]) != ids:
+            continue
+        sentence_numbers = measurement_values(str(item.get("sentence") or ""))
+        if numbers & sentence_numbers or not (numbers or sentence_numbers):
+            return True
+    return False
+
+
+def quality_excluded_count(context: dict) -> int:
+    """직전 품질 평가 지목으로 다시 쓴 보고서에서 뺀 상위 claim·판정 기록 수(한계점에 공개한다)."""
+    count = sum(
+        _flagged_by_quality(claim.get("statement", ""), claim.get("evidence_ids", []), context)
+        for claim in context["claims"].values()
+    )
+    for result in context["findings"].values():
+        for record in (result or {}).get("records", []):
+            text = f"{record.get('value') or ''} {record.get('findings') or ''}"
+            count += _flagged_by_quality(text, record.get("evidence_ids", []), context)
+    return count
 
 
 def _unique(values: Iterable[str]) -> list[str]:
@@ -261,6 +304,8 @@ def _usable_claims(context: dict, perspective: str) -> list[dict]:
             # 인용할 근거가 없는 주장은 사실 문장으로 싣지 않는다(공백·한계는 별도 섹션에 남는다).
             continue
         if _violates_report_rules(claim.get("statement", ""), evidence_ids, context):
+            continue
+        if _flagged_by_quality(claim.get("statement", ""), evidence_ids, context):
             continue
         result.append(claim)
     return result
@@ -350,6 +395,8 @@ def _usable_records(context: dict, perspective: str, *, trl_only: bool = False) 
         if any(eid not in context["evidence_store"] for eid in ids):
             continue
         if not _line_ok(f"{record.get('value') or ''} {record.get('findings') or ''}", ids, context):
+            continue
+        if _flagged_by_quality(f"{record.get('value') or ''} {record.get('findings') or ''}", ids, context):
             continue
         records.append(record)
     return records
@@ -723,7 +770,10 @@ def _synthesis_view(section_id: SectionId, context: NormalizedInput, limit: int)
     if section_id == "summary":
         relations, _ = select_relations(context, {"agreement", "conflict"}, 2)
         return {
-            "summary_claims": [c for c in synthesis.get("summary_claims", [])][:limit],
+            "summary_claims": [
+                c for c in synthesis.get("summary_claims", [])
+                if not _flagged_by_quality(str(c.get("text") or ""), c.get("evidence_ids", []), context)
+            ][:limit],
             "cross_findings": [row for row, _, _ in relations],
             "status": synthesis.get("status"),
         }
@@ -892,6 +942,11 @@ def _required_upstream_status_lines(context: NormalizedInput) -> list[str]:
         # 분량 생략과 마찬가지로 규칙 위반 제외도 숨기지 않는다(전체 목록은 final_state.json).
         lines.append(
             f"- 우열 표현이나 근거로 확인되지 않는 수치 조건을 담은 상위 결과 {excluded}건은 보고서에 싣지 않았다(전체 목록은 final_state.json)."
+        )
+    flagged = quality_excluded_count(context)
+    if flagged:
+        lines.append(
+            f"- 직전 품질 평가에서 인용 근거가 뒷받침하지 않는다고 판정된 상위 결과 {flagged}건은 다시 쓴 보고서에서 뺐다(판정 내용은 final_state.json의 eval_result)."
         )
     return lines
 
