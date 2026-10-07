@@ -193,6 +193,26 @@ class RelationsTest(unittest.TestCase):
         hw_sx1 = [f for f in run(state)["cross_findings"] if f["rule_id"] == "SX1" and f["technology"] == "hw"]
         self.assertTrue(hw_sx1)
 
+    def test_sx3_skips_condition_recoverable_from_cited_quote(self):
+        """live 5차: 원문에 'up to … CPU-offload'가 있는데 주장 구조화에서 빠져 자기모순 상충 문장이 보고서에 실렸다."""
+        state = load()
+        claim = next(c for c in state["market_findings"]["claims"] if c["claim_id"] == "market:claim:003")
+        state["evidence_store"][claim["evidence_ids"][0]]["quote"] = (
+            "ITME achieves up to a 35.7% throughput improvement over the CPU-offload baseline"
+        )
+        sx3 = [f for f in run(state)["cross_findings"]
+               if f["rule_id"] == "SX3" and "market/claim/market:claim:003" in f["record_refs"]]
+        self.assertEqual(sx3, [])
+
+    def test_sx3_keeps_forbidden_number_even_if_quote_has_it(self):
+        state = load()
+        claim = next(c for c in state["market_findings"]["claims"] if c["claim_id"] == "market:claim:003")
+        claim.update(text="MLA는 훈련 비용을 42.5% 줄였다.", technology="sw")
+        state["evidence_store"][claim["evidence_ids"][0]]["quote"] = "DeepSeek-V2 saves 42.5% of training costs"
+        sx3 = [f for f in run(state)["cross_findings"]
+               if f["rule_id"] == "SX3" and "market/claim/market:claim:003" in f["record_refs"]]
+        self.assertTrue(sx3)
+
     def test_unknown_basis_does_not_trigger_sx2(self):
         refs = [r for f in run(load())["cross_findings"] if f["rule_id"] == "SX2" for r in f["record_refs"]]
         self.assertNotIn("domain/hw/전력·발열", refs)
