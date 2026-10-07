@@ -32,6 +32,8 @@ REQUIRED_HEADINGS = (
     "# REFERENCE",
 )
 
+MAX_SUMMARY_CHARS = 1000
+
 PROHIBITED_COMPARISON = (
     "승자",
     "추천",
@@ -170,6 +172,11 @@ def validate_section(draft: SectionDraft, context: dict) -> list[ValidationIssue
                 section_id,
             )
         )
+
+    if section_id == "summary":
+        body = re.sub(r"〔근거:[^〕]*〕", "", draft["markdown"]).split("\n", 1)[-1]
+        if len(body.strip()) > MAX_SUMMARY_CHARS:
+            issues.append(issue("summary_too_long", f"SUMMARY가 반 페이지({MAX_SUMMARY_CHARS}자)를 넘음: {len(body.strip())}자", section_id))
 
     unknown_evidence = [eid for eid in draft["evidence_ids"] if eid not in store]
     if unknown_evidence:

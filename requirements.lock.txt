@@ -39,3 +39,7 @@ uuid_utils==0.17.1
 websockets==16.1.1
 xxhash==4.0.1
 zstandard==0.25.0
+langgraph-checkpoint-sqlite==3.1.1
+reportlab==4.5.1
+pytest==9.1.1
+matplotlib==3.11.2

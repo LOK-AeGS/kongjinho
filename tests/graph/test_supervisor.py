@@ -66,7 +66,7 @@ class Harness:
         self.calls["report"] = self.calls.get("report", 0) + 1
         store = state["evidence_store"]
         ids = sorted({next(i for i, e in store.items() if e["perspective"] == p) for p in ("technical", "market", "stakeholder", "domain") if any(e["perspective"] == p for e in store.values())})
-        text = self.report_text(self.calls["report"]) if self.report_text else "# 보고서\n각 관점의 평가는 다음과 같다. 〔근거: " + ", ".join(ids) + "〕\n# REFERENCE\n"
+        text = self.report_text(self.calls["report"]) if self.report_text else "# SUMMARY\n각 관점의 평가는 다음과 같다. 〔근거: " + ", ".join(ids) + "〕\n# REFERENCE\n"
         return {"report_sections": {"final_markdown": text}, "references": {},
                 "quality_by_perspective": {"report": {"status": "passed", "violations": [], "warnings": [], "checked_claim_ids": []}}}
 
@@ -143,18 +143,19 @@ class RoutingTest(unittest.TestCase):
 
 class QualityLoopTest(unittest.TestCase):
     def test_quality_failure_loops_back_then_passes(self):
-        bad_then_good = lambda n: ("# 보고서\n이 기술을 추천한다. 〔근거: ev:technical:0, ev:market:0, ev:stakeholder:0, ev:domain:0〕\n" if n == 1
-                                   else "# 보고서\n관점별 평가. 〔근거: ev:technical:0, ev:market:0, ev:stakeholder:0, ev:domain:0〕\n")
+        bad_then_good = lambda n: ("# SUMMARY\n이 기술을 추천한다. 〔근거: ev:technical:0, ev:market:0, ev:stakeholder:0, ev:domain:0〕\n# REFERENCE\n" if n == 1
+                                   else "# SUMMARY\n관점별 평가. 〔근거: ev:technical:0, ev:market:0, ev:stakeholder:0, ev:domain:0〕\n# REFERENCE\n")
         h = Harness(report_text=bad_then_good)
         final, _, _ = run(h)
         self.assertEqual(h.calls["report"], 2)
+        self.assertEqual(h.calls["synthesis"], 1)  # 보고서만 고치면 되는 미달은 평가 종합을 다시 돌리지 않는다
         self.assertEqual(final["quality_iterations"], 2)
         self.assertTrue(final["quality_verdict"]["passed"])
         self.assertIn(("quality_rework", ("report",)), path(final))
         self.assertEqual(final["final_status"], "ok")
 
     def test_quality_that_never_passes_stops_at_loop_limit(self):
-        h = Harness(report_text=lambda n: "# 보고서\n이 기술을 추천한다.\n")
+        h = Harness(report_text=lambda n: "# SUMMARY\n이 기술을 추천한다.\n")
         final, _, _ = run(h)
         self.assertEqual(final["quality_iterations"], 2)
         self.assertEqual(h.calls["report"], 2)
@@ -187,22 +188,70 @@ class QualityLoopTest(unittest.TestCase):
         node = make_quality_node()
         store = {e["id"]: e for p in ("technical", "market", "stakeholder", "domain") for e in (evidence(p, 0), evidence(p, 1), evidence(p, 2))}
         ids = "ev:technical:0, ev:market:0, ev:stakeholder:0, ev:domain:0"
-        ok = node({"report_sections": {"final_markdown": f"관점별 평가 〔근거: {ids}〕"}, "evidence_store": store})["quality_verdict"]
+        ok = node({"report_sections": {"final_markdown": f"# SUMMARY\n관점별 평가 〔근거: {ids}〕\n# REFERENCE\n"}, "evidence_store": store})["quality_verdict"]
         self.assertTrue(ok["passed"])
-        negated = node({"report_sections": {"final_markdown": f"특정 기술을 추천하지 않는다. 〔근거: {ids}〕"}, "evidence_store": store})["quality_verdict"]
+        negated = node({"report_sections": {"final_markdown": f"# SUMMARY\n특정 기술을 추천하지 않는다. 〔근거: {ids}〕\n# REFERENCE\n"}, "evidence_store": store})["quality_verdict"]
         self.assertTrue(negated["passed"])
-        bad = node({"report_sections": {"final_markdown": "A 기술이 승자다. 〔근거: ev:nope〕"}, "evidence_store": store})["quality_verdict"]
+        bad = node({"report_sections": {"final_markdown": "# SUMMARY\nA 기술이 승자다. 〔근거: ev:nope〕\n# REFERENCE\n"}, "evidence_store": store})["quality_verdict"]
         self.assertEqual(set(bad["failed_checks"]), {"groundedness", "neutrality", "coverage"})
-        missing = node({"report_sections": {"final_markdown": "〔근거: ev:technical:0〕"}, "evidence_store": store})["quality_verdict"]
+        missing = node({"report_sections": {"final_markdown": "# SUMMARY\n〔근거: ev:technical:0〕\n# REFERENCE\n"}, "evidence_store": store})["quality_verdict"]
         self.assertEqual(missing["failed_checks"], ["coverage"])
         self.assertEqual(missing["target_perspectives"], ["report"])
+
+
+class GroundednessTest(unittest.TestCase):
+    """groundedness 는 '출처로 추적되는가'를 본다: 근거 ID · 근거가 확정된 주장 ID · 코퍼스 문서 ID 는 통과, 확정되지 않은 청크 ID 는 실패."""
+
+    def state(self):
+        store = {e["id"]: {**e, "doc_id": "arxiv:1.0v1"} for e in (evidence("technical", 0), evidence("market", 0))}
+        return {"evidence_store": store, "corpus_manifest": [{"doc_id": "arxiv:1.0v1"}, {"doc_id": "arxiv:2.0v1"}],
+                "technical_findings": {"claims": [{"claim_id": "technical:claim:ok", "evidence_ids": ["ev:technical:0"]},
+                                                   {"claim_id": "technical:claim:orphan", "evidence_ids": ["ev:gone:0"]}]},
+                "synthesis": {"summary_claims": [{"claim_id": "synthesis:claim:1", "evidence_ids": ["ev:market:0"]}]}}
+
+    def check(self, text):
+        from graph.quality import check_groundedness
+        return check_groundedness(self.state(), text)[0]
+
+    def test_evidence_claim_and_document_ids_are_traceable(self):
+        self.assertEqual(self.check("〔근거: ev:technical:0〕 〔근거: technical:claim:ok, synthesis:claim:1〕 〔근거: arxiv:2.0v1〕"), [])
+
+    def test_unconfirmed_chunk_and_orphan_claim_ids_fail(self):
+        issues = self.check("〔근거: technical:chunk:abc123, technical:claim:orphan, ev:technical:0〕")
+        self.assertEqual(len(issues), 1)
+        self.assertIn("technical:chunk:abc123", issues[0]); self.assertIn("technical:claim:orphan", issues[0])
+        self.assertNotIn("ev:technical:0", issues[0])
+
+    def test_malformed_closing_bracket_does_not_glue_ids_together(self):
+        text = "〔근거: ev:technical:0】.\n\n〔근거: ev:market:0〕"
+        self.assertEqual(self.check(text), [])
+
+    def test_no_citation_at_all_fails(self):
+        self.assertIn("인용이 하나도 없음", self.check("근거 없는 보고서")[0])
+
+
+class StructureCheckTest(unittest.TestCase):
+    def check(self, text):
+        from graph.quality import check_structure
+        return check_structure({"report_sections": {"final_markdown": text}})[0]
+
+    def test_summary_first_reference_last_passes(self):
+        self.assertEqual(self.check("# SUMMARY\n짧은 요약\n\n# 1. 본문\n내용\n\n# REFERENCE\n- 출처"), [])
+
+    def test_wrong_order_and_long_summary_fail(self):
+        self.assertTrue(self.check("# 1. 본문\n내용\n\n# SUMMARY\n요약\n\n# REFERENCE\n"))
+        self.assertTrue(self.check("# SUMMARY\n" + "가" * 1200 + "\n\n# 1. 본문\n내용\n\n# REFERENCE\n"))
+        self.assertTrue(self.check("# SUMMARY\n요약\n\n# REFERENCE\n\n# 6. 한계점\n끝"))
+
+    def test_no_report_means_no_structure_check(self):
+        self.assertEqual(self.check(""), [])
 
 
 class LengthCheckTest(unittest.TestCase):
     def verdict(self, layout):
         store = {e["id"]: e for p in ("technical", "market", "stakeholder", "domain") for e in (evidence(p, 0), evidence(p, 1), evidence(p, 2))}
         ids = "ev:technical:0, ev:market:0, ev:stakeholder:0, ev:domain:0"
-        state = {"report_sections": {"final_markdown": f"관점별 평가 〔근거: {ids}〕"}, "evidence_store": store,
+        state = {"report_sections": {"final_markdown": f"# SUMMARY\n관점별 평가 〔근거: {ids}〕\n# REFERENCE\n"}, "evidence_store": store,
                  "run_meta": {"report": {"pdf_layout": layout}} if layout else {}}
         return make_quality_node()(state)["quality_verdict"]
 
@@ -269,13 +318,13 @@ class LLMGuardTest(unittest.TestCase):
         return SimpleNamespace(responses=SimpleNamespace(parse=parse))
 
     def test_valid_llm_proposal_is_used(self):
-        proposer = make_llm_proposer(self.fake_client({"action": "dispatch", "targets": ["technical"], "reason": "기술 조사 먼저"}), "gpt-6.1-sol")
+        proposer = make_llm_proposer(self.fake_client({"action": "dispatch", "targets": ["technical"], "reason": "기술 조사 먼저"}), "gpt-5.5")
         final, _, _ = run(Harness(), supervisor=make_supervisor(proposer))
         self.assertEqual(final["decision_log"][0]["source"], "llm")
         self.assertEqual(final["decision_log"][0]["reason"], "기술 조사 먼저")
 
     def test_illegal_llm_proposal_falls_back_to_rule(self):
-        proposer = make_llm_proposer(self.fake_client({"action": "report", "targets": [], "reason": "바로 보고서"}), "gpt-6.1-sol")
+        proposer = make_llm_proposer(self.fake_client({"action": "report", "targets": [], "reason": "바로 보고서"}), "gpt-5.5")
         h = Harness()
         final, _, _ = run(h, supervisor=make_supervisor(proposer))
         self.assertTrue(all(d["source"] == "fallback" for d in final["decision_log"][:2]))
@@ -283,7 +332,7 @@ class LLMGuardTest(unittest.TestCase):
         self.assertEqual(final["final_status"], "ok")
 
     def test_llm_error_falls_back_and_graph_still_finishes(self):
-        proposer = make_llm_proposer(self.fake_client(exc=RuntimeError("model not found")), "gpt-6.1-sol")
+        proposer = make_llm_proposer(self.fake_client(exc=RuntimeError("model not found")), "gpt-5.5")
         final, _, _ = run(Harness(), supervisor=make_supervisor(proposer))
         self.assertEqual({d["source"] for d in final["decision_log"]}, {"fallback"})
         self.assertIn("LLM 호출 실패", final["decision_log"][0]["reason"])
@@ -305,3 +354,64 @@ class LLMGuardTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StateContractTest(unittest.TestCase):
+    """README 의 State Schema 7항목이 코드에서 실제로 성립하는지."""
+
+    def test_trace_id_is_shared_by_state_log_and_config(self):
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            state = new_state(run_id="abc123")
+            app = build_graph(**Harness().nodes(), supervisor=make_supervisor(log_dir=tmp), checkpointer=InMemorySaver())
+            config = {"configurable": {"thread_id": state["run_id"]}, "metadata": {"trace_id": state["trace_id"]}, "recursion_limit": 50}
+            final = app.invoke(state, config)
+            lines = [json.loads(line) for line in (Path(tmp) / f"{final['trace_id']}.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(final["trace_id"], "trace-abc123")
+        self.assertTrue(all(entry["trace_id"] == "trace-abc123" and entry["run_id"] == "abc123" for entry in lines))
+        self.assertEqual(app.get_state(config).config["configurable"]["thread_id"], "abc123")
+
+    def test_conflicting_concurrent_evidence_writes_keep_existing_and_fill_blanks(self):
+        from graph.state import merge_evidence_store
+        old = evidence("market", 0)
+        new = {**old, "quote": "다른 인용", "title": "", "url": None, "metric_tag": "tag"}
+        merged = merge_evidence_store({old["id"]: {**old, "metric_tag": None}}, {old["id"]: new})[old["id"]]
+        self.assertEqual(merged["quote"], old["quote"])      # 기존 값 우선
+        self.assertEqual(merged["metric_tag"], "tag")        # 빈 필드만 보충
+        self.assertEqual(merge_evidence_store(None, None), {})
+
+    def test_sqlite_checkpoint_survives_a_new_process_graph(self):
+        try:
+            import sqlite3
+
+            from langgraph.checkpoint.sqlite import SqliteSaver
+        except ImportError:
+            self.skipTest("langgraph-checkpoint-sqlite 미설치")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "cp.sqlite")
+            config = {"configurable": {"thread_id": "resume-1"}, "recursion_limit": 50}
+            first = build_graph(**Harness().nodes(), checkpointer=SqliteSaver(sqlite3.connect(db, check_same_thread=False)))
+            final = first.invoke(new_state(run_id="resume-1"), config)
+            second = build_graph(**Harness().nodes(), checkpointer=SqliteSaver(sqlite3.connect(db, check_same_thread=False)))
+            saved = second.get_state(config).values  # 새 그래프 객체가 파일에서 상태를 읽는다
+        self.assertEqual(saved["final_status"], final["final_status"])
+        self.assertEqual(saved["node_status"]["report"], final["node_status"]["report"])
+        self.assertEqual(saved["step_count"], final["step_count"])
+
+
+class OfflineMainTest(unittest.TestCase):
+    def test_offline_main_produces_report_and_terminates(self):
+        import subprocess
+        import tempfile
+        root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as tmp:
+            done = subprocess.run([sys.executable, "main.py", "--no-pdf", "--output-dir", tmp], cwd=root, capture_output=True, text=True, timeout=120)
+            folders = list(Path(tmp).iterdir())
+            self.assertEqual(len(folders), 1, done.stdout + done.stderr)
+            report = (folders[0] / "report.md").read_text(encoding="utf-8")
+            summary = (folders[0] / "summary.md").read_text(encoding="utf-8")
+        self.assertTrue(report.lstrip().startswith("# SUMMARY") and "# REFERENCE" in report)
+        self.assertIn("## Supervisor", summary)
+        self.assertIn("supervisor: 종료 상태", done.stdout)

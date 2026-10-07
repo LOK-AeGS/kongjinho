@@ -26,7 +26,7 @@ from graph.sufficiency import (
 
 STAGE_MAX_ATTEMPTS = 4
 ACTIONS = ("dispatch", "synthesis", "report", "quality", "quality_rework", "finish")
-DEFAULT_SUPERVISOR_MODEL = "gpt-6.1-sol"
+DEFAULT_SUPERVISOR_MODEL = "gpt-5.5"
 
 
 # ---------------------------------------------------------------- 단계 상태
@@ -118,9 +118,9 @@ def combine(first: dict, second: dict) -> dict:
     return merged
 
 
-def invalidate_downstream(state: dict) -> dict:
+def invalidate_downstream(state: dict, stages: tuple[str, ...] = ("synthesis", "report")) -> dict:
     stale = {}
-    for stage in ("synthesis", "report"):
+    for stage in stages:
         previous = (state.get("node_status") or {}).get(stage)
         if previous:
             stale[stage] = {"status": "stale", "error": None, "attempts": previous.get("attempts", 0)}
@@ -146,7 +146,9 @@ def apply_quality_rework(state: dict, targets: list[str]) -> dict:
     feedback = [{"technology": "both", "perspective": "report", "criterion": check, "reason": "; ".join(verdict["details"].get(check, []))[:200],
                  "missing_evidence": []} for check in verdict["failed_checks"]]
     requests = {t: make_rework_request(state, t, "quality", feedback if t == "report" else None) for t in targets}
-    return combine({"rework_requests": requests}, invalidate_downstream(state))
+    # 보고서만 고치면 되는 미달(groundedness·중립성·분량…)에서는 평가 종합을 다시 돌릴 필요가 없다.
+    stages = ("report",) if set(targets) == {"report"} else ("synthesis", "report")
+    return combine({"rework_requests": requests}, invalidate_downstream(state, stages))
 
 
 def degraded_reasons(state: dict) -> list[str]:

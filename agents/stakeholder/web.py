@@ -2,6 +2,7 @@
 import hashlib
 import json
 import re
+import threading
 import time
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -60,7 +61,8 @@ class PageFetcher:
         self.client = client or httpx.Client(timeout=20, follow_redirects=True, max_redirects=4)
         self.min_interval = min_interval
         self.allowed_domains = tuple(allowed_domains)
-        self.last_request = 0.0
+        self.last_request = {}  # 호스트별 마지막 요청 시각 (같은 사이트에만 간격을 둔다)
+        self.lock = threading.Lock()
         self.memory = {}
 
     def _get(self, url):
@@ -69,8 +71,10 @@ class PageFetcher:
             raise ValueError('invalid_url')
         if self.allowed_domains and not any(p.hostname == d or p.hostname.endswith('.' + d) for d in self.allowed_domains):
             raise ValueError('domain_filtered')
-        time.sleep(max(0, self.min_interval - (time.monotonic() - self.last_request)))
-        self.last_request = time.monotonic()
+        with self.lock:  # 같은 호스트는 min_interval 간격으로, 다른 호스트는 동시에 요청
+            start = max(time.monotonic(), self.last_request.get(p.hostname, 0.0) + self.min_interval)
+            self.last_request[p.hostname] = start
+        time.sleep(max(0, start - time.monotonic()))
         r = self.client.get(url, headers={'User-Agent': 'RAGStakeholderResearch/0.3'})
         return r.status_code, dict(r.headers), r.content, str(r.url)
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from typing import Iterable
 
@@ -126,6 +127,12 @@ def normalize_state(state: dict) -> NormalizedInput:
     domain = str(state.get("domain") or request.get("scope") or "")
     as_of_date = str(request.get("as_of") or "")
     initial_revisions = int((state.get("retries") or {}).get("report", 0) or 0)
+    # 품질 평가 미달로 다시 돌 때: 이전 실행의 수정 횟수를 이어받으면 repair 가 한 번도 돌지 않아 같은 글이 나온다.
+    hint = state.get("rework_hint") or {}
+    feedback: list[str] = []
+    if hint.get("requested_by") == "quality":
+        initial_revisions = 0
+        feedback = [f"{g.get('criterion', '')}: {g.get('reason', '')}".strip(": ") for g in hint.get("gaps") or []][:8]
 
     findings: dict[str, dict | None] = {
         "technical": state.get("technical_findings"),
@@ -184,7 +191,8 @@ def normalize_state(state: dict) -> NormalizedInput:
         "domain": domain,
         "technologies": technologies,
         "initial_revision_rounds": initial_revisions,
-        "max_revision_rounds": MAX_REPORT_REVISIONS,
+        "max_revision_rounds": MAX_REPORT_REVISIONS + (1 if feedback else 0),
+        "quality_feedback": feedback,
         "findings": findings,
         "claims": claims,
         "evidence_store": evidence_store,
@@ -451,6 +459,23 @@ class DeterministicSectionWriter:
         return draft
 
 
+_CHUNK_REASON = re.compile(r"(원문에 없는 인용문|reference_violation)[^/;]*")
+_CHUNK_ID = re.compile(r"\b[a-z]+:chunk:[0-9a-f]+")
+_INTERNAL_KEYS = ("meta", "input_evidence_ids", "search_logs", "gate_traces", "quality_report")
+
+
+def _scrub_text(value):
+    """기각된 인용 후보(청크 ID)가 보고서 인용으로 번지지 않도록 중립 문장으로 바꾼다."""
+    if isinstance(value, str):
+        value = _CHUNK_REASON.sub("일부 인용 후보가 원문 대조에서 기각됨", value)
+        return _CHUNK_ID.sub("(기각된 인용 후보)", value)
+    if isinstance(value, list):
+        return list(dict.fromkeys(_scrub_text(item) for item in value)) if all(isinstance(i, str) for i in value) else [_scrub_text(i) for i in value]
+    if isinstance(value, dict):
+        return {key: _scrub_text(item) for key, item in value.items() if key not in _INTERNAL_KEYS}
+    return value
+
+
 def section_payload(section_id: SectionId, context: NormalizedInput) -> dict:
     """외부 writer에 전체 evidence_store 대신 해당 섹션의 최소 입력만 제공한다."""
     perspective = {
@@ -470,11 +495,13 @@ def section_payload(section_id: SectionId, context: NormalizedInput) -> dict:
         "technologies": context["technologies"],
     }
     if perspective:
-        payload["findings"] = context["findings"].get(perspective)
+        payload["findings"] = _scrub_text(deepcopy(context["findings"].get(perspective)))
     elif section_id in {"summary", "comparison_matrix", "conditions", "conflicts", "shared_and_complement", "open_questions", "limitations"}:
-        payload["synthesis"] = context["synthesis"]
+        payload["synthesis"] = _scrub_text(deepcopy(context["synthesis"]))
         payload["upstream_statuses"] = context["upstream_statuses"]
-        payload["upstream_gaps"] = context["upstream_gaps"]
+        payload["upstream_gaps"] = _scrub_text(list(context["upstream_gaps"]))
+    if context.get("quality_feedback"):
+        payload["quality_feedback"] = context["quality_feedback"]
     claim_ids = set()
     raw = str(payload)
     for claim_id in context["claims"]:
@@ -491,7 +518,10 @@ def section_payload(section_id: SectionId, context: NormalizedInput) -> dict:
             for eid in context["claims"][claim_id].get("evidence_ids", [])
         ]
     )
-    payload["evidence"] = {eid: context["evidence_store"][eid] for eid in evidence_ids if eid in context["evidence_store"]}
+    payload["evidence"] = {
+        eid: {key: value for key, value in context["evidence_store"][eid].items() if key != "document_id"}
+        for eid in evidence_ids if eid in context["evidence_store"]
+    }
     return payload
 
 
@@ -502,6 +532,73 @@ def _writer_context(
     public = {"payload": payload, "prompt": build_section_prompt(section_id, payload)}
     # 결정적 재현 writer만 정규형 전체를 읽는다. 일반 LLM writer에는 최소 입력만 노출한다.
     return {**context, **public} if include_normalized else public
+
+
+_BRACKET = re.compile(r"[【〔]\s*(?:근거\s*:\s*)?([^】〕\n]+?)\s*[】〕]")
+_ID_LIKE = re.compile(r"[A-Za-z][\w\-]*:[\w.:\-]+")
+
+
+def _canonical_ids(token: str, context: NormalizedInput) -> list[str]:
+    store, claims = context["evidence_store"], context["claims"]
+    if token in store:
+        return [token]
+    if token in claims:
+        return [eid for eid in claims[token]["evidence_ids"] if eid in store]
+    return [eid for eid, ev in store.items() if ev.get("document_id") == token][:2]
+
+
+def normalize_draft(draft: SectionDraft, context: NormalizedInput) -> SectionDraft:
+    """LLM 이 쓴 인용을 확정된 형식으로 바로잡는다.
+
+    - 【 】 와 근거 표기 없는 괄호를 〔근거: …〕 로 통일
+    - claim ID·문서 ID 는 그 근거 ID 로 바꾸고, 알 수 없는 ID(기각된 청크 포함)는 지운다
+    - 한계점: partial·failed 인 관점은 항상 명시한다
+    """
+    claims = context["claims"]
+    seen_claims: list[str] = []
+
+    def replace(match):
+        raw = match.group(1)
+        tokens = [item.strip() for item in re.split(r"[,;]", raw) if item.strip()]
+        if match.group(0)[0] == "【" and not all(_ID_LIKE.fullmatch(item) for item in tokens):
+            return match.group(0)
+        ids: list[str] = []
+        for token in tokens:
+            if token in claims:
+                seen_claims.append(token)
+            ids.extend(_canonical_ids(token, context))
+        ids = _unique(ids)
+        return f"〔근거: {', '.join(ids)}〕" if ids else ""
+
+    markdown = _BRACKET.sub(replace, draft["markdown"])
+    if draft["section_id"] == "limitations":
+        degraded = {name: status for name, status in context["upstream_statuses"].items() if status in {"partial", "failed"}}
+        missing = [f"- {name} upstream 상태는 {status}이며 관련 공백을 최종 판단에 반영해야 한다."
+                   for name, status in degraded.items() if name not in markdown or status not in markdown]
+        for item in context.get("quality_feedback") or []:
+            if item.startswith("bias") and "편중" not in markdown:
+                missing.append("- 일부 관점의 근거가 소수 출처에 편중되어 있어 해석에 유의해야 한다.")
+        if missing:
+            markdown = markdown.rstrip() + "\n\n" + "\n".join(missing)
+    claim_ids = _unique([c for c in [*draft["claim_ids"], *seen_claims] if c in claims])
+    evidence_ids = _unique([*extract_citations(markdown), *[e for e in draft["evidence_ids"] if e in context["evidence_store"]]])
+    return {**draft, "markdown": markdown, "claim_ids": claim_ids, "evidence_ids": evidence_ids}
+
+
+class NormalizingWriter:
+    """어떤 writer 가 쓴 초안이든 인용 형식과 한계점 필수 문장을 같은 규칙으로 정리한다."""
+
+    def __init__(self, inner, context: NormalizedInput):
+        self.inner, self.context = inner, context
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def write(self, section_id, context):
+        return normalize_draft(self.inner.write(section_id, context), self.context)
+
+    def repair(self, section_id, draft, issues, context):
+        return normalize_draft(self.inner.repair(section_id, draft, issues, context), self.context)
 
 
 def _resolve_writer(deps: ReportAgentDeps):
@@ -524,6 +621,7 @@ def _include_normalized(writer, deps: ReportAgentDeps) -> bool:
 
 
 def _generation_metadata(writer, deps: ReportAgentDeps) -> dict:
+    writer = getattr(writer, "inner", writer)
     if isinstance(writer, DeterministicSectionWriter):
         return {"mode": "deterministic", "provider": None, "model": None}
     return {
@@ -671,7 +769,7 @@ def finalize_report(
 def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
     deps = deps or ReportAgentDeps()
     context = normalize_state(state)
-    writer = _resolve_writer(deps)
+    writer = NormalizingWriter(_resolve_writer(deps), context)
     input_issues: list[dict] = list(validate_input(context))
     body_sections: dict[SectionId, SectionDraft] = {}
 

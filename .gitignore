@@ -38,3 +38,10 @@ outputs/**/domain_findings*.json
 # Supervisor 결정 로그·체크포인트
 logs/
 data/checkpoints.sqlite*
+
+# 제출용 임시 산출물·개인 자료 (코드가 아님)
+/output/
+outputs/stakeholder/
+outputs/stakeholder-cache/
+/*.docx
+/*.pdf

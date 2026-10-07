@@ -3,7 +3,7 @@
   python main.py                                   # 전부 오프라인 (API 키 불필요)
   python main.py --live synthesis                  # 평가 종합만 실제 LLM
   python main.py --live all                        # 여섯 노드 전부 실제 실행 (비용 발생)
-  python main.py --live all --supervisor llm       # Supervisor 도 LLM(SUPERVISOR_MODEL, 기본 gpt-6.1-sol)이 라우팅
+  python main.py --live all --supervisor llm       # Supervisor 도 LLM(SUPERVISOR_MODEL, 기본 gpt-5.5)이 라우팅
 
 패턴: Supervisor. 모든 노드가 supervisor 로만 돌아오고, supervisor 가 State(관점별 결과·근거 충분성·재작업 예산·품질 평가)를
       보고 다음 노드를 고른다 (graph/supervisor.py). 근거가 부족하면 해당 관점에 재작업을 요청하고, 보고서 뒤 품질 평가가

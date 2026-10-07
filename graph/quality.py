@@ -10,10 +10,10 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from agents.report.validators import PROHIBITED_COMPARISON
+from agents.report.validators import MAX_SUMMARY_CHARS, PROHIBITED_COMPARISON
 from graph.sufficiency import MIN_SOURCES, PERSPECTIVES, perspective_evidence, source_key
 
-CITATION = re.compile(r"〔근거:\s*([^〕]+)〕")
+CITATION = re.compile(r"〔근거:\s*([^〕】〔\n]+)")  # LLM 이 닫는 괄호를 잘못 쓴 경우(】 등)에도 ID 가 이어 붙지 않게 끊는다
 EXTRA_PROHIBITED = ("최고", "1위", "should adopt", "recommend", "best choice", "clear winner")
 NEGATION = ("않", "아니", "없", "금지", "삼간", "하지 말", "not ", "no ", "never")
 MAX_SINGLE_SOURCE_SHARE = 0.6
@@ -34,13 +34,45 @@ def cited_ids(text: str) -> list[str]:
     return ids
 
 
-def check_groundedness(state: dict, text: str) -> tuple[list[str], list[str]]:
+def known_claims(state: dict) -> dict[str, list[str]]:
+    """주장 ID → 그 주장이 기대는 근거 ID. 네 관점 findings 와 종합의 요약 주장."""
+    claims = {}
+    for p in PERSPECTIVES:
+        for c in (state.get(f"{p}_findings") or {}).get("claims") or []:
+            claims[c["claim_id"]] = c.get("evidence_ids") or []
+    for c in (state.get("synthesis") or {}).get("summary_claims") or []:
+        claims[c["claim_id"]] = c.get("evidence_ids") or []
+    return claims
+
+
+def resolve_citation(state: dict, token: str, claims: dict[str, list[str]]) -> str | None:
+    """인용 ID 가 출처로 추적되면 그 종류를, 안 되면 None 을 돌려준다.
+
+    - evidence : evidence_store 의 근거 ID
+    - claim    : 그 주장의 근거가 evidence_store 에 모두 있는 주장 ID
+    - document : 코퍼스(corpus_manifest)나 근거의 doc_id (문서 단위 인용)
+    청크 ID 처럼 근거로 확정되지 않은 것은 추적되지 않은 것으로 본다.
+    """
     store = state.get("evidence_store") or {}
+    if token in store:
+        return "evidence"
+    if token in claims and claims[token] and all(e in store for e in claims[token]):
+        return "claim"
+    doc_ids = {d.get("doc_id") for d in state.get("corpus_manifest") or []} | {e.get("doc_id") for e in store.values()}
+    if token in doc_ids:
+        return "document"
+    return None
+
+
+def check_groundedness(state: dict, text: str) -> tuple[list[str], list[str]]:
     cited = cited_ids(text)
     if not cited:
         return ["보고서에 〔근거: …〕 인용이 하나도 없음"], ["report"]
-    unknown = sorted({eid for eid in cited if eid not in store})
-    return ([f"evidence_store 에 없는 인용 ID {len(unknown)}건: {', '.join(unknown[:3])}"] if unknown else []), ["report"]
+    claims = known_claims(state)
+    unresolved = sorted({t for t in cited if resolve_citation(state, t, claims) is None})
+    if not unresolved:
+        return [], ["report"]
+    return [f"출처로 추적되지 않는 인용 ID {len(unresolved)}건: {', '.join(unresolved[:3])}"], ["report"]
 
 
 def check_neutrality(text: str) -> tuple[list[str], list[str]]:
@@ -81,6 +113,24 @@ def check_coverage(state: dict, text: str) -> tuple[list[str], list[str]]:
     return issues, targets
 
 
+def check_structure(state: dict) -> tuple[list[str], list[str]]:
+    """가이드의 필수 목차: 맨 앞 SUMMARY(반 페이지 이내), 맨 뒤 REFERENCE. 보고서가 있을 때만 검사한다."""
+    sections = state.get("report_sections") or {}
+    text = (sections.get("final_markdown") or "").strip()
+    if not text:
+        return [], ["report"]
+    issues = []
+    headings = re.findall(r"^# (.+)$", text, re.M)
+    if not headings or headings[0].strip() != "SUMMARY":
+        issues.append("보고서가 SUMMARY 로 시작하지 않음")
+    if not headings or headings[-1].strip() != "REFERENCE":
+        issues.append("보고서가 REFERENCE 로 끝나지 않음")
+    summary = re.split(r"^# (?!SUMMARY)", text.split("# SUMMARY", 1)[-1], maxsplit=1, flags=re.M)[0]
+    if "# SUMMARY" in text and len(CITATION.sub("", summary).strip()) > MAX_SUMMARY_CHARS:
+        issues.append(f"SUMMARY 가 반 페이지({MAX_SUMMARY_CHARS}자)를 넘음")
+    return issues, ["report"]
+
+
 def check_length(state: dict) -> tuple[list[str], list[str]]:
     """제출 보고서는 최대 10장. PDF 를 만든 실행에서만 검사한다 (report 노드가 run_meta 에 페이지 수를 남김)."""
     layout = ((state.get("run_meta") or {}).get("report") or {}).get("pdf_layout")
@@ -102,6 +152,7 @@ def make_quality_node(judge=None):
             "bias": check_bias(state),
             "coverage": check_coverage(state, text),
             "length": check_length(state),
+            "structure": check_structure(state),
         }.items():
             if issues:
                 details[name] = issues

@@ -22,7 +22,7 @@ def build_request(state: dict) -> dict:
     request = default_request(parent.get("as_of"))
     # 재작업 때 늘어난 라운드 수는 Supervisor 워커 래퍼가 request.max_search_rounds 에 이미 더해 준다.
     request["max_search_rounds"] = max(1, min(int(parent.get("max_search_rounds") or request["max_search_rounds"]), 3))
-    request["max_queries"] = min(24, 2 * len(GROUPS) * request["max_search_rounds"] + 2)
+    request["max_queries"] = min(24, 2 * 2 * len(GROUPS) * request["max_search_rounds"])  # 쌍당 질의 2개 × 라운드
     request["domain"] = "datacenter"
     for side in ("sw", "hw"):
         spec = (state.get("selected_tech") or {}).get(side)
@@ -135,10 +135,62 @@ def to_app_update(final: dict) -> dict:
             "quality_by_perspective": {"stakeholder": quality}}
 
 
+def merge_findings(previous: dict | None, new: dict, retried: set[tuple[str, str]]) -> dict:
+    """재작업 결과를 이전 결과와 합친다. 재작업은 gap 이 있는 쌍만 다시 조사하므로 덮어쓰면 앞서 얻은 주장이 사라진다.
+
+    - claims: claim_id 기준 합집합
+    - records: 같은 (기술, 그룹)은 지지/반대/중립 건수와 근거 ID 를 합산하고 우세 입장을 다시 계산
+    - gaps: 합친 records 에 없는 쌍만 남기되, 이번에 다시 조사한 쌍은 새 사유를, 안 한 쌍은 이전 사유를 쓴다
+    """
+    if not previous:
+        return new
+    claims = {c["claim_id"]: c for c in [*previous["claims"], *new["claims"]]}
+    records = {}
+    for record in [*previous["records"], *new["records"]]:
+        key = (record["technology"], record["criterion"])
+        if key not in records:
+            records[key] = {**record, "stance_counts": dict(record["stance_counts"]), "evidence_ids": list(record["evidence_ids"])}
+            continue
+        merged = records[key]
+        for stance, n in record["stance_counts"].items():
+            merged["stance_counts"][stance] = merged["stance_counts"].get(stance, 0) + n
+        merged["evidence_ids"] = sorted(set(merged["evidence_ids"]) | set(record["evidence_ids"]))
+        merged["scope"] = merged["scope"] if merged["scope"] == record["scope"] else "mixed"
+        merged["basis"] = "direct" if merged["scope"] == "direct" else "inferred"
+        merged["evidence_level"] = max(merged["evidence_level"], record["evidence_level"], key=LEVEL_RANK.get)
+        merged["assessment"] = _dominant(merged["stance_counts"])
+        merged["limitations"] = list(dict.fromkeys([*merged["limitations"], *record["limitations"]]))
+        total = sum(merged["stance_counts"].values())
+        merged["findings"] = f"{merged['criterion']} 발언 {total}건 중 {merged['assessment']} 우세"
+    covered = set(records)
+    new_gaps = {(g["technology"], g["criterion"]): g for g in new["gaps"]}
+    old_gaps = {(g["technology"], g["criterion"]): g for g in previous["gaps"]}
+    gaps = []
+    for key in sorted(set(new_gaps) | set(old_gaps)):
+        if key in covered:
+            continue
+        retried_now = (key[0], LABEL_TO_GROUP.get(key[1])) in retried
+        gaps.append(new_gaps[key] if retried_now and key in new_gaps else old_gaps.get(key, new_gaps.get(key)))
+    limitations = list(dict.fromkeys([*new["limitations"], *previous["limitations"]]))[:20]
+    status = "partial" if gaps or (new["status"] != "complete") else "complete"
+    if not claims:
+        status = "failed" if new["status"] == "failed" else "partial"
+    return {"perspective": "stakeholder", "status": status, "records": list(records.values()), "claims": list(claims.values()),
+            "gaps": gaps, "limitations": limitations,
+            "input_evidence_ids": sorted(set(previous["input_evidence_ids"]) | set(new["input_evidence_ids"]))}
+
+
 def stakeholder_node(state: dict, *, backend=None) -> dict:
     request = build_request(state)
     final = run_stakeholder(request, project_technical(state.get("technical_findings")), backend)
-    return to_app_update(final)
+    update = to_app_update(final)
+    if state.get("rework_hint") and state.get("stakeholder_findings"):
+        retried = {(t, g) for t, g in request.get("only_pairs") or []}
+        update["stakeholder_findings"] = merge_findings(state["stakeholder_findings"], update["stakeholder_findings"], retried)
+        merged_ids = {cid for c in update["stakeholder_findings"]["claims"] for cid in [c["claim_id"]]}
+        quality = update["quality_by_perspective"]["stakeholder"]
+        quality["checked_claim_ids"] = sorted(merged_ids)
+    return update
 
 
 def make_node(backend=None):
@@ -146,4 +198,4 @@ def make_node(backend=None):
     return partial(stakeholder_node, backend=backend)
 
 
-__all__ = ["make_node", "build_request", "to_app_update"]
+__all__ = ["make_node", "build_request", "to_app_update", "merge_findings"]

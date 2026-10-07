@@ -14,6 +14,16 @@ GROUPS = ('competitor', 'adopter', 'investor')
 GROUP_LABELS = {'competitor': '경쟁 기술 진영', 'adopter': '도입 기업·개발자', 'investor': '투자·산업 관계자'}
 
 
+GROUP_QUERIES = {
+    'competitor': {'r1': '{name} competing approaches alternatives public stance response',
+                   'r1c': '{name} versus alternatives comparison drawbacks criticism'},
+    'adopter': {'r1': '{name} deployment experience production usage review adoption',
+                'r1c': '{name} issues limitations problems GitHub issue discussion migration cost'},
+    'investor': {'r1': '{name} investment analyst market outlook industry report',
+                 'r1c': '{name} analyst risk skepticism concerns adoption challenges'},
+}
+
+
 def default_request(as_of_date=None):
     return {
         'sw': {'name': 'DeepSeek-V2 Multi-head Latent Attention (MLA)', 'selection_reason': '모델 구조의 KV 압축',
@@ -21,7 +31,7 @@ def default_request(as_of_date=None):
         'hw': {'name': 'ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories',
                'selection_reason': 'CXL 기반 계층 확장', 'seed_urls': ['https://arxiv.org/abs/2606.12556']},
         'domain': 'datacenter', 'as_of_date': as_of_date or date.today().isoformat(), 'language': 'ko',
-        'max_search_rounds': 2, 'max_revision_rounds': 1, 'max_queries': 8,
+        'max_search_rounds': 2, 'max_revision_rounds': 1, 'max_queries': 12,
     }
 
 
@@ -31,6 +41,30 @@ def unique(items):
 
 def pages_from(batches):
     return {url: page for batch in batches for url, page in batch.get('pages', {}).items()}
+
+
+MAX_QUOTE_WORDS = 20
+MAX_QUOTE_CHARS = 240
+
+
+def shorten_quote(quote):
+    """공백을 정규화한 인용의 앞부분을 단어 단위로 자른다 (원문의 부분 문자열이 유지된다)."""
+    words = normalize(quote).split()[:MAX_QUOTE_WORDS]
+    while len(' '.join(words)) > MAX_QUOTE_CHARS and len(words) > 1:
+        words.pop()
+    return ' '.join(words)[:MAX_QUOTE_CHARS]
+
+
+def url_of(reason):
+    """기각 사유 문자열 '사유: URL' 에서 URL 만 꺼낸다."""
+    return reason.split(': ', 1)[1] if ': ' in reason else ''
+
+
+def problem_pairs(batches, rejected):
+    """기각된 URL 을 찾아 온 질의의 (기술, 그룹). 이 쌍만 '검증 미완료'로 본다."""
+    urls = {url_of(r) for r in rejected}
+    return {(log['technology_id'], log['group']) for b in batches for log in b.get('search_logs', [])
+            if urls & set(log.get('urls', []))}
 
 
 def validate_observations(extraction, batches, as_of):
@@ -46,9 +80,10 @@ def validate_observations(extraction, batches, as_of):
         if page['content_hash'] != content_hash or not block or not item.quote or normalize(item.quote) not in normalize(block['text']):
             rejected.append(f'원문 hash/locator/quote 불일치: {item.source_url}')
             continue
-        if len(item.quote.split()) > 20 or len(item.quote) > 240:
-            rejected.append(f'인용 길이 초과: {item.source_url}')
-            continue
+        if len(item.quote.split()) > MAX_QUOTE_WORDS or len(item.quote) > MAX_QUOTE_CHARS:
+            # 원문의 연속 구간이므로 앞부분만 쓰면 그대로 검증을 통과한다. 통째로 버리지 않고 줄인다.
+            item = item.model_copy(update={'quote': shorten_quote(item.quote),
+                                           'uncertainty': (item.uncertainty + ' 인용을 20단어 이내로 줄임.').strip()})
         if item.domain_relevance != 'datacenter' or not item.speaker.strip() or not item.statement.strip():
             rejected.append(f'도메인·발언 정보 미확인: {item.source_url}')
             continue
@@ -82,17 +117,30 @@ def validate_observations(extraction, batches, as_of):
     return accepted, unique(rejected)
 
 
-def search_outcomes(observations, batches, invalid=False):
+def search_outcomes(observations, batches, problems=()):
+    """기술×그룹×근거방향 별 found / not_found / blocked / unsearched.
+
+    problems: 검증 미완료 쌍 {(기술, 그룹)}. 이 쌍만 not_found 대신 blocked 가 된다 (다른 쌍은 영향받지 않는다).
+    """
     logs = [log for b in batches for log in b.get('search_logs', [])]
+    pages = pages_from(batches)
+
+    def completed(log):
+        if log['status'] in ('ok', 'no_results'):
+            return True
+        # 일부 원문만 접근 실패한 경우: 읽은 원문이 하나라도 있으면 검색은 끝난 것으로 본다.
+        return log['status'] == 'access_incomplete' and any(pages.get(u, {}).get('status') == 'ok' for u in log.get('urls', []))
+
     outcomes = []
     for side in ('sw', 'hw'):
         for group in GROUPS:
             scoped = [q for q in logs if q['technology_id'] == side and q['group'] == group]
-            successful = [q for q in scoped if q['status'] in ('ok', 'no_results')]
+            successful = [q for q in scoped if completed(q)]
             for stance in ('support', 'counter', 'neutral'):
                 found = any(o.technology_id == side and o.group == group and o.target_scope == 'selected_technology'
                             and o.evidence_stance == stance for o in observations)
-                status = 'found' if found else 'not_found' if successful and not invalid else 'blocked' if scoped else 'unsearched'
+                clean = successful and (side, group) not in problems
+                status = 'found' if found else 'not_found' if clean else 'blocked' if scoped else 'unsearched'
                 outcomes.append({'technology_id': side, 'group': group, 'stance': stance, 'status': status,
                                  'query_ids': [q['id'] for q in scoped],
                                  'scope_note': '한정된 질의·기간·최대 5개 원문 내 결과이며, 의견의 부재를 증명하지 않음'})
@@ -131,7 +179,7 @@ def make_findings(state):
     for ev in pool.values():
         old_evidence.append({'evidence_id': ev['id'], 'title': ev['title'], 'url': ev['url'],
                              'published_date': ev['published_at'], 'excerpt': ev['quote']})
-    outcomes = search_outcomes(observations, state['batches'], invalid=bool(gaps or state['errors']))
+    outcomes = search_outcomes(observations, state['batches'], problem_pairs(state['batches'], [*state['rejected'], *rejected]))
     unresolved = [o for o in outcomes if o['status'] in ('blocked', 'unsearched')]
     gaps.extend(f"{o['technology_id']}/{o['group']}/{o['stance']}: {o['status']}" for o in unresolved)
     status = 'failed' if not observations and state['errors'] else 'partial' if gaps or state['errors'] else 'complete'
@@ -145,10 +193,16 @@ def build_stakeholder_graph(backend):
         request = state['request']
         focus = ' '.join(request.get('focus_queries') or [])[:200]
         only = {tuple(pair) for pair in request.get('only_pairs') or []}
-        queries = [{'id': f'{side}:{group}:r1', 'technology_id': side, 'group': group,
-                    'query': f"{request[side]['name']} datacenter {GROUP_LABELS[group]} benefits criticism concerns adoption support counter neutral"
-                             + (f' {focus}' if focus else '')}
-                   for side in ('sw', 'hw') for group in GROUPS if not only or (side, group) in only]
+        queries = []
+        for side in ('sw', 'hw'):
+            for group in GROUPS:
+                if only and (side, group) not in only:
+                    continue
+                # 쌍마다 지지 쪽(r1)과 우려 쪽(r1c) 질의를 따로 보낸다. 한 질의로는 반대 의견이 거의 안 잡힌다.
+                for suffix, template in GROUP_QUERIES[group].items():
+                    text = template.format(name=request[side]['name']) + ' data center LLM inference'
+                    queries.append({'id': f'{side}:{group}:{suffix}', 'technology_id': side, 'group': group,
+                                    'query': text + (f' {focus}' if focus else '')})
         return {'queries': queries[:request['max_queries']]}
 
     def search(state):
@@ -171,7 +225,7 @@ def build_stakeholder_graph(backend):
     def review(state):
         extraction = Extraction.model_validate(state['extraction'])
         accepted, rejected = validate_observations(extraction, state['batches'], state['request']['as_of_date'])
-        outcomes = search_outcomes(accepted, state['batches'], bool(rejected or extraction.gaps or state['errors']))
+        outcomes = search_outcomes(accepted, state['batches'], problem_pairs(state['batches'], rejected))
         gaps = extraction.gaps + [f"{o['technology_id']}/{o['group']}: {o['status']}" for o in outcomes if o['status'] in ('blocked', 'unsearched')]
         return {'rejected': rejected, 'gaps': unique(gaps), 'extraction': {'observations': [o.model_dump() for o in accepted], 'gaps': extraction.gaps}}
 

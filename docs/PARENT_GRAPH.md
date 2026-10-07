@@ -25,7 +25,7 @@ START → supervisor ⇄ {technical, market, stakeholder, domain, synthesis, rep
 | `graph/stubs.py` | **임시 노드**: 아직 AppState 형식 노드가 없는 자리를 합성 fixture 재생으로 채움 |
 | `main.py` | 실행 진입점. 노드 조립 → `build_graph` → 실행 → 결과 저장 |
 | `tests/graph/test_parent_graph.py` | 부모 그래프 통합 테스트 (API·네트워크 없음) |
-| `tests/graph/test_supervisor.py` | 라우팅·재작업·종료·품질 Loop·LLM guard 테스트 20개 |
+| `tests/graph/test_supervisor.py` | 라우팅·재작업·종료·품질 Loop·LLM guard·State 계약(trace_id·sqlite 재개·reducer)·오프라인 `main.py` 종단 테스트 |
 
 규칙대로 엣지는 `graph/build.py`에만 있고, `main.py`는 각 에이전트의 `make_node()`만 가져다 씁니다.
 
@@ -166,8 +166,8 @@ python -m unittest tests.graph.test_parent_graph -v
 
 ## 5. 아직 없는 것
 
-- **Supervisor 전환 후 실제 API 실행 기록.** 오프라인 테스트로 라우팅·재작업·종료는 확인했지만, `gpt-6.1-sol`(사용자 지정 모델 ID)로 `--live all` 을 돌린 기록과 LangSmith 캡처는 아직 없습니다. 모델 접근이 안 되면 규칙 라우팅으로 대체되어 끝까지 돕니다(`source=fallback`).
-- **보고서 에이전트의 재작업 힌트 소비.** 품질 평가가 보고서 재작성을 요청해도 보고서 에이전트는 `rework_hint` 를 읽지 않아 다시 돌릴 뿐입니다(자체 revise 루프와 LLM 변동에 기대). stakeholder 는 힌트를 읽어 해당 (기술, 그룹)만 재검색합니다.
+- **Supervisor 전환 후 실제 API 실행 기록.** 오프라인 테스트로 라우팅·재작업·종료는 확인했지만, `gpt-5.5`로 `--live all` 을 돌린 결과는 `docs/LIVE_RUN.md`에 있고, LangSmith 캡처(`tracing-*.png`)는 계정에서 직접 찍어야 합니다. 모델 접근이 안 되면 규칙 라우팅으로 대체되어 끝까지 돕니다(`source=fallback`).
+- (해결됨) 모든 워커가 `rework_hint` 를 읽습니다: 기술 조사·시장·도메인은 보완 질의/계획 힌트로, 이해관계자는 gap 쌍만 재검색 후 결과 병합, 보고서는 미달 사유를 프롬프트로 받고 수정 횟수를 초기화합니다.
 - **체크포인트 파일 저장.** `langgraph-checkpoint-sqlite` 가 없으면 메모리에만 저장됩니다.
 
 **PDF 폰트.** macOS 는 AppleGothic 을 자동으로 씁니다. 폰트를 못 찾으면 환경변수 `REPORT_PDF_FONT`에 TTF/TTC 경로를 지정하세요 (`agents/report/pdf.py`).

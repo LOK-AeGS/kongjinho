@@ -76,6 +76,7 @@ class MarketLocal(TypedDict, total=False):
     domain: str
     as_of_date: str
     technical_summary: str
+    rework_focus: str
     max_search_rounds: int
     query_bank: dict[str, list[str]]
     pending: list[dict]

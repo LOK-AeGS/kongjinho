@@ -21,7 +21,7 @@
 - **동적 처리** : 고정 순서가 아니라 Supervisor가 매 턴 State에서 다음 노드를 계산한다 — ① `technical_findings`가 없으면
   technical(다른 관점이 기술 조사 결과를 입력으로 쓰는 데이터 의존성), ② 그다음 결과가 없거나 근거가 부족한 관점만 `Send`로
   병렬 디스패치, ③ 근거가 충분해야 종합 → 보고서, ④ 보고서 뒤 품질 평가가 미달이면 지목된 관점/보고서에만 재작업 요청.
-  같은 코드로 실행해도 State에 따라 경로가 달라진다(트레이스 캡처 3종 참고). 다음 행동의 제안은 LLM(`gpt-6.1-sol`)이 하고, 허용
+  같은 코드로 실행해도 State에 따라 경로가 달라진다(트레이스 캡처 3종 참고). 다음 행동의 제안은 LLM(`gpt-5.5`)이 하고, 허용
   행동 집합 밖이거나 API 오류면 규칙 선택으로 대체(`source=fallback`)해 재현성과 종료를 보장한다.
 - **Method** : Multi-Agent(Supervisor) + Agentic RAG. LangGraph 부모 그래프 하나에 에이전트를 노드로 연결한다.
   에이전트는 각자 검색·수집·검증을 따로 구현하며, 공유하는 것은 State 스키마와 근거 형식뿐이다.
@@ -121,11 +121,13 @@ CXL은 랙 스케일 인터커넥트 규격이라 온디바이스·엣지에는 
 
 ## Tech Stack
 
-- **Framework** : LangGraph 1.x (StateGraph, 병렬 fan-out/fan-in, reducer), LangChain 1.x
+- **Framework** : LangGraph 1.x (StateGraph, `add_conditional_edges`, `Send` 병렬, reducer, 체크포인터), LangChain 1.x, LangSmith(트레이싱)
 - **LLM/Generator** : 에이전트마다 다릅니다(아래 표). 하나로 통일할지는 팀 결정 사항입니다([ISSUE.md](ISSUE.md) 2-3).
-- **LLM/Judge** : 단일 judge 모델을 두지 않고, 코드로 답할 수 있는 검증은 코드가, 문맥 판단이
-  필요한 것만 LLM이 맡습니다(아래 표).
-- **Retrieval** : BM25(rank-bm25) + Dense(FAISS + BGE-M3) + RRF 하이브리드
+- **LLM/Supervisor** : `gpt-5.5` (`SUPERVISOR_MODEL`) — 다음 행동을 제안하고, 코드 guard가 허용 행동 집합·예산·종료를 강제하며
+  API 오류나 위반 시 규칙 라우팅으로 대체한다.
+- **LLM/Judge** : 품질 평가 노드의 LLM Judge는 `gpt-5.5`(`JUDGE_MODEL`, `--judge`로 켬)이고 규칙 검사가 실패한 항목을
+  **추가**만 할 수 있다. 기본은 규칙 검사만(결정적). 에이전트별 검증은 코드가 할 수 있는 것은 코드가, 문맥 판단이 필요한 것만 LLM이 맡는다(아래 표).
+- **Retrieval** : BM25(rank-bm25) + Dense(FAISS + BGE-M3) + RRF 하이브리드 — Hit Rate@K·MRR은 아래 "검색 방식 비교"(도메인 에이전트의 Golden Set 16문항, 청크 213개) 기준
 - **Embedding** : `BAAI/bge-m3` (MIT, 8192 토큰) — 오픈소스 임베딩만 사용
 
 ### 에이전트별 모델과 검증 방식
@@ -134,10 +136,11 @@ CXL은 랙 스케일 인터커넥트 규격이라 온디바이스·엣지에는 
 |---|---|---|
 | ① 기술 조사 | `gpt-4.1` (관측 구조화) | 코드 — TRL Gate 연속 충족 계산, 인용 원문 대조, 수치·baseline 검사 |
 | ② 시장 평가 | `gpt-4.1-mini` (계획·판정) | 코드 rubric(6칸 충분/부분/부족) + `gpt-4.1` 반대 근거 재귀속 재검증 |
-| ③ 이해관계자 평가 | `gpt-5-mini` (Responses `web_search`) | 규칙 기반 편향 플래그, 누락 조합 1회 재검색 |
+| ③ 이해관계자 평가 | `gpt-5-mini` (Responses `web_search`, 추론 강도 low) | 원문을 직접 가져와 인용문·locator·content_hash·날짜·수치를 코드로 대조, 기각된 항목은 gap으로 기록, 재작업은 gap 쌍만 재검색 후 결과 병합 |
 | ④ 도메인 평가 | `gpt-4o` (판정·주장·self_check 단일 호출) | 프롬프트 내 self_check + 코드 참조 무결성 검사 |
 | ⑤ 평가 종합 | `gpt-4.1` (서술) | 코드 C1~C7 중립성 검사, 위반 문장 1회 재생성 후 제거 |
-| ⑥ 보고서 생성 | `gpt-4o-mini` (섹션 작성) | 결정적 validator(인용·수치·목차·REFERENCE), 위반 섹션만 최대 2회 부분 수정 |
+| ⑥ 보고서 생성 | `gpt-4o-mini` (섹션 작성) | 결정적 validator(인용·수치·목차·REFERENCE·SUMMARY 분량), 인용 정규화(claim·문서·청크 ID → 근거 ID), 위반 섹션만 부분 수정, 품질 미달 재작업 시 사유를 프롬프트로 받아 수정 |
+| Supervisor / 품질 평가 | `gpt-5.5` (라우팅 제안, 선택적 Judge) | 허용 행동 집합·예산·step 상한 guard, 규칙 검사(Groundedness·중립성·편향·커버리지·분량·목차) |
 
 ### 검색 방식 비교 (Golden Set 16문항, 청크 213개)
 
@@ -198,6 +201,10 @@ SX4 수치 차이(10% 초과), SX5 시점 차이(12개월 초과), SX6 같은 �
 
 ## Architecture
 
+![Supervisor 그래프](outputs/agent-architecture/png/00-supervisor-graph.png)
+
+(`python -m scripts.render_graph`가 실제 `graph/build.py`의 edge로 그린 그림이다.)
+
 ```mermaid
 flowchart TD
     S0([START]) --> SUP{{"Supervisor<br/>State 보고 다음 노드 결정<br/>(LLM 제안 + 규칙 guard)"}}
@@ -247,7 +254,7 @@ flowchart TD
 
 | 항목 | 검사 | 미달 시 재작업 대상 |
 |---|---|---|
-| Groundedness | 모든 `〔근거: id〕`가 `evidence_store`에 존재, 인용이 하나도 없으면 실패 | report |
+| Groundedness | 모든 `〔근거: id〕`가 출처로 추적됨: `evidence_store`의 근거 ID, 근거가 확정된 주장 ID, 코퍼스 문서 ID는 통과 / 기각된 청크 ID 등 근거로 확정되지 않은 ID와 인용이 하나도 없으면 실패 | report |
 | 중립성 | 추천·우열 어휘("승자", "추천", "최고", "1위", "recommend"…)가 부정문 없이 쓰였는지 | report |
 | 편향 통제 | 관점별 출처 2곳 이상, 단일 출처 비중 60% 이하 | 해당 관점 |
 | 관점 커버리지 | 4개 관점이 보고서에 모두 인용됨 (근거는 있는데 인용만 빠졌으면 report, 근거가 없으면 해당 관점) | report 또는 해당 관점 |
@@ -294,7 +301,7 @@ PNG·SVG·Mermaid 원본으로 있습니다(전체 8장). 실행할 때마다 La
 ## Directory Structure
 
 ```
-Capstone_Ai_RAG/
+kongjinho/
 ├── graph/                      ★ 팀 공유 영역 (여기만 공유)
 │   ├── state.py                AppState(페이로드 + 제어 메타데이터), reducer, create_initial_state
 │   ├── build.py                Supervisor 중심 그래프 조립 (워커 → supervisor 로만 edge)
@@ -319,9 +326,9 @@ Capstone_Ai_RAG/
 │   ├── search_cache/           검색 질의 캐시 (git 제외)
 │   └── fetch_cache/            수집 본문 캐시 (git 제외)
 │
-├── scripts/                    에이전트 단독 실행 (python -m scripts.run_<이름>)
+├── scripts/                    에이전트 단독 실행(run_<이름>), Supervisor 시나리오 재현(run_scenarios), 그래프 그림(render_graph), 제출 압축(package_submission)
 ├── tests/                      에이전트별 오프라인 테스트 (API 키 없이 실행)
-├── docs/                       에이전트별 설계 문서, State 설계
+├── docs/                       에이전트별 설계 문서, State 설계(STATE_DESIGN.md), 시나리오 기록(TRACE_SCENARIOS.md)
 ├── outputs/                    실행 산출물, 아키텍처 다이어그램
 ├── main.py                     부모 그래프 실행 진입점
 ├── requirements.txt            통합 의존성
@@ -370,7 +377,7 @@ cp .env.example .env
 python main.py                          # 전부 오프라인 (API 키 불필요, 비용 없음)
 python main.py --live synthesis         # 평가 종합만 실제 LLM
 python main.py --live all --debug       # 여섯 노드 전부 실제 실행 + 단계별 중간 결과 (비용 발생)
-python main.py --live all --supervisor llm --judge   # Supervisor 라우팅·품질 Judge 도 LLM (SUPERVISOR_MODEL, 기본 gpt-6.1-sol)
+python main.py --live all --supervisor llm --judge   # Supervisor 라우팅·품질 Judge 도 LLM (SUPERVISOR_MODEL, 기본 gpt-5.5)
 python main.py --supervisor rule        # 규칙만으로 라우팅 (API 불필요, 같은 규칙이 LLM 의 guard/폴백으로도 쓰임)
 ```
 
@@ -432,14 +439,14 @@ LANGSMITH_PROJECT=kongjinho-supervisor
 ### 4. 테스트 (API 키 없이 실행, 비용 없음)
 
 ```bash
-python -m pytest tests --ignore=tests/agents/report/test_report_llm_integration.py   # 139개, 키 불필요
+python -m pytest tests --ignore=tests/agents/report/test_report_llm_integration.py   # 전체 오프라인, 키 불필요
 python -m pytest tests/graph -q                          # 부모 그래프 + Supervisor 패턴 (라우팅·재작업·종료·품질 Loop·LLM guard)
-python -m pytest tests/agents/stakeholder -q             # 이해관계자 20개 (원문 검증·환각 차단·AppState 계약)
+python -m pytest tests/agents/stakeholder -q             # 이해관계자 (원문 검증·환각 차단·AppState 계약·재작업 병합)
 python -m unittest tests.agents.synthesis.test_synthesis -v   # 평가 종합 42개
 ```
 
 `python -m pytest tests`로 전부 돌리면 보고서 LLM 연동 테스트 1개가 추가로 실행돼 실제 API
-비용이 발생합니다. 키가 없으면 그 1개만 skip되고 나머지 139개는 그대로 통과합니다.
+비용이 발생합니다. 키가 없으면 그 1개만 skip되고 나머지는 그대로 통과합니다.
 
 | 대상 | 테스트 수 | 확인하는 것 |
 |---|---|---|
@@ -542,10 +549,10 @@ git commit을 기록합니다. 검색 질의는 `data/search_cache/`에, 수집 
 
 | 담당 | 이름 | 주요 작업 |
 |---|---|---|
-| 공유 State · 부모 그래프 | | `graph/state.py`, `graph/build.py`, `main.py`, 노드 통합·이슈 관리 |
+| 공유 State · 부모 그래프(Supervisor) | 지승환 | Supervisor 패턴 전환(`graph/supervisor.py`·`workers.py`·`sufficiency.py`), State 제어 메타데이터, 품질 평가 노드, 시나리오 재현·트레이싱 설정 |
 | ① 기술 조사 에이전트 | 강유성 | Pool A 코퍼스 구축, 하이브리드 검색, TRL Gate 판정 |
 | ② 시장 평가 에이전트 | 이효은 | Pool B 런타임 수집, 출처 등급 필터, rubric 판정, 반대 근거 재검증 |
-| ③ 이해관계자 평가 에이전트 | 지승환 | OpenAI web_search 기반 발언 수집, 편향 플래그, 아키텍처 다이어그램 |
+| ③ 이해관계자 평가 에이전트 | 지승환 | OpenAI web_search 기반 발언 수집, 원문 검증(환각 차단), 병렬 수집·재작업 병합, 아키텍처 다이어그램 |
 | ④ 도메인 평가 에이전트 | 이산 | 웹 검색 RAG, 임베딩·검색 방식 비교 실험, 요구사항 축별 판정 |
 | ⑤ 평가 종합 에이전트 | 안균승 | 비교 매트릭스, 상충 규칙 SX1~SX7, 중립성 검사 C1~C7 |
 | ⑥ 보고서 생성 에이전트 | 이동영 | 섹션별 LLM 서술, 인용·REFERENCE 검증, PDF 출력 |
