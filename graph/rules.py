@@ -17,6 +17,16 @@ PROHIBITED_COMPARISON: tuple[str, ...] = (
 VERIFICATION_ADVICE_PATTERN = r"(확인|검토|검증|재현)\s*(을|를)?\s*권장"
 
 
+# ── Groundedness: 근거가 가리키는 선정 기술 ──────────────────────────────
+# 제목·발췌에 하나라도 단어로 있으면 그 기술을 다룬 근거로 본다. 일반 CXL·KV cache 자료는 해당하지 않는다.
+# live 5차: 도메인 ITME 주장 5건이 ITME를 언급하지 않는 'Understanding Inference Scaling' 발췌를 인용했다.
+# 도메인 규칙이라 선정 기술이 바뀌면 이 표만 교체한다(소문자).
+TECHNOLOGY_TERMS: dict[str, tuple[str, ...]] = {
+    "sw": ("mla", "multi-head latent attention", "deepseek-v2", "2405.04434"),
+    "hw": ("itme", "inference tiered memory expansion", "2606.12556"),
+}
+
+
 # ── Groundedness: 핵심 수치의 측정 조건 ─────────────────────────────────
 # 선정 기술(DeepSeek-V2 MLA, ITME) 원논문의 수치는 측정 조건과 함께 써야 한다(RAG 단계 팀 규칙).
 # 도메인 규칙이라 선정 기술이 바뀌면 이 표만 교체한다.

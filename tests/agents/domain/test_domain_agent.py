@@ -19,7 +19,7 @@ from agents.domain.node import (  # noqa: E402
     _to_team_claim, _to_team_evidence, _to_team_gaps, _to_team_record,
     project_input, summarize_technical,
 )
-from agents.domain.subgraph import DomainAnalysis, DraftClaim, DraftRecord, SelfCheck, _shape  # noqa: E402
+from agents.domain.subgraph import DomainAnalysis, DraftClaim, DraftRecord, SelfCheck, _expand_query, _shape  # noqa: E402
 from agents.domain.tools.evidence import (  # noqa: E402
     Evidence, make_evidence_id, merge_evidence, normalize_url,
 )
@@ -148,7 +148,9 @@ def test_실제_ID를_그대로_적어도_받아들인다():
 
 def test_기술이_어긋난_참조는_연결을_끊는다():
     """실측에서 sw 판정이 hw 주장을 가리키는 교차 참조가 나온 적이 있다."""
-    ev = _evidence()
+    # hw 주장은 ITME를 다루는 근거를 인용해야 연결 검사까지 간다(아니면 오귀속으로 먼저 제외된다).
+    ev = _evidence(title="ITME: Inference Tiered Memory Expansion", url="https://arxiv.org/abs/2606.12556",
+                   quote="ITME expands KV cache capacity with CXL-hybrid tiers")
     _, records, gaps = _shape(
         _analysis(claim_tech=["hw"], rec_tech="sw", evidence_ids=["E1"], claim_keys=["sw-mem-1"]),
         _store(ev), label_to_id={"E1": ev["evidence_id"]},
@@ -156,6 +158,27 @@ def test_기술이_어긋난_참조는_연결을_끊는다():
     assert records[0]["claim_ids"] == []
     assert records[0]["assessment"] == "unknown"
     assert any("다른 기술 주장" in g for g in gaps)
+
+
+def test_다른_기술만_다룬_근거를_인용한_주장은_제외한다():
+    """live 5차: ITME 주장이 ITME를 언급하지 않는 일반 추론 논문 발췌를 인용했다."""
+    ev = _evidence(title="Understanding Inference Scaling for LLMs", url="https://arxiv.org/abs/2601.00001",
+                   quote="utilize multiple tiers together with high-speed interconnect")
+    claims, records, gaps = _shape(
+        _analysis(claim_key="hw-mem-1", claim_tech=["hw"], rec_tech="hw", claim_keys=["hw-mem-1"]),
+        _store(ev), label_to_id={"E1": ev["evidence_id"]},
+    )
+    assert claims == []
+    assert records[0]["assessment"] == "unknown"
+    assert any("해당 기술을 다루지 않아 주장 제외" in g for g in gaps)
+
+
+def test_약어만_쓴_검색_질의에_정식_기술명을_붙인다():
+    state = {"sw_name": "DeepSeek-V2 Multi-head Latent Attention", "hw_name": "ITME: Inference Tiered Memory Expansion"}
+    assert _expand_query("ITME latency in datacenters?", state).endswith("ITME: Inference Tiered Memory Expansion")
+    assert _expand_query("HBM capacity limits?", state) == "HBM capacity limits?"
+    full = "DeepSeek-V2 Multi-head Latent Attention power use?"
+    assert _expand_query(full, state) == full
 
 
 def test_주장은_한_문장_길이로_잘린다():
