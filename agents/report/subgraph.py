@@ -766,7 +766,7 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
     }
     report_sections["final_markdown"] = report["markdown"]
     if deps.pdf_output_path:
-        from agents.report.pdf import export_markdown_pdf
+        from agents.report.pdf import export_markdown_pdf_fit
 
         technology_names = [
             str(context["technologies"].get(side, {}).get("name") or "").strip()
@@ -778,13 +778,15 @@ def run_report(state: dict, deps: ReportAgentDeps | None = None) -> dict:
             context["domain"],
             f"조사 기준일 {context['as_of_date']}" if context["as_of_date"] else "",
         ]
-        pdf_path = export_markdown_pdf(
+        pdf = export_markdown_pdf_fit(
             report["markdown"],
             deps.pdf_output_path,
             title=title,
             subtitle=" · ".join(part for part in subtitle_parts if part),
         )
-        report["pdf_path"] = str(pdf_path)
+        report["pdf_path"] = str(pdf.path)
+        report["pdf_layout"] = {"pages": pdf.pages, "max_pages": pdf.max_pages, "within_limit": pdf.within_limit,
+                                "cover_page": pdf.cover_page, "scale": pdf.scale}
     return {
         "report": report,
         "report_sections": report_sections,

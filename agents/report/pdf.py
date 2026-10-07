@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 from html import escape
 from pathlib import Path
 
@@ -112,14 +113,51 @@ def _markdown_story(markdown: str, styles: dict, page_width: float) -> list:
     return story
 
 
-def export_markdown_pdf(
+MAX_REPORT_PAGES = 10  # 과제 요건: 평가 보고서는 최대 10장
+# (표지 별도 페이지 여부, 글자·줄간격 배율). 첫 단계가 기본 모양이고, 한도를 넘으면 다음 단계로 줄여 다시 만든다.
+FIT_LADDER = ((True, 1.0), (False, 1.0), (False, 0.94), (False, 0.88))
+
+
+@dataclass(frozen=True)
+class PdfResult:
+    path: Path
+    pages: int
+    max_pages: int
+    cover_page: bool
+    scale: float
+
+    @property
+    def within_limit(self) -> bool:
+        return self.pages <= self.max_pages
+
+
+def export_markdown_pdf(markdown: str, output_path: str | Path, *, title: str = "기술 비교 평가 보고서", subtitle: str = "") -> Path:
+    """Markdown 보고서를 A4 PDF로 저장하고 절대 경로를 반환한다 (분량 조정 없음)."""
+    return _build_pdf(markdown, output_path, title=title, subtitle=subtitle, cover_page=True, scale=1.0)[0]
+
+
+def export_markdown_pdf_fit(
     markdown: str,
     output_path: str | Path,
     *,
     title: str = "기술 비교 평가 보고서",
     subtitle: str = "",
-) -> Path:
-    """Markdown 보고서를 A4 PDF로 저장하고 절대 경로를 반환한다."""
+    max_pages: int = MAX_REPORT_PAGES,
+) -> PdfResult:
+    """최대 페이지 수 안에 들도록 표지·글자 크기를 단계적으로 줄이며 PDF를 만든다.
+
+    내용은 자르지 않는다. 가장 작은 단계에서도 넘으면 within_limit=False 로 돌려주고, 호출한 쪽(품질 평가)이 분량 미달로 처리한다.
+    """
+    result = None
+    for cover_page, scale in FIT_LADDER:
+        path, pages = _build_pdf(markdown, output_path, title=title, subtitle=subtitle, cover_page=cover_page, scale=scale)
+        result = PdfResult(path, pages, max_pages, cover_page, scale)
+        if result.within_limit:
+            break
+    return result
+
+
+def _build_pdf(markdown: str, output_path: str | Path, *, title: str, subtitle: str, cover_page: bool, scale: float) -> tuple[Path, int]:
     try:
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_CENTER
@@ -145,41 +183,48 @@ def export_markdown_pdf(
 
     navy = colors.HexColor("#17365D")
     muted = colors.HexColor("#5D6B7A")
+
+    def scaled(name, **kw):
+        for key in ("fontSize", "leading", "spaceBefore", "spaceAfter"):
+            if key in kw:
+                kw[key] = round(kw[key] * scale, 2)
+        return ParagraphStyle(name, **kw)
+
     styles = {
-        "cover": ParagraphStyle(
+        "cover": scaled(
             "ReportCover", fontName=font_name, fontSize=24, leading=34,
             textColor=navy, alignment=TA_CENTER, spaceAfter=18,
         ),
-        "subtitle": ParagraphStyle(
+        "subtitle": scaled(
             "ReportSubtitle", fontName=font_name, fontSize=11, leading=18,
             textColor=muted, alignment=TA_CENTER,
         ),
-        "h1": ParagraphStyle(
+        "h1": scaled(
             "ReportH1", fontName=font_name, fontSize=16, leading=23,
             textColor=navy, spaceBefore=16, spaceAfter=8,
         ),
-        "h2": ParagraphStyle(
+        "h2": scaled(
             "ReportH2", fontName=font_name, fontSize=13, leading=19,
             textColor=colors.HexColor("#28507A"), spaceBefore=12, spaceAfter=6,
         ),
-        "h3": ParagraphStyle(
+        "h3": scaled(
             "ReportH3", fontName=font_name, fontSize=11, leading=17,
             textColor=navy, spaceBefore=9, spaceAfter=5,
         ),
-        "body": ParagraphStyle(
+        "body": scaled(
             "ReportBody", fontName=font_name, fontSize=9.2, leading=15,
             textColor=colors.HexColor("#202833"), wordWrap="CJK", spaceAfter=4,
         ),
-        "bullet": ParagraphStyle(
+        "bullet": scaled(
             "ReportBullet", fontName=font_name, fontSize=9.2, leading=15,
             textColor=colors.HexColor("#202833"), wordWrap="CJK",
             leftIndent=11, firstLineIndent=-8, spaceAfter=4,
         ),
-        "table": ParagraphStyle(
+        "table": scaled(
             "ReportTable", fontName=font_name, fontSize=7.4, leading=10.5,
             textColor=colors.HexColor("#202833"), wordWrap="CJK",
         ),
-        "table_header": ParagraphStyle(
+        "table_header": scaled(
             "ReportTableHeader", fontName=font_name, fontSize=7.7, leading=11,
             textColor=navy, wordWrap="CJK",
         ),
@@ -208,16 +253,22 @@ def export_markdown_pdf(
         canvas.line(18 * mm, A4[1] - 13 * mm, A4[0] - 18 * mm, A4[1] - 13 * mm)
         canvas.restoreState()
 
-    story = [Spacer(1, 54 * mm), _paragraph(title, styles["cover"])]
-    if subtitle:
-        story.append(_paragraph(subtitle, styles["subtitle"]))
-    story.extend([
-        Spacer(1, 12 * mm),
-        _paragraph("구조화된 평가 결과와 확인된 근거를 바탕으로 작성", styles["subtitle"]),
-        PageBreak(),
-    ])
+    if cover_page:
+        story = [Spacer(1, 54 * mm), _paragraph(title, styles["cover"])]
+        if subtitle:
+            story.append(_paragraph(subtitle, styles["subtitle"]))
+        story.extend([
+            Spacer(1, 12 * mm),
+            _paragraph("구조화된 평가 결과와 확인된 근거를 바탕으로 작성", styles["subtitle"]),
+            PageBreak(),
+        ])
+    else:  # 표지 없이 첫 페이지 상단에 제목 블록
+        story = [_paragraph(title, styles["h1"])]
+        if subtitle:
+            story.append(_paragraph(subtitle, styles["subtitle"]))
+        story.append(Spacer(1, 4 * mm))
     story.extend(_markdown_story(markdown, styles, document.width))
     document.build(story, onFirstPage=first_page, onLaterPages=later_pages)
     if not target.is_file() or target.stat().st_size == 0:
         raise PdfExportError(f"PDF 파일이 생성되지 않았습니다: {target}")
-    return target
+    return target, document.page

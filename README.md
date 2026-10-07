@@ -1,7 +1,7 @@
 # Subject
 
 본 프로젝트는 KV cache 최적화 기술을 소프트웨어, 하드웨어 두 진영에서 선정하여,
-시장·이해관계자·도메인 관점에서 평가하는 Agentic RAG를 개발하는 프로젝트 임.
+시장·이해관계자·도메인 관점에서 평가하는 **Supervisor 패턴** 기반 Agentic RAG를 설계/개발하는 프로젝트 임.
 
 여섯 개의 에이전트가 각자 근거를 수집해 판단하고, 관점끼리 서로의 결론을 보지 않은 채
 평가한 뒤, 마지막에 대조·종합하여 하나의 보고서로 만듭니다. 우열을 매기는 것이 목적이
@@ -13,8 +13,17 @@
 
 - **Objective** : 하나의 기술을 복수 관점에서 비교 평가. 순위·점수를 만들지 않고, 관점별
   판정과 그 판정이 성립하는 조건, 판단하지 못한 공백(gap)을 함께 기록한다.
-- **Method** : Multi-Agent(Distributed) + Agentic RAG. LangGraph 부모 그래프 하나에 여섯
-  에이전트를 노드로 연결하고, 세 평가 관점(시장·이해관계자·도메인)은 병렬로 실행한다.
+- **Pattern** : **Supervisor** (LangGraph `add_conditional_edges`). 여섯 에이전트와 품질 평가 노드는 모두 Supervisor와만
+  통신하고 서로 직접 호출하지 않는다. 선택 이유: ① 관점마다 근거 충분성이 다르게 나와 "어느 관점을 다시 조사할지"가 실행 중에
+  정해져야 하고, ② 평가 종합이 이미 `retry_requests`(재조사 요청)를 만들지만 소비하는 쪽이 없었으며, ③ 보고서 뒤 품질 평가가
+  미달이면 해당 관점·보고서만 골라 다시 돌려야 해서, 계획을 한 번에 세우는 Orchestrator-Workers보다 State를 보고 매 턴
+  결정하는 Supervisor가 맞는다.
+- **동적 처리** : 고정 순서가 아니라 Supervisor가 매 턴 State에서 다음 노드를 계산한다 — ① `technical_findings`가 없으면
+  technical(다른 관점이 기술 조사 결과를 입력으로 쓰는 데이터 의존성), ② 그다음 결과가 없거나 근거가 부족한 관점만 `Send`로
+  병렬 디스패치, ③ 근거가 충분해야 종합 → 보고서, ④ 보고서 뒤 품질 평가가 미달이면 지목된 관점/보고서에만 재작업 요청.
+  같은 코드로 실행해도 State에 따라 경로가 달라진다(트레이스 캡처 3종 참고). 다음 행동의 제안은 LLM(`gpt-6.1-sol`)이 하고, 허용
+  행동 집합 밖이거나 API 오류면 규칙 선택으로 대체(`source=fallback`)해 재현성과 종료를 보장한다.
+- **Method** : Multi-Agent(Supervisor) + Agentic RAG. LangGraph 부모 그래프 하나에 에이전트를 노드로 연결한다.
   에이전트는 각자 검색·수집·검증을 따로 구현하며, 공유하는 것은 State 스키마와 근거 형식뿐이다.
 - **Tools** : Tavily Search/Extract(웹 검색·본문 추출), OpenAI Responses `web_search`(이해관계자),
   pdfplumber(PDF 파싱), rank-bm25 + FAISS + BGE-M3(하이브리드 검색), reportlab(PDF 보고서 출력)
@@ -172,7 +181,7 @@ MRR만 보면 dense 단독이 하이브리드보다 앞섭니다(0.875 대 0.833
 |---|---|---|---|
 | ① | **기술 조사** `agents/technical` | Pool A 고정 PDF RAG + Tavily로 기술 성숙도를 조사하고, 코드가 TRL 1~9 Gate를 계산 | `technical_findings`, `evidence_store` |
 | ② | **시장 평가** `agents/market` | 시장 규모·성장성, 상용화·채택, 생태계 지지를 웹 검색 + Pool B 런타임 코퍼스로 조사 | `market_findings`, `evidence_store`, `search_log_by_perspective` |
-| ③ | **이해관계자 평가** `agents/stakeholder_eval.py` | 기술 2개 × 그룹 4개(경쟁 진영/운영자·서빙 엔지니어/공급사/투자자)의 실제 발언을 찾아 지지·반대·중립으로 분류 | `stakeholder_findings`, `evidence_store` |
+| ③ | **이해관계자 평가** `agents/stakeholder` | 기술 2개 × 그룹 3개(경쟁 기술 진영/도입 기업·개발자/투자·산업 관계자)의 발언을 찾되, **원문을 직접 가져와 인용문·locator·content hash·날짜·수치를 코드로 대조**하고 통과한 것만 근거로 인정. 반대 의견을 못 찾으면 가짜 근거 없이 `not_found`로 기록 | `stakeholder_findings`, `evidence_store`, `search_log_by_perspective`, `quality_by_perspective` |
 | ④ | **도메인 평가** `agents/domain` | 데이터센터 요구사항 6축 × 기술 2개 = 12개 판정을, 웹 검색 + 하이브리드 RAG 근거로 생성 | `domain_findings`, `evidence_store`, `quality_by_perspective`, `run_meta` |
 | ⑤ | **평가 종합** `agents/synthesis` | 네 관점 결과를 처음으로 한자리에 모아 비교 매트릭스·상충(SX1~SX7)·보완 관계를 만듦. 새 검색을 하지 않고 관점별 판정을 고쳐 쓰지 않음 | `synthesis` |
 | ⑥ | **보고서 생성** `agents/report` | 확정 State를 섹션별 최소 payload로 나눠 LLM이 서술하고, 인용 연결·REFERENCE·PDF는 코드가 담당 | `report_sections`, `references`, `quality_by_perspective`, `retries`, `run_meta` |
@@ -191,15 +200,22 @@ SX4 수치 차이(10% 초과), SX5 시점 차이(12개월 초과), SX6 같은 �
 
 ```mermaid
 flowchart TD
-    S0([START]) --> T["① 기술 조사<br/>technical"]
-    T --> M["② 시장 평가<br/>market"]
-    T --> H["③ 이해관계자 평가<br/>stakeholder"]
-    T --> D["④ 도메인 평가<br/>domain"]
-    M --> SY["⑤ 평가 종합<br/>synthesis"]
-    H --> SY
-    D --> SY
-    SY --> R["⑥ 보고서 생성<br/>report"]
-    R --> S1([END])
+    S0([START]) --> SUP{{"Supervisor<br/>State 보고 다음 노드 결정<br/>(LLM 제안 + 규칙 guard)"}}
+    SUP -->|"결과 없음/근거 부족"| T["① technical"]
+    SUP -->|"Send 병렬"| M["② market"]
+    SUP -->|"Send 병렬"| H["③ stakeholder"]
+    SUP -->|"Send 병렬"| D["④ domain"]
+    SUP -->|"충분"| SY["⑤ synthesis"]
+    SUP --> R["⑥ report"]
+    SUP --> Q["품질 평가 quality"]
+    T --> SUP
+    M --> SUP
+    H --> SUP
+    D --> SUP
+    SY --> SUP
+    R --> SUP
+    Q -->|"미달: 재작업 요청 Loop"| SUP
+    SUP -->|"통과 / 예산 소진 / step 상한"| S1([END])
 
     PA[("Pool A<br/>고정 PDF 6편 136p")] -. "BM25+Dense+RRF" .-> T
     PB[("Pool B<br/>런타임 수집 코퍼스")] -. "BM25" .-> M
@@ -210,9 +226,32 @@ flowchart TD
     W -.-> D
 ```
 
-①이 먼저 실행되고 ②③④는 같은 단계에서 병렬로 실행되며 서로의 결과를 보지 않습니다. 세 결과가
-모두 모인 뒤 ⑤가 실행되고, `evidence_store`는 이 지점에서 reducer(`merge_evidence_store`)로
-합쳐집니다. 엣지는 `graph/build.py`에만 있고, 노드 조립과 실행은 `main.py`가 담당합니다.
+모든 노드의 유일한 출구는 Supervisor이고(`graph/build.py`), 어디로 갈지는 Supervisor가 State로 계산합니다
+(`graph/supervisor.py`). 독립한 관점은 `Send`로 병렬 실행되며 서로의 결과를 보지 않고, `evidence_store`는 reducer
+(`merge_evidence_store`)로 합쳐집니다.
+
+**Supervisor 판단 순서 (State 입력 기준)**
+
+1. step 상한(`max_steps`)이면 새 재작업 없이 종합 → 보고서만 마치고 종료(`final_status=degraded`)
+2. 결과가 없거나, 충분성 미달(근거 3건 미만 / 출처 2곳 미만 / `status=failed`)이거나, 평가 종합의 `retry_requests`·품질 평가가
+   요청한 관점 → 그 관점만 디스패치(technical이 후보면 먼저). 이미 한 번 돈 관점은 `ReworkRequest`(gap·초점 질의·추가 라운드)를 붙여 재작업
+3. 재작업 후보가 없으면 종합 → 보고서 → 품질 평가 순으로 진행(근거 충분성 평가 전에는 보고서를 쓰지 않음)
+4. 품질 평가 미달이고 루프 예산이 남았으면 `target_perspectives`에만 재작업을 요청해 2번으로 돌아감
+5. 통과하거나 예산이 소진되면 종료. 예산 소진 시 부족 사유를 `run_meta.supervisor.degraded_reasons`에 남기고 보고서에 한계로 반영
+
+종료 보장: `max_steps` 14턴, 관점별 재작업 2회, 전체 재작업 4회, 품질 평가 루프 2회, `recursion_limit` 50.
+
+### 품질 평가 노드 (`graph/quality.py`, Hybrid)
+
+보고서 생성 뒤 반드시 실행되며 미달이면 Loop를 돕니다. 규칙 검사는 결정적이고, `--judge`를 켜면 LLM Judge가 **실패 항목만 추가**할 수 있습니다.
+
+| 항목 | 검사 | 미달 시 재작업 대상 |
+|---|---|---|
+| Groundedness | 모든 `〔근거: id〕`가 `evidence_store`에 존재, 인용이 하나도 없으면 실패 | report |
+| 중립성 | 추천·우열 어휘("승자", "추천", "최고", "1위", "recommend"…)가 부정문 없이 쓰였는지 | report |
+| 편향 통제 | 관점별 출처 2곳 이상, 단일 출처 비중 60% 이하 | 해당 관점 |
+| 관점 커버리지 | 4개 관점이 보고서에 모두 인용됨 (근거는 있는데 인용만 빠졌으면 report, 근거가 없으면 해당 관점) | report 또는 해당 관점 |
+| 분량 | 제출 PDF **최대 10장**. PDF 생성 시 10장을 넘으면 표지를 없애고 글자·줄간격을 94% → 88%로 줄여 다시 만들며(내용은 자르지 않음), 그래도 넘으면 미달 처리 | report |
 
 에이전트별 내부 흐름 다이어그램은 [`outputs/agent-architecture/`](outputs/agent-architecture/)에
 PNG·SVG·Mermaid 원본으로 있습니다(전체 8장). 실행할 때마다 LangGraph가 그린 실제 구조가
@@ -233,6 +272,20 @@ PNG·SVG·Mermaid 원본으로 있습니다(전체 8장). 실행할 때마다 La
 - 실패해도 예외를 밖으로 던지지 않고 `status`를 `partial`·`failed`로 표시한 뒤 이유를
   `gaps`/`errors`에 담아 반환합니다.
 
+### State Schema (동적 패턴 설계 근거)
+
+`AppState`는 **페이로드**(findings·evidence_store·synthesis·report)와 **제어 메타데이터**(라우팅·종료·재개용 최소치)를 구분합니다.
+
+| 항목 | 설계 | 근거 |
+|---|---|---|
+| 제어 vs 페이로드 분리 | 제어: `step_count`, `max_steps`, `next_action`, `next_targets`, `rework_requests`, `node_status`, `last_error`, `quality_verdict`, `quality_iterations`, `final_status`. 결과물(`*_findings`, `evidence_store`, `synthesis`, `report_sections`)은 기존 키 그대로. Supervisor는 제어 키와 각 관점의 `status`·근거 수만 읽고 본문은 읽지 않는다 | 라우팅에 필요한 최소 상태만 두면 결정이 설명 가능하고 체크포인트가 가볍다 |
+| 관측성 위치 | 결정 로그(행동·대상·사유·결정 주체 llm/rule/fallback)는 **외부**로 낸다: `logs/<trace_id>.jsonl`(전체)와 LangSmith 트레이스. State의 `decision_log`에는 최근 20건만 남긴다 | 결정과 사유는 남기되 State가 로그 저장소가 되지 않게 함 |
+| 지속성 비용 | `decision_log`는 `append_capped`(20건 상한), `search_log_by_perspective`는 관점별 최근 30건, `evidence_store`는 id로 병합하고 재작업은 **새로 찾은 근거만** 반환. 보고서 전문은 `report_sections`에 한 번만 저장 | 체크포인트마다 State 전체가 저장되므로 누적 필드를 상한으로 묶음 |
+| 상관 | `trace_id`·`run_id`를 초기 State에 한 번 부여하고 State·`logs/*.jsonl`·LangSmith `metadata`·체크포인터 `thread_id`에 같은 값을 사용 | 외부 로그와 State를 같은 키로 연결 |
+| 재개/복구 | 체크포인터(`thread_id=run_id`; `langgraph-checkpoint-sqlite`가 있으면 `data/checkpoints.sqlite`, 없으면 메모리). 재개에 필요한 최소 상태: `node_status`(상태·오류·시도 횟수), `last_error`, `rework_requests`, `step_count`. 워커 예외는 크래시 대신 `node_status=failed`로 기록 | 중단돼도 어느 노드가 몇 번 시도했고 무엇이 대기 중인지 State만으로 알 수 있음 |
+| 동시 처리 | `Send` 병렬 디스패치. 동시에 쓰는 키에는 reducer: `evidence_store`(`merge_evidence_store`), `node_status`·`rework_requests`·`quality_by_perspective`·`search_log_by_perspective`·`run_meta`(`merge_dict_right`), `decision_log`(`append_capped`). 워커는 reducer 키와 자기 결과 키만 쓴다 | 병렬 워커가 같은 일반 키를 쓰면 에러가 나므로 구조적으로 막음 |
+| 종료 보장 | `max_steps`(14턴), 관점별 재작업 2회, 전체 재작업 4회, 품질 루프 2회, 단계 실패 재시도 4회, `recursion_limit` 50. 상한에 닿으면 새 재작업 없이 종합→보고서만 마치고 `final_status=degraded` | 어떤 State에서도 유한 단계 안에 끝남 (테스트로 확인) |
+
 상세 설계는 [`docs/STATE_DESIGN.md`](docs/STATE_DESIGN.md), 폴더 규칙은
 [`디렉터리 구조 설명.md`](디렉터리%20구조%20설명.md)에 있습니다.
 
@@ -243,14 +296,19 @@ PNG·SVG·Mermaid 원본으로 있습니다(전체 8장). 실행할 때마다 La
 ```
 Capstone_Ai_RAG/
 ├── graph/                      ★ 팀 공유 영역 (여기만 공유)
-│   ├── state.py                AppState, reducer, create_initial_state
-│   ├── build.py                add_node / add_edge 만
+│   ├── state.py                AppState(페이로드 + 제어 메타데이터), reducer, create_initial_state
+│   ├── build.py                Supervisor 중심 그래프 조립 (워커 → supervisor 로만 edge)
+│   ├── supervisor.py           Supervisor 노드·라우터·guard·LLM 제안
+│   ├── sufficiency.py          근거 충분성·재작업 예산
+│   ├── workers.py              팀원 노드를 감싸는 래퍼 (예외 격리·재작업 힌트·시도 횟수)
+│   ├── quality.py              보고서 품질 평가 노드 (Groundedness·중립성·편향·커버리지)
 │   └── stubs.py                fixture 재생 임시 노드 (오프라인 실행용)
 │
 ├── agents/                     에이전트별 구현 (서로 import 하지 않음)
 │   ├── technical/              ① 기술 조사 — Pool A RAG + Tavily + TRL Gate
 │   ├── market/                 ② 시장 평가 — 웹 검색 + Pool B (rag/, quality/)
-│   ├── stakeholder_eval.py     ③ 이해관계자 평가 — 단일 파일, OpenAI web_search
+│   ├── stakeholder/            ③ 이해관계자 평가 — web_search + 원문 fetch·검증 (web/backend/subgraph/node)
+│   ├── stakeholder_eval.py     (폐기 표기) 검증 없는 간소화 버전 — 환각 위험으로 부모 그래프에서 제외
 │   ├── domain/                 ④ 도메인 평가 — 웹 검색 + 하이브리드 RAG (tools/)
 │   ├── synthesis/              ⑤ 평가 종합 — matrix/relations/writer/review
 │   └── report/                 ⑥ 보고서 생성 — writer/validators/references/pdf
@@ -268,6 +326,7 @@ Capstone_Ai_RAG/
 ├── main.py                     부모 그래프 실행 진입점
 ├── requirements.txt            통합 의존성
 ├── .env.example                API 키 템플릿
+├── logs/                       Supervisor 결정 로그 logs/<trace_id>.jsonl (git 제외)
 ├── ISSUE.md                    팀 이슈 트래킹
 └── README.md
 ```
@@ -311,13 +370,18 @@ cp .env.example .env
 python main.py                          # 전부 오프라인 (API 키 불필요, 비용 없음)
 python main.py --live synthesis         # 평가 종합만 실제 LLM
 python main.py --live all --debug       # 여섯 노드 전부 실제 실행 + 단계별 중간 결과 (비용 발생)
+python main.py --live all --supervisor llm --judge   # Supervisor 라우팅·품질 Judge 도 LLM (SUPERVISOR_MODEL, 기본 gpt-6.1-sol)
+python main.py --supervisor rule        # 규칙만으로 라우팅 (API 불필요, 같은 규칙이 LLM 의 guard/폴백으로도 쓰임)
 ```
 
 | 옵션 | 내용 |
 |---|---|
 | `--live` | 실제로 실행할 노드(쉼표 구분): `all` 또는 `technical`, `market`, `stakeholder`, `domain`, `synthesis`, `report` |
 | `--debug` | 노드가 끝날 때마다 주장·공백·요약 문장·위반 샘플까지 출력 |
-| `--rounds` | 시장·도메인의 최대 검색 라운드 1 또는 2 (기본 1) |
+| `--supervisor` | `auto`(기본: `--live`가 있으면 llm, 없으면 rule) / `llm` / `rule` |
+| `--judge` | 품질 평가에 LLM Judge 추가 (실패 항목만 추가 가능, 모델은 `JUDGE_MODEL`, 기본은 supervisor 모델) |
+| `--max-steps` | Supervisor 턴 상한 (기본 14) |
+| `--rounds` | 시장·도메인의 최대 검색 라운드 1 또는 2 (기본 1). 재작업 때는 요청한 만큼 늘어남(최대 3) |
 | `--as-of` | 조사 기준일 (기본 2026-09-22) |
 | `--fixture` | 재생 노드가 쓸 AppState JSON |
 | `--output-dir` | 결과 폴더 (기본 `outputs/graph`) |
@@ -330,8 +394,9 @@ python main.py --live all --debug       # 여섯 노드 전부 실제 실행 + �
 
 | 파일 | 내용 |
 |---|---|
-| `report.pdf` / `report.md` | 최종 보고서 (16개 섹션 + REFERENCE) |
-| `summary.md` | 실행 경로, 노드별 소요 시간·갱신 키·오류, 공통 State 요약 |
+| `report.pdf` / `report.md` | 최종 보고서 (16개 섹션 + REFERENCE, 최대 10장 — 쪽수는 `final_state.json`의 `run_meta.report.pdf_layout`) |
+| `summary.md` | Supervisor 결정 표(턴·행동·대상·결정 주체·사유), 종료 상태·저하 사유, 실행 경로, 노드별 시도 횟수·오류 |
+| `decision_log.json` | State에 남은 최근 결정 로그 (전체는 `logs/<trace_id>.jsonl`) |
 | `steps/<단계>_<노드>.json` | 노드별 중간 결과 전체 |
 | `final_state.json` | 실행이 끝난 AppState 전체 |
 | `trace.json` | 노드 실행 기록 |
@@ -347,14 +412,29 @@ python -m scripts.run_synthesis --writer openai      # 평가 종합 (생략 시
 python -m scripts.run_report --fixture --deterministic   # 보고서 (API 없이 fixture 재현)
 ```
 
-이해관계자 에이전트는 단독 스크립트 없이 `main.py --live stakeholder` 또는
-`from agents.stakeholder_eval import make_node`로 실행합니다.
+이해관계자 에이전트는 `main.py --live stakeholder` 또는
+`from agents.stakeholder import make_node`(인자: `OpenAIBackend`)로 실행합니다. 테스트에서는 `FakeBackend`로 API 없이 검증합니다.
+
+### LangSmith 트레이싱 (동적 처리 확인용)
+
+`.env`에 아래를 넣으면 `main.py` 실행이 자동으로 트레이스됩니다. `run_name=supervisor_run`, `metadata.trace_id/run_id`가 붙어
+State·`logs/<trace_id>.jsonl`과 같은 키로 연결됩니다.
+
+```bash
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2_...
+LANGSMITH_PROJECT=kongjinho-supervisor
+```
+
+제출용 캡처는 시나리오 3종으로 찍습니다(supervisor 호출 횟수와 노드 순서가 시나리오마다 달라짐을 보이기 위함):
+정상 실행 / 한 관점이 근거 부족·실패 후 재작업 / 재작업 예산 소진(`degraded`). 긴 경로는 `tracing-1.png`, `tracing-2.png`처럼 나눕니다.
 
 ### 4. 테스트 (API 키 없이 실행, 비용 없음)
 
 ```bash
 python -m pytest tests --ignore=tests/agents/report/test_report_llm_integration.py   # 139개, 키 불필요
-python -m unittest tests.graph.test_parent_graph -v       # 부모 그래프 15개
+python -m pytest tests/graph -q                          # 부모 그래프 + Supervisor 패턴 (라우팅·재작업·종료·품질 Loop·LLM guard)
+python -m pytest tests/agents/stakeholder -q             # 이해관계자 20개 (원문 검증·환각 차단·AppState 계약)
 python -m unittest tests.agents.synthesis.test_synthesis -v   # 평가 종합 42개
 ```
 
@@ -385,6 +465,8 @@ python -m agents.domain.tools.ablation --embedding ""            # BM25만 (빠�
 ## Evaluation
 
 2026-09-22 `python main.py --live all --debug` 전체 실행 기록입니다(여섯 노드 모두 실제 API).
+**고정 순서 그래프 시절의 기록**이며, Supervisor 전환 후의 실제 API 실행 기록(LangSmith 캡처 포함)은 아직 남기지 못했습니다.
+전환 후에는 오프라인 테스트(`tests/graph`)로 라우팅·재작업·종료·품질 Loop를 확인했습니다.
 
 | step | 노드 | 소요 시간 | 상태 | 결과 |
 |---|---|---|---|---|

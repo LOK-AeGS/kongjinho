@@ -34,3 +34,7 @@ outputs/domain/
 outputs/synthesis/
 outputs/index_artifacts/
 outputs/**/domain_findings*.json
+
+# Supervisor 결정 로그·체크포인트
+logs/
+data/checkpoints.sqlite*

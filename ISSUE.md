@@ -28,7 +28,9 @@ claims / gaps)로, 근거를 `graph.state.Evidence`(`id`/`page_or_locator`/
 전용 필드가 없어 `run_meta["domain"]`에 남깁니다. `graph.build.build_graph(domain=...)`에
 연결해 실제 API로 end-to-end 실행까지 확인했습니다(4-1 참고).
 
-⬜ **이해관계자 (미해결)**
+✅ **이해관계자 (해결, Supervisor 전환 브랜치)** — `agents/stakeholder/node.py` 를 AppState 형식으로 다시 썼고(`stakeholder_findings`·`evidence_store`·`search_log_by_perspective`·`quality_by_perspective`), 도메인 값 `datacenter_inference` 허용, `max_search_rounds` 반영. 원문 검증이 없어 환각 위험이 있던 `stakeholder_eval.py` 는 부모 그래프에서 제외했습니다(`docs/STAKEHOLDER_AGENT.md`).
+
+(아래 표는 해결 전 상태 기록입니다.)
 
 > 참고: 별도 간소화 버전 `agents/stakeholder_eval.py`(PR #6)는 AppState 형식으로 들어왔고, 부모 그래프(`main.py --live stakeholder`)는 이쪽을 씁니다.
 > 시장(PR #4)·평가 종합(PR #5)·보고서(PR #7)도 AppState 형식입니다.

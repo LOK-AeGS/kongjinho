@@ -283,6 +283,43 @@ class QualityReport(TypedDict):
 
 
 # =========================================================
+# 7-1. Supervisor 제어 메타데이터 (페이로드와 분리)
+# =========================================================
+
+class ReworkRequest(TypedDict):
+    perspective: str
+    gaps: list[Gap]
+    focus_queries: list[str]
+    extra_rounds: int
+    requested_by: str  # supervisor-sufficiency | synthesis | quality
+
+
+class NodeRun(TypedDict):
+    status: Literal["ok", "partial", "failed", "stale"]
+    error: str | None
+    attempts: int
+
+
+class QualityVerdict(TypedDict):
+    passed: bool
+    iteration: int
+    failed_checks: list[str]
+    details: dict[str, list[str]]
+    target_perspectives: list[str]
+
+
+class DecisionEntry(TypedDict):
+    step: int
+    action: str
+    targets: list[str]
+    reason: str
+    source: Literal["llm", "rule", "fallback"]
+
+
+DECISION_LOG_LIMIT = 20
+
+
+# =========================================================
 # 8. Reducer
 # =========================================================
 
@@ -297,6 +334,14 @@ def merge_dict_right(
     merged = dict(current or {})
     merged.update(update or {})
     return merged
+
+
+def append_capped(
+    current: list[DecisionEntry] | None,
+    update: list[DecisionEntry] | None,
+) -> list[DecisionEntry]:
+    """결정 로그는 최근 DECISION_LOG_LIMIT건만 State에 두고 전체는 외부 로그/트레이스에 남긴다."""
+    return ([*(current or []), *(update or [])])[-DECISION_LOG_LIMIT:]
 
 
 def merge_evidence_store(
@@ -387,6 +432,30 @@ class AppState(TypedDict):
         merge_dict_right,
     ]
 
+    # ── Supervisor 제어 메타데이터 (라우팅·종료·재개에 필요한 최소치) ──
+    trace_id: str
+    run_id: str
+    step_count: int
+    max_steps: int
+    next_action: str
+    next_targets: list[str]
+    rework_requests: Annotated[
+        dict[str, ReworkRequest | None],
+        merge_dict_right,
+    ]
+    node_status: Annotated[
+        dict[str, NodeRun],
+        merge_dict_right,
+    ]
+    last_error: str | None
+    quality_verdict: QualityVerdict | None
+    quality_iterations: int
+    final_status: Literal["ok", "degraded"] | None
+    decision_log: Annotated[
+        list[DecisionEntry],
+        append_capped,
+    ]
+
 
 # =========================================================
 # 10. 초기 State 생성
@@ -397,7 +466,12 @@ def create_initial_state(
     request: RequestSpec,
     selected_tech: dict[Technology, TechSpec],
     corpus_manifest: list[DocMeta],
+    max_steps: int = 14,
+    run_id: str | None = None,
 ) -> AppState:
+    import uuid
+
+    run_id = run_id or uuid.uuid4().hex[:12]
     return {
         "request": request,
         "selected_tech": selected_tech,
@@ -426,4 +500,18 @@ def create_initial_state(
             "report": 0,
         },
         "run_meta": {},
+
+        "trace_id": f"trace-{run_id}",
+        "run_id": run_id,
+        "step_count": 0,
+        "max_steps": max_steps,
+        "next_action": "",
+        "next_targets": [],
+        "rework_requests": {},
+        "node_status": {},
+        "last_error": None,
+        "quality_verdict": None,
+        "quality_iterations": 0,
+        "final_status": None,
+        "decision_log": [],
     }

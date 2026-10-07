@@ -20,6 +20,8 @@ def report_agent(state: dict, *, deps: ReportAgentDeps | None = None) -> dict:
     }
     if report.get("pdf_path"):
         report_meta["pdf_path"] = report["pdf_path"]
+    if report.get("pdf_layout"):
+        report_meta["pdf_layout"] = report["pdf_layout"]
     return {
         "report_sections": final["report_sections"],
         "references": final["references"],
