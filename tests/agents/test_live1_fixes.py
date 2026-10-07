@@ -114,3 +114,26 @@ def test_line_citing_evidence_without_its_number_is_blocking():
     bound = "- MLA는 DeepSeek 67B 대비 KV 캐시를 93.3% 줄인다. 〔근거: technical:ev:y〕"
     assert [item["code"] for item in _citation_binding_issues("domain", mixed, context)] == ["numeric_citation_mismatch"]
     assert _citation_binding_issues("domain", bound, context) == []
+
+
+def test_upstream_claim_breaking_report_rules_is_excluded_from_deterministic_render():
+    # live 3차: 도메인 주장 "성능 우위", 시장 주장 "학습 비용 42.5% 절감(MLA 귀속)"이 대체 렌더에도 남았다.
+    from agents.report.subgraph import _violates_report_rules
+
+    assert _violates_report_rules("MLA는 기존 MHA 대비 성능 우위를 목표로 설계되었다.")
+    assert _violates_report_rules("MLA로 학습 비용을 42.5% 절감했다.")
+    assert not _violates_report_rules("ITME는 CPU-offload 대비 최대 35.7% 처리량 향상을 보였다.")
+
+
+def test_coverage_counts_cited_line_that_also_mentions_unconfirmed_limits():
+    # live 3차: TRL 줄이 '운영 사례 미확인' 한계를 함께 담아 technical 관점 누락으로 오판됐다.
+    from agents.quality.checks import coverage
+
+    sections = {
+        "4.1 기술 성숙도(TRL)": "- HW: TRL 4–5 — laboratory validation / 상용 사례 미확인 〔근거: e1〕",
+        "4.2 시장성": "- 시장 근거 〔근거: e2〕",
+        "4.3 이해관계자": "- 발언 〔근거: e3〕",
+        "4.4 도메인 적용": "- 판정 〔근거: e4〕",
+    }
+    markdown = "# SUMMARY\n\n" + "\n\n".join(f"## {title}\n\n{body}" for title, body in sections.items())
+    assert coverage(markdown)["passed"]

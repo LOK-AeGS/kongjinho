@@ -213,8 +213,11 @@ def coverage(markdown: str) -> dict:
     for perspective, title in SECTIONS.items():
         body = _section(markdown, title)
         content_lines = [line.strip() for line in body.splitlines() if line.strip()]
+        # 판정과 인용이 있는 줄은 "미확인" 같은 한계 문구를 함께 담아도 실질 내용으로 본다
+        # (live 3차: TRL 줄이 '운영 사례 미확인' 한계를 포함해 technical 누락으로 오판됨).
         only_unconfirmed = bool(content_lines) and all(
-            any(phrase in line for phrase in META_PHRASES) for line in content_lines
+            any(phrase in line for phrase in META_PHRASES) and not citation_ids(line)
+            for line in content_lines
         )
         meaningful = bool(content_lines) and not only_unconfirmed
         if not meaningful or not citation_ids(body):

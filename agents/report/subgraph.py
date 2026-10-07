@@ -23,7 +23,7 @@ from agents.report.budget import (
     shrink,
 )
 from agents.report.prompts import build_section_prompt
-from agents.report.metrics import annotate_metrics
+from agents.report.metrics import annotate_metrics, metric_violations
 from agents.report.references import collect_references, number_citations, reference_numbers
 from agents.report.state import (
     BODY_SECTION_ORDER,
@@ -37,6 +37,8 @@ from agents.report.state import (
     SectionId,
 )
 from agents.report.validators import (
+    PROHIBITED_COMPARISON,
+    _citation_binding_issues,
     blocking,
     extract_citations,
     validate_input,
@@ -256,8 +258,31 @@ def _usable_claims(context: dict, perspective: str) -> list[dict]:
             continue
         if claim.get("basis") in {"direct", "direct_evidence"} and not evidence_ids:
             continue
+        if _violates_report_rules(claim.get("statement", "")):
+            continue
         result.append(claim)
     return result
+
+
+def _line_ok(text: str, evidence_ids: list[str], context: dict) -> bool:
+    """판정 기록·관계 행도 보고서 규칙(우열 표현, 고칠 수 없는 수치 귀속, 인용 근거 밖 수치)을 지켜야 싣는다."""
+    if _violates_report_rules(text):
+        return False
+    if not evidence_ids:
+        return True
+    line = f"- {text} 〔근거: {', '.join(evidence_ids)}〕"
+    return not _citation_binding_issues("comparison_matrix", line, context)
+
+
+def _violates_report_rules(text: str) -> bool:
+    """상위 주장 자체가 보고서 규칙을 어기면 결정적 렌더에서 뺀다.
+
+    우열 표현(예: "성능 우위")이나 조건 부착으로 고칠 수 없는 수치 귀속(42.5%를 MLA 효과로)은
+    LLM 수정·결정적 대체로도 사라지지 않아 live 3차에서 needs_review로 남았다.
+    """
+    if any(expression in text for expression in PROHIBITED_COMPARISON):
+        return True
+    return any(rule.canonical_condition is None for rule in metric_violations(text))
 
 
 def select_claims(context: dict, perspective: str, limit: int) -> tuple[list[dict], int]:
@@ -275,6 +300,8 @@ def _usable_records(context: dict, perspective: str, *, trl_only: bool = False) 
             continue
         ids = record.get("evidence_ids", [])
         if any(eid not in context["evidence_store"] for eid in ids):
+            continue
+        if not _line_ok(f"{record.get('value') or ''} {record.get('findings') or ''}", ids, context):
             continue
         records.append(record)
     return records
@@ -321,7 +348,11 @@ def select_relations(
 ) -> tuple[list[tuple[dict, list[str], list[str]]], int]:
     """설명이 있는 행을, 상충을 일치보다, 미해소를 해소보다 앞에 두고 limit개 고른다."""
     rows = context["synthesis"].get("cross_findings") or context["synthesis"].get("relations") or []
-    linked = [item for item in _linked_rows(context, rows) if item[0].get("kind") in accepted]
+    linked = [
+        item for item in _linked_rows(context, rows)
+        if item[0].get("kind") in accepted
+        and _line_ok(item[0].get("explanation") or item[0].get("reason") or "", item[2], context)
+    ]
     ranked = sorted(
         linked,
         key=lambda item: (
